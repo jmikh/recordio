@@ -48,6 +48,10 @@ describe('deriveEntitlementsState', () => {
 });
 
 describe('entitlementsForState', () => {
+    it('the free cap is 5 (finalized in revamp Step 4)', () => {
+        expect(FREE_PROJECT_CAP).toBe(5);
+    });
+
     it('free: everything locked, project cap applied', () => {
         expect(entitlementsForState('free')).toEqual({
             state: 'free',
@@ -56,6 +60,7 @@ describe('entitlementsForState', () => {
             canBackgroundExport: false,
             can4k: false,
             canInvite: false,
+            canRestore: false,
             projectCap: FREE_PROJECT_CAP,
             trialEndsAt: null,
             canExtendTrial: false,
@@ -70,6 +75,7 @@ describe('entitlementsForState', () => {
             canBackgroundExport: true,
             can4k: true,
             canInvite: false,
+            canRestore: true,
             projectCap: null,
             trialEndsAt: FUTURE.toISOString(),
             canExtendTrial: false,
@@ -84,6 +90,7 @@ describe('entitlementsForState', () => {
             canBackgroundExport: true,
             can4k: true,
             canInvite: true,
+            canRestore: true,
             projectCap: null,
             trialEndsAt: null,
             canExtendTrial: false,

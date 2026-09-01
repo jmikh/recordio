@@ -112,12 +112,25 @@ function trackEvent(eventName: string, params: Record<string, any> = {}) {
 // Upgrade Funnel Events
 // ============================================================================
 
-export function trackUpgradeModalViewed() {
-    trackEvent('upgrade_modal_viewed');
+/** Stable analytics buckets for the upgrade modal — NOT the UI copy in `feature`. */
+export type UpgradeModalReason =
+    | 'captions'
+    | 'share'
+    | 'export'
+    | 'export_4k'
+    | 'background_export'
+    | 'restore';
+
+export function trackUpgradeModalViewed(reason: UpgradeModalReason) {
+    trackEvent('upgrade_modal_viewed', { reason });
 }
 
-export function trackUpgradeModalDismissed() {
-    trackEvent('upgrade_modal_dismissed');
+export function trackUpgradeModalDismissed(reason: UpgradeModalReason) {
+    trackEvent('upgrade_modal_dismissed', { reason });
+}
+
+export function trackUpgradeModalUpgradeClicked(reason: UpgradeModalReason) {
+    trackEvent('upgrade_modal_upgrade_clicked', { reason });
 }
 
 export function trackGetProClicked(billingInterval: 'monthly' | 'yearly') {
@@ -216,19 +229,26 @@ export function trackExtensionUninstalled() {
 }
 
 // ============================================================================
-// Review Modal
+// Leave Review Modal (unified — trial extension + export triggers)
 // ============================================================================
 
-export function trackReviewModalShown() {
-    trackEvent('review_modal_shown');
+/** What put the review modal on screen. */
+export type ReviewModalTrigger = 'trial_extended' | 'export_completed';
+
+export function trackReviewModalViewed(trigger: ReviewModalTrigger) {
+    trackEvent('review_modal_viewed', { trigger });
 }
 
-export function trackReviewModalDismissed() {
-    trackEvent('review_modal_dismissed');
+export function trackReviewModalReviewClicked(trigger: ReviewModalTrigger) {
+    trackEvent('review_modal_review_clicked', { trigger });
 }
 
-export function trackReviewModalReviewClicked() {
-    trackEvent('review_modal_review_clicked');
+export function trackReviewModalAlreadyReviewedClicked(trigger: ReviewModalTrigger) {
+    trackEvent('review_modal_already_reviewed_clicked', { trigger });
+}
+
+export function trackReviewModalMaybeLaterClicked(trigger: ReviewModalTrigger) {
+    trackEvent('review_modal_maybe_later_clicked', { trigger });
 }
 
 // ============================================================================
@@ -241,14 +261,6 @@ export function trackTrialExtended(workspaceId: string | null) {
 
 export function trackTrialExtendFailed(workspaceId: string | null) {
     trackEvent('trial_extend_failed', { workspace_id: workspaceId });
-}
-
-export function trackTrialReviewModalReviewClicked() {
-    trackEvent('trial_review_modal_review_clicked');
-}
-
-export function trackTrialReviewModalDismissed() {
-    trackEvent('trial_review_modal_dismissed');
 }
 
 // ============================================================================
@@ -277,6 +289,8 @@ interface RenderCompletedParams {
     render_duration_s: number;
     input_resolution: string;
     output_resolution: string;
+    /** Selected export quality ('1080p' | '2K' | '4K') — output_resolution is the project outputSize, not the rendered size. */
+    quality: string;
 }
 
 export function trackRenderLocallyCompleted(params: RenderCompletedParams) {
@@ -415,10 +429,18 @@ export function trackImportPageLoaded(params: { recording_id: string | null }) {
 
 export function trackImportFailed(params: BaseFailureParams & {
     recording_id: string | null;
-    phase: 'no_id' | 'extension' | 'no_workspace';
+    phase: 'no_id' | 'extension' | 'no_workspace' | 'cap';
     bridge_status?: string;
 }) {
     trackEvent('import_failed', params);
+}
+
+/** Which exit the user took from the at-cap recovery panel (revamp Step 4). */
+export function trackImportCapRecovery(params: {
+    action: 'delete' | 'switch_workspace' | 'upgrade';
+    workspace_id: string | null;
+}) {
+    trackEvent('import_cap_recovery', params);
 }
 
 export function trackProjectCreationFailed(params: BaseFailureParams & {

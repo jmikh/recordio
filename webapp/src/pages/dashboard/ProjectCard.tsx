@@ -4,7 +4,6 @@ import { LuRotateCcw, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
 import { MdOutlineAutoDelete } from 'react-icons/md';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
-import { ProGate } from './ProGate';
 import { timeAgo } from './timeAgo';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
 
@@ -20,8 +19,6 @@ export interface ProjectCardData {
     createdAt: Date | string;
     /** Duration in milliseconds (from output windows) */
     durationMs?: number | null;
-    /** ISO date when the project will be auto-deleted (null = no expiry) */
-    expiresAt?: string | null;
     /** Share slug for public video link (null = not shared) */
     shareSlug?: string | null;
     /** ISO date when the project was soft-deleted (null = active) */
@@ -39,7 +36,6 @@ interface ProjectCardProps {
     selected?: boolean;
     onSelect?: () => void;
     onRestore?: () => void;
-    restoreGated?: boolean;
     onRename?: (id: string, newName: string) => void;
     onDelete?: (id: string) => void;
     showUpdatedAt?: boolean;
@@ -71,7 +67,6 @@ export const ProjectCard = ({
     selected = false,
     onSelect,
     onRestore,
-    restoreGated = false,
     onRename,
     onDelete,
     showUpdatedAt = false,
@@ -79,7 +74,6 @@ export const ProjectCard = ({
     const isGrid = variant === 'grid';
     const isTrashed = !!project.deletedAt;
 
-    const expiryDays = project.expiresAt ? daysUntil(project.expiresAt) : null;
     const purgedays = project.deletedAt ? daysUntil(new Date(new Date(project.deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()) : null;
     const shareUrl = project.shareSlug ? `${VIDEO_BASE_URL}/${project.shareSlug}` : null;
 
@@ -194,30 +188,17 @@ export const ProjectCard = ({
                     </div>
                 )}
 
-                {/* Restore overlay for trashed projects */}
+                {/* Restore overlay for trashed projects — always pressable;
+                    the free-tier press opens the upgrade modal upstream */}
                 {isTrashed && onRestore && (
-                    restoreGated ? (
-                        <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <ProGate feature="restoring deleted videos">
-                                <button
-                                    type="button"
-                                    className="flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-md cursor-pointer"
-                                >
-                                    <LuRotateCcw className="w-4 h-4 text-white" />
-                                    <span className="text-white text-sm font-medium">Restore</span>
-                                </button>
-                            </ProGate>
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onRestore(); }}
-                            className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
-                        >
-                            <LuRotateCcw className="w-4 h-4 text-white" />
-                            <span className="text-white text-sm font-medium">Restore</span>
-                        </button>
-                    )
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRestore(); }}
+                        className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
+                    >
+                        <LuRotateCcw className="w-4 h-4 text-white" />
+                        <span className="text-white text-sm font-medium">Restore</span>
+                    </button>
                 )}
 
                 {/* Duration Badge */}
@@ -268,15 +249,10 @@ export const ProjectCard = ({
                             : `Created ${timeAgo(project.createdAt)}`
                         }
                     </span>
-                    {isTrashed && purgedays !== null ? (
+                    {isTrashed && purgedays !== null && (
                         <span className="flex items-center gap-1 text-xs text-destructive/70 ml-auto">
                             <MdOutlineAutoDelete className="w-3.5 h-3.5" />
                             {purgedays} {purgedays === 1 ? 'day' : 'days'}
-                        </span>
-                    ) : expiryDays !== null && (
-                        <span className="flex items-center gap-1 text-xs text-destructive/70 ml-auto">
-                            <MdOutlineAutoDelete className="w-3.5 h-3.5" />
-                            {expiryDays} {expiryDays === 1 ? 'day' : 'days'}
                         </span>
                     )}
                 </div>

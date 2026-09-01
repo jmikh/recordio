@@ -6,7 +6,7 @@ import { useToast } from '../components/Toast';
 import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { useEntitlements } from './useEntitlements';
-import { useTrialExtendedModal } from './TrialExtendedModal';
+import { maybeOpenLeaveReviewModal } from '../components/LeaveReviewModal';
 import { trackTrialExtended, trackTrialExtendFailed } from '../analytics';
 
 interface TrialExtendLinkProps {
@@ -21,8 +21,9 @@ interface TrialExtendLinkProps {
  * The "extend trial" hyperlink (billing revamp Step 3). Renders nothing
  * unless entitlements.canExtendTrial — drop it on any upgrade surface.
  * On click it grants the one self-serve extension (+7 days), applies
- * the returned entitlements to the store (gates unlock live), and opens
- * the global TrialExtendedModal with the review ask.
+ * the returned entitlements to the store (gates unlock live), confirms
+ * via toast, and follows with the review ask (LeaveReviewModal) unless
+ * the user has already reviewed. Grant always precedes the ask.
  */
 export function TrialExtendLink({
     label = 'Extend free trial — 7 more days',
@@ -31,7 +32,6 @@ export function TrialExtendLink({
 }: TrialExtendLinkProps) {
     const { canExtendTrial } = useEntitlements();
     const workspaceId = useWorkspaceStore(s => s.workspaceId);
-    const openExtendedModal = useTrialExtendedModal(s => s.open);
     const [busy, setBusy] = useState(false);
     const { addToast } = useToast();
 
@@ -61,7 +61,12 @@ export function TrialExtendLink({
         trackTrialExtended(workspaceId);
         applyEntitlements(data.entitlements);
         onExtended?.();
-        openExtendedModal();
+        addToast({
+            type: 'success',
+            title: 'Trial extended',
+            message: "You've got Pro features for another week 🎉",
+        });
+        void maybeOpenLeaveReviewModal('trial_extended');
     };
 
     return (
@@ -69,7 +74,9 @@ export function TrialExtendLink({
             variant="ghost"
             onClick={handleClick}
             disabled={busy}
-            className={`p-0 text-xs text-primary font-medium hover:underline ${className ?? ''}`}
+            // interactive-ghost's h-9/px-3/text-sm win the cascade over plain
+            // utilities here — force the inline-link shape
+            className={`p-0! h-auto! text-xs! font-medium hover:underline ${className ?? ''}`}
         >
             {busy ? 'Extending…' : label}
         </Button>

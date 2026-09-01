@@ -50,7 +50,6 @@ export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     'last_accessed_at',       p.last_accessed_at,
                     'updated_at',             p.updated_at,
                     'created_at',             p.created_at,
-                    'expires_at',             p.expires_at,
                     'thumbnail_storage_path', p.thumbnail_storage_path,
                     'slug',                   p.slug,
                     'share_policy',           p.share_policy,

@@ -20,10 +20,10 @@ import type { UserEvents } from '../../shared/types';
 import { TEST_USER, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, API_URL } from './testUser';
 
 const SCREEN_WEBM = path.join(import.meta.dirname, 'assets/screen.webm');
-const SCREEN_DURATION_MS = 2000; // matches the generated fixture video
-const SCREEN_SIZE = { width: 1280, height: 720 };
+export const SCREEN_DURATION_MS = 2000; // matches the generated fixture video
+export const SCREEN_SIZE = { width: 1280, height: 720 };
 
-const EMPTY_USER_EVENTS: UserEvents = {
+export const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
     mousePositions: [],
     keyboardEvents: [],
@@ -118,4 +118,18 @@ export async function seedProject(name = `e2e project ${randomUUID().slice(0, 8)
     };
 
     return { projectId, name, workspaceId, cleanup };
+}
+
+/**
+ * Best-effort removal of a project the app itself created during a test
+ * (e.g. via the import flow) — mirrors seedProject's cleanup.
+ */
+export async function deleteProject(projectId: string): Promise<void> {
+    const { token, userId } = await signIn();
+    await api('project-delete', token, { projectId }).catch(() => {});
+    const storagePath = cloudStoragePath(userId, projectId, 'screen');
+    await fetch(`${SUPABASE_URL}/storage/v1/object/project-media/${storagePath}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, apikey: SUPABASE_SERVICE_ROLE_KEY },
+    }).catch(() => {});
 }

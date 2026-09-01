@@ -12,7 +12,7 @@ import { AuthModal } from './auth/AuthModal';
 import { useUserStore } from './auth/useUserStore';
 import { UploadProgressToast } from './storage/UploadProgressToast';
 import { useUploadBeforeUnloadWarning } from './storage/useUploadBeforeUnloadWarning';
-import { TrialExtendedModal } from './billing/TrialExtendedModal';
+import { LeaveReviewModal } from './components/LeaveReviewModal';
 
 // Initialize auth before React renders — ensures onAuthStateChange fires
 // before any component tries to make Supabase queries.
@@ -87,8 +87,8 @@ export function App() {
             {getPage()}
             <AuthModal isOpen={showAuthModal} onClose={() => {}} />
             <UploadProgressToast />
-            {/* Global host — the extend link's surfaces are transient (revamp Step 3) */}
-            <TrialExtendedModal />
+            {/* Global host — its triggers live on transient surfaces */}
+            <LeaveReviewModal />
         </ToastProvider>
     );
 }

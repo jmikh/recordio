@@ -9,6 +9,7 @@ const FREE_ENTITLEMENTS: WorkspaceEntitlements = {
     canBackgroundExport: false,
     can4k: false,
     canInvite: false,
+    canRestore: false,
     projectCap: null,
     trialEndsAt: null,
     // Never offer the extension before the real payload arrives

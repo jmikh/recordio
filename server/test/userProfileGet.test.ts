@@ -51,13 +51,13 @@ describe.runIf(hasTestDb())('POST /user-profile-get (e2e, real Postgres)', () =>
         });
     }
 
-    it('returns the profile blob (name only — no trial since revamp Step 2)', async () => {
+    it('returns the profile blob (name + has_reviewed — no trial since revamp Step 2)', async () => {
         const user = await seedAuthUser(pool, { name: 'Profiled Person' });
         createdUsers.push(user.id);
 
         const res = await post(testApp(), await userToken({ sub: user.id, email: user.email }));
         expect(res.statusCode).toBe(200);
-        expect(res.json()).toEqual({ name: 'Profiled Person' });
+        expect(res.json()).toEqual({ name: 'Profiled Person', has_reviewed: false });
     });
 
     it('null when no profile row exists', async () => {

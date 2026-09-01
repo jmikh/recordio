@@ -9,13 +9,14 @@ import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
 
 export type DashboardView = 'all' | 'published' | 'trash';
 
-const FREE_PROJECT_LIMIT = 5;
-
 interface DashboardSidebarProps {
     activeView: DashboardView;
     onViewChange: (view: DashboardView) => void;
     projectCount: number;
-    hasNonFreeAccess: boolean;
+    /** The caller's own live projects — the set the free cap counts (Step 4) */
+    ownedProjectCount: number;
+    /** Server-sourced cap from entitlements; null = uncapped (trial/pro) */
+    projectCap: number | null;
     trashCount: number;
     publishedCount: number;
     onRecord: () => void;
@@ -41,7 +42,8 @@ export function DashboardSidebar({
     activeView,
     onViewChange,
     projectCount,
-    hasNonFreeAccess,
+    ownedProjectCount,
+    projectCap,
     trashCount,
     publishedCount,
     onRecord,
@@ -117,23 +119,23 @@ export function DashboardSidebar({
                     </nav>
                 </div>
 
-                {/* Free plan usage */}
-                {!hasNonFreeAccess && (
+                {/* Free plan usage — cap and count come from the server (Step 4) */}
+                {projectCap != null && (
                     <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
                         <div className="flex items-center justify-between mb-1.5">
                             <span className="text-xs font-medium text-text-main">
-                                {projectCount} of {FREE_PROJECT_LIMIT} projects used
+                                {ownedProjectCount} of {projectCap} projects used
                             </span>
                         </div>
                         <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all ${
-                                    projectCount >= FREE_PROJECT_LIMIT ? 'bg-destructive' : 'bg-primary'
+                                    ownedProjectCount >= projectCap ? 'bg-destructive' : 'bg-primary'
                                 }`}
-                                style={{ width: `${Math.min((projectCount / FREE_PROJECT_LIMIT) * 100, 100)}%` }}
+                                style={{ width: `${Math.min((ownedProjectCount / projectCap) * 100, 100)}%` }}
                             />
                         </div>
-                        {projectCount >= FREE_PROJECT_LIMIT && (
+                        {ownedProjectCount >= projectCap && (
                             <>
                                 <p className="text-[11px] text-text-muted mt-1.5">
                                     Upgrade to Pro for unlimited projects

@@ -455,7 +455,8 @@ export function CaptionsSettings() {
                                     <ProUpgradeModal
                                         isOpen={isProModalOpen}
                                         onClose={() => setIsProModalOpen(false)}
-                                        feature="OpenAI transcription"
+                                        feature="transcription"
+                                        reason="captions"
                                     />
                                 </>
                             ) : (

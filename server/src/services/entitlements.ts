@@ -17,9 +17,10 @@
  * the "extend trial" link client-side; /trial-extend enforces the same
  * predicate (plus owner-only) in its UPDATE guard.
  *
- * projectCap and canInvite are computed but not yet enforced anywhere
- * (revamp Steps 4 and 6) — the payload ships complete from day 1 so
- * the client reads one stable shape.
+ * projectCap is enforced by /project-create-v2 and canRestore by
+ * /project-restore (revamp Step 4). canInvite is computed but not yet
+ * enforced (revamp Step 6) — the payload ships complete so the client
+ * reads one stable shape.
  */
 import type {
     WorkspaceEntitlements,
@@ -27,8 +28,8 @@ import type {
 } from '@shared/api/entitlements';
 import type { Clock, Db } from '../deps.js';
 
-/** Active-project cap on free workspaces (exact N finalized in revamp Step 4). */
-export const FREE_PROJECT_CAP = 3;
+/** Active-project cap on free workspaces (finalized 2026-09-01, revamp Step 4). */
+export const FREE_PROJECT_CAP = 5;
 
 const PRO_STATUSES = new Set(['active', 'past_due', 'trialing']);
 
@@ -60,6 +61,7 @@ export function entitlementsForState(
         canBackgroundExport: paid,
         can4k: paid,
         canInvite: state === 'pro',
+        canRestore: paid,
         projectCap: paid ? null : FREE_PROJECT_CAP,
         trialEndsAt: state === 'trial' && trialEndsAt ? trialEndsAt.toISOString() : null,
         canExtendTrial: state === 'free' && canExtendTrial,

@@ -46,6 +46,7 @@ import { workspaceInviteRescindRoutes } from './routes/workspaces/workspaceInvit
 import { workspaceMemberRemoveRoutes } from './routes/workspaces/workspaceMemberRemove.js';
 import { workspaceMemberUpdateRoleRoutes } from './routes/workspaces/workspaceMemberUpdateRole.js';
 import { userProfileGetRoutes } from './routes/userProfileGet.js';
+import { userReviewSetRoutes } from './routes/userReviewSet.js';
 import { workspaceGetDefaultRoutes } from './routes/workspaces/workspaceGetDefault.js';
 import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
 import { trialExtendRoutes } from './routes/billing/trialExtend.js';
@@ -207,6 +208,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(workspaceMemberRemoveRoutes);
     app.register(workspaceMemberUpdateRoleRoutes);
     app.register(userProfileGetRoutes);
+    app.register(userReviewSetRoutes);
     app.register(workspaceGetDefaultRoutes);
     app.register(subscriptionGetRoutes);
 

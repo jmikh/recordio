@@ -21,9 +21,14 @@ export interface WorkspaceEntitlements {
     canInvite: boolean;
     /**
      * Active-project cap per user in this workspace; null = uncapped.
-     * Enforcement lands in revamp Step 4 (project cap).
+     * Enforced by /project-create-v2 (revamp Step 4).
      */
     projectCap: number | null;
+    /**
+     * Restore-from-trash is trial/pro; enforced by /project-restore
+     * (revamp Step 4).
+     */
+    canRestore: boolean;
     /**
      * When the workspace trial ends (ISO); non-null only while
      * state === 'trial'.

@@ -7,15 +7,17 @@ import { LocalPreferences } from '../../../lib/localPreferences';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { captureError } from '../../../lib/sentry';
 import type { Project } from '@shared/types';
+import type { ExportQuality } from '@shared/utils/exportQuality';
 
 interface UseLocalRenderOptions {
     project: Project;
     projectName: string;
+    quality: ExportQuality;
     videoDecodePreference: 'gpu' | 'cpu';
     onDecodeFallback: () => void;
 }
 
-export function useLocalRender({ project, projectName, videoDecodePreference, onDecodeFallback }: UseLocalRenderOptions) {
+export function useLocalRender({ project, projectName, quality, videoDecodePreference, onDecodeFallback }: UseLocalRenderOptions) {
     const [isLocalRendering, setIsLocalRendering] = useState(false);
     const [localRenderProgress, setLocalRenderProgress] = useState<ExportProgress | null>(null);
     const exportRef = useRef<ExportManager | null>(null);
@@ -73,7 +75,7 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
             phase = 'exporting';
             const result = await exportManager.exportProject(
                 fullProject,
-                '1080p',
+                quality,
                 (progress) => setLocalRenderProgress(progress),
                 { skipDownload: false },
                 env,
@@ -114,7 +116,7 @@ export function useLocalRender({ project, projectName, videoDecodePreference, on
             setLocalRenderProgress(null);
             exportRef.current = null;
         }
-    }, [isLocalRendering, project, projectName, videoDecodePreference, onDecodeFallback]);
+    }, [isLocalRendering, project, projectName, quality, videoDecodePreference, onDecodeFallback]);
 
     return { isLocalRendering, localRenderProgress, startOrCancel };
 }

@@ -28,7 +28,10 @@
  * cloudVersion must be an integer (the RPC param is INT — the edge fn
  * only checked non-null).
  *
- * Request:  { projectId, cloudVersion }
+ * High-res output (2K/4K) additionally requires can4k — enforced here
+ * on top of canBackgroundExport; quality defaults to 1080p when absent.
+ *
+ * Request:  { projectId, cloudVersion, quality? }
  * Response: { jobId, status, renderStoragePath }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
@@ -56,6 +59,16 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                     // minimum 1: cloud_version starts at 1, and Ajv coercion
                     // would otherwise turn a null body value into 0
                     cloudVersion: Type.Integer({ minimum: 1 }),
+                    // Mirrors ExportQuality (@shared/utils/exportQuality)
+                    quality: Type.Optional(
+                        Type.Union([
+                            Type.Literal('480p'),
+                            Type.Literal('720p'),
+                            Type.Literal('1080p'),
+                            Type.Literal('2K'),
+                            Type.Literal('4K'),
+                        ]),
+                    ),
                 }),
                 response: {
                     200: Type.Object({
@@ -78,7 +91,7 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                 throw new Error('renderJobCreateRoutes: statusCallbackUrl not configured');
             }
 
-            const { projectId, cloudVersion } = req.body;
+            const { projectId, cloudVersion, quality = '1080p' } = req.body;
             const userId = req.user!.id;
             req.logCtx.set({ 'project.id': projectId });
 
@@ -95,11 +108,15 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
             if (!entitlements.canBackgroundExport) {
                 return reply.code(403).send({ error: 'subscription_required' });
             }
+            if ((quality === '2K' || quality === '4K') && !entitlements.can4k) {
+                return reply.code(403).send({ error: 'subscription_required' });
+            }
 
             const job = await getOrCreateRenderJob(app.deps, {
                 projectId,
                 userId,
                 cloudVersion,
+                quality,
                 statusCallbackUrl,
                 log: req.log,
             });

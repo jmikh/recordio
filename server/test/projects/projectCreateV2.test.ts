@@ -1,7 +1,13 @@
 /**
  * POST /project-create-v2 — e2e against the real local `supabase start`
  * Postgres (merge-blocking tier). No storage involvement (the TUS
- * upload stays on Supabase); fakeClock pins the 14-day expiry.
+ * upload stays on Supabase).
+ *
+ * Billing revamp Step 4: the route requires workspace membership and
+ * enforces the active-project cap on free workspaces (live = ready,
+ * not soft-deleted, counted per owner, excluding the upserted id).
+ * The 14-day expiry it replaced is pinned GONE (expires_at never
+ * written).
  *
  * The round-trip test is load-bearing: Fastify's Ajv strips body
  * properties not in the schema, and `project` is the entire arbitrary
@@ -21,14 +27,16 @@ import {
     deleteProjects,
     deleteWorkspaces,
     hasTestDb,
+    SEEDED_USER_2_ID,
     SEEDED_USER_ID,
+    seedProject,
     seedSubscription,
     seedWorkspace,
+    seedWorkspaceMember,
 } from '../helpers/db.js';
+import { FREE_PROJECT_CAP } from '../../src/services/entitlements.js';
 
 const ownerToken = () => userToken({ sub: SEEDED_USER_ID });
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function projectStruct(overrides: Record<string, unknown> = {}) {
     return {
@@ -222,37 +230,139 @@ describe.runIf(hasTestDb())('POST /project-create-v2 (e2e, real Postgres)', () =
         expect((await projectRow(project.id))!.project_data).toEqual(expected);
     });
 
-    it.each([
-        ['active', true],
-        ['past_due', true],
-        ['trialing', false],
-        ['canceled', false],
-    ])('expires_at with a %s subscription: null=%s', async (status, noExpiry) => {
-        const { app, deps } = testApp();
-        const ws = await seedWs(status);
+    it('expires_at is never written — the 14-day expiry is gone (Step 4)', async () => {
+        const { app } = testApp();
+        const ws = await seedWs(); // free: the tier that used to get the expiry
         const project = projectStruct();
 
         const res = await create(app, { project, workspaceId: ws.id });
         expect(res.statusCode).toBe(200);
-
-        const row = await projectRow(project.id);
-        if (noExpiry) {
-            expect(row!.expires_at).toBeNull();
-        } else {
-            // Pinned by fakeClock: exactly now + 14 days
-            const expected = deps.clock.now().getTime() + 14 * DAY_MS;
-            expect(row!.expires_at!.getTime()).toBe(expected);
-        }
+        expect((await projectRow(project.id))!.expires_at).toBeNull();
     });
 
-    it('expires_at is set when the workspace has no subscription row', async () => {
-        const { app, deps } = testApp();
-        const ws = await seedWs();
+    describe('active-project cap (Step 4)', () => {
+        /** N live (ready, non-deleted) projects owned by `ownerId` in `workspaceId`. */
+        async function seedLive(
+            workspaceId: string,
+            n: number,
+            opts: { ownerId?: string; uploadStatus?: 'pending' | 'ready'; deletedAt?: string } = {},
+        ) {
+            const ids: string[] = [];
+            for (let i = 0; i < n; i++) {
+                const p = await seedProject(pool, {
+                    workspaceId,
+                    uploadStatus: opts.uploadStatus ?? 'ready',
+                    ownerId: opts.ownerId,
+                    deletedAt: opts.deletedAt ?? null,
+                });
+                createdProjects.push(p.id);
+                ids.push(p.id);
+            }
+            return ids;
+        }
+
+        it('free workspace at the cap: 403 project_cap_reached, no row written', async () => {
+            const { app } = testApp();
+            const ws = await seedWs();
+            await seedLive(ws.id, FREE_PROJECT_CAP);
+            const project = projectStruct();
+
+            const res = await create(app, { project, workspaceId: ws.id });
+            expect(res.statusCode).toBe(403);
+            expect(res.json()).toEqual({
+                error: 'project_cap_reached',
+                cap: FREE_PROJECT_CAP,
+            });
+            expect(await projectRow(project.id)).toBeUndefined();
+        });
+
+        it('free workspace one under the cap: 200', async () => {
+            const { app } = testApp();
+            const ws = await seedWs();
+            await seedLive(ws.id, FREE_PROJECT_CAP - 1);
+
+            const res = await create(app, { project: projectStruct(), workspaceId: ws.id });
+            expect(res.statusCode).toBe(200);
+        });
+
+        it('only live ready owned rows count: soft-deleted, pending, and other-owner rows do not', async () => {
+            const { app } = testApp();
+            const ws = await seedWs();
+            await seedLive(ws.id, FREE_PROJECT_CAP - 1);
+            // None of these may push the count to the cap:
+            await seedLive(ws.id, 1, { deletedAt: new Date().toISOString() });
+            await seedLive(ws.id, 1, { uploadStatus: 'pending' });
+            await seedLive(ws.id, 1, { ownerId: SEEDED_USER_2_ID });
+
+            const res = await create(app, { project: projectStruct(), workspaceId: ws.id });
+            expect(res.statusCode).toBe(200);
+        });
+
+        it('retrying an id that is one of the cap-many rows never self-blocks', async () => {
+            const { app } = testApp();
+            const ws = await seedWs();
+            const ids = await seedLive(ws.id, FREE_PROJECT_CAP);
+
+            const res = await create(app, {
+                project: projectStruct({ id: ids[0] }),
+                workspaceId: ws.id,
+            });
+            expect(res.statusCode).toBe(200);
+        });
+
+        it('trial workspaces are uncapped (trial lifts limits)', async () => {
+            const { app } = testApp();
+            const ws = await seedWorkspace(pool, { trialEndsAt: '2100-01-01T00:00:00Z' });
+            createdWorkspaces.push(ws.id);
+            await seedLive(ws.id, FREE_PROJECT_CAP);
+
+            const res = await create(app, { project: projectStruct(), workspaceId: ws.id });
+            expect(res.statusCode).toBe(200);
+        });
+
+        it.each(['active', 'past_due'])('%s subscriptions are uncapped', async (status) => {
+            const { app } = testApp();
+            const ws = await seedWs(status);
+            await seedLive(ws.id, FREE_PROJECT_CAP);
+
+            const res = await create(app, { project: projectStruct(), workspaceId: ws.id });
+            expect(res.statusCode).toBe(200);
+        });
+
+        it('one-way door: a canceled subscription means free ⇒ capped', async () => {
+            const { app } = testApp();
+            const ws = await seedWs('canceled');
+            await seedLive(ws.id, FREE_PROJECT_CAP);
+
+            const res = await create(app, { project: projectStruct(), workspaceId: ws.id });
+            expect(res.statusCode).toBe(403);
+            expect(res.json()).toMatchObject({ error: 'project_cap_reached' });
+        });
+
+        it('per-user: a member is capped by their OWN projects, not the workspace total', async () => {
+            const { app } = testApp();
+            const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_2_ID });
+            createdWorkspaces.push(ws.id);
+            await seedWorkspaceMember(pool, {
+                workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'creator',
+            });
+            await seedLive(ws.id, FREE_PROJECT_CAP, { ownerId: SEEDED_USER_2_ID });
+
+            const res = await create(app, { project: projectStruct(), workspaceId: ws.id });
+            expect(res.statusCode).toBe(200);
+        });
+    });
+
+    it('403 for a workspace the caller is not a member of, no row written (Step 4)', async () => {
+        const { app } = testApp();
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_2_ID });
+        createdWorkspaces.push(ws.id);
         const project = projectStruct();
 
-        await create(app, { project, workspaceId: ws.id });
-        const row = await projectRow(project.id);
-        expect(row!.expires_at!.getTime()).toBe(deps.clock.now().getTime() + 14 * DAY_MS);
+        const res = await create(app, { project, workspaceId: ws.id });
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: 'Not a member of this workspace' });
+        expect(await projectRow(project.id)).toBeUndefined();
     });
 
     it('name defaults to Untitled; duration_ms null when timeline is absent', async () => {

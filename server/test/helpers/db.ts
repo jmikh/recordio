@@ -386,14 +386,15 @@ export interface SeedRenderJobOptions {
     status?: 'pending' | 'completed' | 'failed' | 'canceled';
     userId?: string;
     renderStoragePath?: string | null;
+    quality?: string;
 }
 
 /** render_jobs rows cascade with their project (deleteProjects covers them). */
 export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise<string> {
     const id = randomUUID();
     await db.query(
-        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path, quality)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
             id,
             opts.projectId,
@@ -403,6 +404,7 @@ export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise
             opts.renderStoragePath === undefined
                 ? `${opts.userId ?? SEEDED_USER_ID}/${opts.projectId}/renders/v${opts.cloudVersion}.mp4`
                 : opts.renderStoragePath,
+            opts.quality ?? '1080p',
         ],
     );
     return id;

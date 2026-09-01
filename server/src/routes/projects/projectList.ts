@@ -44,7 +44,6 @@ export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     'last_accessed_at',       p.last_accessed_at,
                     'updated_at',             p.updated_at,
                     'created_at',             p.created_at,
-                    'expires_at',             p.expires_at,
                     'deleted_at',             p.deleted_at,
                     'cloud_version',          p.cloud_version,
                     'duration_ms',            p.duration_ms,

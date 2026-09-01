@@ -3,6 +3,10 @@
  * Part 2 Batch 2. The three owner-gated boolean routes share their
  * shape (owner check IS the WHERE clause; false for non-owner /
  * not-found / wrong-state alike, no error), so one file covers them.
+ *
+ * /project-restore is additionally trial/Pro-gated since revamp Step 4
+ * (canRestore) — its cases seed explicit workspaces; free-workspace
+ * restore is 403 subscription_required.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
@@ -12,10 +16,13 @@ import { TEST_JWT_SECRET, userToken } from './helpers/tokens.js';
 import {
     createTestPool,
     deleteProjects,
+    deleteWorkspaces,
     hasTestDb,
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
     seedProject,
+    seedSubscription,
+    seedWorkspace,
 } from './helpers/db.js';
 
 async function post(app: App, url: string, body: unknown, token?: string) {
@@ -52,13 +59,16 @@ describe.each([
 describe.runIf(hasTestDb())('project lifecycle routes (e2e, real Postgres)', () => {
     let pool: pg.Pool;
     const createdProjects: string[] = [];
+    const createdWorkspaces: string[] = [];
 
     beforeAll(() => {
         pool = createTestPool();
     });
     afterEach(async () => {
         await deleteProjects(pool, createdProjects);
+        await deleteWorkspaces(pool, createdWorkspaces);
         createdProjects.length = 0;
+        createdWorkspaces.length = 0;
     });
     afterAll(async () => {
         await pool.end();
@@ -111,8 +121,21 @@ describe.runIf(hasTestDb())('project lifecycle routes (e2e, real Postgres)', () 
     });
 
     describe('/project-restore', () => {
-        it('owner restores a soft-deleted project', async () => {
-            const p = await seed({ deletedAt: new Date().toISOString() });
+        /** Workspace whose entitlements pass/fail the Step 4 canRestore gate. */
+        async function seedWs(tier: 'pro' | 'trial' | 'free') {
+            const ws = await seedWorkspace(pool, tier === 'trial'
+                ? { trialEndsAt: '2100-01-01T00:00:00Z' }
+                : {});
+            createdWorkspaces.push(ws.id);
+            if (tier === 'pro') {
+                await seedSubscription(pool, { workspaceId: ws.id, status: 'active' });
+            }
+            return ws;
+        }
+
+        it('owner restores a soft-deleted project (pro workspace)', async () => {
+            const ws = await seedWs('pro');
+            const p = await seed({ deletedAt: new Date().toISOString(), workspaceId: ws.id });
             const { app } = testApp();
             const res = await post(app, '/project-restore', { projectId: p.id },
                 await userToken({ sub: SEEDED_USER_ID }));
@@ -120,17 +143,40 @@ describe.runIf(hasTestDb())('project lifecycle routes (e2e, real Postgres)', () 
             expect((await row(p.id)).deleted_at).toBeNull();
         });
 
-        it('false for a non-owner, row untouched', async () => {
-            const p = await seed({ deletedAt: new Date().toISOString() });
+        it('trial workspaces can restore too (canRestore is trial/pro)', async () => {
+            const ws = await seedWs('trial');
+            const p = await seed({ deletedAt: new Date().toISOString(), workspaceId: ws.id });
+            const { app } = testApp();
+            const res = await post(app, '/project-restore', { projectId: p.id },
+                await userToken({ sub: SEEDED_USER_ID }));
+            expect(res.json()).toEqual({ restored: true });
+        });
+
+        it('403 subscription_required on a FREE workspace, row untouched (Step 4)', async () => {
+            const ws = await seedWs('free');
+            const p = await seed({ deletedAt: new Date().toISOString(), workspaceId: ws.id });
+            const { app } = testApp();
+            const res = await post(app, '/project-restore', { projectId: p.id },
+                await userToken({ sub: SEEDED_USER_ID }));
+            expect(res.statusCode).toBe(403);
+            expect(res.json()).toEqual({ error: 'subscription_required' });
+            expect((await row(p.id)).deleted_at).not.toBeNull();
+        });
+
+        it('false for a non-owner, row untouched — even on a free workspace (no gate leak)', async () => {
+            const ws = await seedWs('free');
+            const p = await seed({ deletedAt: new Date().toISOString(), workspaceId: ws.id });
             const { app } = testApp();
             const res = await post(app, '/project-restore', { projectId: p.id },
                 await userToken({ sub: SEEDED_USER_2_ID }));
+            expect(res.statusCode).toBe(200);
             expect(res.json()).toEqual({ restored: false });
             expect((await row(p.id)).deleted_at).not.toBeNull();
         });
 
         it('false for a live project', async () => {
-            const p = await seed();
+            const ws = await seedWs('pro');
+            const p = await seed({ workspaceId: ws.id });
             const { app } = testApp();
             const res = await post(app, '/project-restore', { projectId: p.id },
                 await userToken({ sub: SEEDED_USER_ID }));
@@ -138,8 +184,10 @@ describe.runIf(hasTestDb())('project lifecycle routes (e2e, real Postgres)', () 
         });
 
         it('false for a permanently-deleted project', async () => {
+            const ws = await seedWs('pro');
             const p = await seed({
-                deletedAt: new Date().toISOString(), permanentlyDeleted: true });
+                deletedAt: new Date().toISOString(), permanentlyDeleted: true,
+                workspaceId: ws.id });
             const { app } = testApp();
             const res = await post(app, '/project-restore', { projectId: p.id },
                 await userToken({ sub: SEEDED_USER_ID }));

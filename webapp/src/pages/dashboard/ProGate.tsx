@@ -1,6 +1,5 @@
 import { useState, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { navigate } from '../../lib/navigate';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 
 interface ProGateProps {
@@ -41,9 +40,10 @@ export function ProGate({ feature, children, className }: ProGateProps) {
                     style={{ left: pos.x, top: pos.y - 8 }}
                 >
                     <p className="mb-1.5">Upgrade to use {feature}</p>
+                    {/* New tab (Step 4): keep the caller's context alive */}
                     <button
                         className="text-primary font-medium hover:underline"
-                        onClick={() => navigate('/workspace/settings?tab=billing')}
+                        onClick={() => window.open('/workspace/settings/billing', '_blank')}
                     >
                         Upgrade →
                     </button>

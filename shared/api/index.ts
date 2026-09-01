@@ -61,6 +61,7 @@ import type {
     TrialExtendRequest,
     TrialExtendResponse,
     UserProfile,
+    UserReviewSetResponse,
 } from './session';
 
 export * from './assets';
@@ -93,6 +94,7 @@ export interface ApiRoutes {
     'workspace-member-remove': { request: WorkspaceMemberRemoveRequest; response: WorkspaceMemberRemoveResponse };
     'workspace-member-update-role': { request: WorkspaceMemberUpdateRoleRequest; response: WorkspaceMemberUpdateRoleResponse };
     'user-profile-get': { request: EmptyRequest; response: UserProfile | null };
+    'user-review-set': { request: EmptyRequest; response: UserReviewSetResponse };
     'workspace-get-default': { request: EmptyRequest; response: DefaultWorkspace };
     'subscription-get': { request: SubscriptionGetRequest; response: SubscriptionGetResponse };
     'trial-extend': { request: TrialExtendRequest; response: TrialExtendResponse };

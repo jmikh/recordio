@@ -1,6 +1,6 @@
 # Workspace Permissions & Billing Revamp — High-Level Design
 
-**Status:** In progress — Steps 1–3 shipped 2026-09-01 (see Step log).
+**Status:** In progress — Steps 1–4 shipped 2026-09-01 (see Step log).
 **Purpose:** Umbrella reference for the billing/permissions revamp. Each step gets its own
 step doc in this folder (`workspace-billing-revamp-step-N.md`), created when that step
 starts — not upfront, since earlier steps' outcomes change later steps.
@@ -34,7 +34,7 @@ someone else's.
 | 4k export | no | yes | yes |
 | Transcription / captions | no | yes | yes |
 | Share link (branded watch page) | no | yes | yes |
-| Active projects | cap N per user per workspace (start N=2–3) | uncapped | uncapped |
+| Active projects | cap 5 per user per workspace (decided 2026-09-01, Step 4) | uncapped | uncapped |
 | Collaboration (workspace members) | no — solo | no — solo | yes (creators/admins = seats, viewers free) |
 
 Notes:
@@ -90,8 +90,12 @@ Notes:
 - Self-serve extension, once: +7 days **from the extension date**, offered only
   **after the trial has ended** (decided 2026-09-01, Step 3 — extending mid-trial
   would waste remaining time under from-extension-date semantics; both CTA and
-  endpoint refuse until lapse). Extension count is tracked. On extension, show a
-  popup inviting a Chrome Web Store review — the extension is granted
+  endpoint refuse until lapse). Extension count is tracked. The grant is
+  confirmed by a **toast**; the review ask is the unified **LeaveReviewModal**
+  (reworked 2026-09-02, post-Step-3): personal (founder avatar), shown on trial
+  extension AND after successful exports, gated by a profile-persisted
+  `reviewed_at` flag (`/user-review-set` — "Leave a review" and "I already left
+  a review" both set it; "Maybe later" stores nothing). The extension is granted
   unconditionally *before* the ask (CWS policy forbids incentivized reviews;
   never condition the grant on the review).
 - After the one self-serve extension there is **no further in-product path**
@@ -100,13 +104,26 @@ Notes:
   offer lives outside the product (landing page / support policy).
 
 **Projects & cap**
-- The 14-day project auto-expiry for unsubscribed workspaces is **removed**.
-- Replaced by an active-project cap on free workspaces: N live (non-deleted)
-  projects per user per workspace, counted by `owner_id`. Archiving/deleting frees
-  a slot. Over-cap after a lapse or transfer = grandfathered: keep everything,
-  block new creation until under cap.
-- Enforced server-side at project create/import. Extension-side pre-recording check
-  is deferred (extension ships slowly); the import page handles the at-cap moment.
+- The 14-day project auto-expiry for unsubscribed workspaces is **removed**
+  (Step 4 — stale `expires_at` values nulled; column drop deferred to Step 8).
+- Replaced by an active-project cap on free workspaces: **5** live (ready,
+  non-deleted) projects per user per workspace, counted by `owner_id`
+  (N decided 2026-09-01, Step 4). Deleting frees a slot. Over-cap after a
+  lapse or transfer = grandfathered: keep everything, block new creation
+  until under cap.
+- Enforced server-side at `/project-create-v2` (403 `project_cap_reached` +
+  cap), which also gained the previously-missing workspace-membership check.
+  The import page handles the at-cap moment with an in-place recovery panel
+  (delete inline / save to another workspace / upgrade-extend — the recording
+  survives). Extension-side pre-recording check is deferred (extension ships
+  slowly).
+- **Restore-from-trash stays trial/Pro** (decided 2026-09-01, Step 4):
+  `canRestore` entitlement, enforced by `/project-restore` (previously
+  client-only). Trash is one-way for free users, so delete-and-restore can
+  never defeat the cap.
+- Upgrade CTAs (ProUpgradeModal, ProGate, download modal, at-cap panel) open
+  the billing page in a **new tab** (decided 2026-09-01, Step 4) — the
+  caller's context, especially an un-imported recording, always survives.
 
 **Sharing & rendering**
 - Share links (public watch page) are **trial + Pro**. The watch page carries
@@ -157,7 +174,7 @@ Notes:
 | Entitlements | client-computed (`useNonFreeAccess`) | server-side entitlements service, client reads the payload | ✅ Step 1 |
 | Trial | `user_profiles.trial_ends_at`, no expiry enforcement | workspace-level `trial_ends_at` + extension tracking, one-way door enforced | ✅ Step 2 (extension flow Step 3) |
 | Workspaces | lazy bootstrap on `/workspace-get-default`, `/workspace-create` open | created at signup (trigger), creation/deletion removed, owner membership implicit | ✅ Step 2 (`is_personal` was already dropped pre-revamp, migration `20260512200000`) |
-| Project expiry | 14-day auto-expiry for unsubscribed (`projectCreateV2.ts`) | removed; active-project cap instead | Step 4 |
+| Project expiry | 14-day auto-expiry for unsubscribed (`projectCreateV2.ts`) | removed; active-project cap instead | ✅ Step 4 |
 | Share gate | client-only (`Header.tsx`); `/project-share` had no tier check | server-side trial/Pro gate | ✅ Step 1 |
 | Cloud render gate | client-only (`DownloadModal.tsx`); `/render-job-create`, `/mux-video-create` unchecked | server-side gate + rate limits | gate ✅ Step 1; rate limits Step 5 |
 | Download UX | two-button local/cloud modal | one button, tier-decided, ETA + contextual upsell | Step 5 |
@@ -232,8 +249,8 @@ path, no banner (both decided 2026-09-01 during step planning).
   gate treatments carry the offer); existing share links created during trial
   stay live after it ends (creating/updating stays blocked).
 
-### Step 4 — Active-project cap (replaces 14-day expiry)
-*Doc: `workspace-billing-revamp-step-4.md` — created when the step starts.*
+### Step 4 — Active-project cap (replaces 14-day expiry) ✅
+*Doc: [`workspace-billing-revamp-step-4.md`](workspace-billing-revamp-step-4.md) — **implemented 2026-09-01**.*
 
 **Goal:** Remove auto-expiry; enforce N active projects per user per workspace on
 free workspaces.
@@ -241,12 +258,13 @@ free workspaces.
 - Server: delete expiry logic in `projectCreateV2.ts`; cap check (count live
   projects by `owner_id` in workspace) at project create + import; grandfathering
   (over-cap = keep all, block new).
-- Frontend: import page at-cap state — inline "delete a project or upgrade";
-  project-list cap indicator (e.g. "2 of 3 projects") on free workspaces.
+- Frontend: import page at-cap recovery panel (delete inline / switch workspace /
+  upgrade-extend); server-sourced cap meter in the dashboard sidebar.
 - Deferred: extension-side pre-recording cap warning (later fast-follow; server is
   the source of truth regardless).
-- Open for step doc: exact N (start 2–3); whether cap warnings appear before the
-  cap is hit.
+- Resolved in step doc: N = 5; the existing sidebar meter is the only pre-cap
+  warning; restore stays Pro-only (server-enforced via `canRestore`); upgrade
+  CTAs open in a new tab.
 
 ### Step 5 — Sharing & rendering gates + download UX
 *Doc: `workspace-billing-revamp-step-5.md` — created when the step starts.*
@@ -373,9 +391,36 @@ transfer-or-delete flow.
   - Share links confirmed to survive trial end (`/shared-video-get` is
     entitlement-free) and pinned by a regression test — knob resolved (§7).
 
+- **Step 4 — completed 2026-09-01** ([`workspace-billing-revamp-step-4.md`](workspace-billing-revamp-step-4.md)).
+  Verified: cap/membership/restore suites green (full vitest 718 passed; the 33
+  remaining failures are a pre-existing baseline verified at HEAD — see
+  agent-suggestions #8), server typecheck, webapp + extension dev builds,
+  migration smoke-tested locally. Outstanding: manual browser smoke of the
+  recovery panel; prod deploy (server → migration → webapp). Design changes
+  made during planning/implementation (propagated above):
+  - **N = 5** (not the 2–3 lean); the sidebar meter now reads
+    `entitlements.projectCap` + the caller's owned-project count instead of a
+    hardcoded limit and the workspace total.
+  - **Restore stays Pro-only** — new `canRestore` entitlement, server-enforced
+    on `/project-restore` (was client-only theater); trash is one-way for free
+    users, which also closes the delete-restore cap loophole.
+  - **At-cap import UX is an in-place recovery panel** (delete a project inline
+    with auto-retry / save to another creator-role workspace via
+    `workspace-set-default` / upgrade-extend + try again) — the recording never
+    leaves the page.
+  - **Upgrade CTAs open the billing page in a new tab** (ProUpgradeModal,
+    ProGate, DownloadModal) on the canonical `/workspace/settings/billing`
+    path — the old `?tab=billing` links were silently landing on the General
+    tab.
+  - `/project-create-v2` gained the missing workspace-membership check;
+    "live" = ready + non-deleted, per owner, excluding the upserted id
+    (retries never self-block); pending rows deliberately don't count.
+  - `expires_at`: no longer written, stale values nulled by migration
+    `20260901163840`; column drop stays in Step 8 (deploy-order safety).
+
 ## 7. Global open knobs (tuning, not blockers)
 
-- Free cap N (start 2–3 active projects).
+- ~~Free cap N (start 2–3 active projects)~~ — decided Step 4: **5** (`FREE_PROJECT_CAP`).
 - Hidden viewer ceiling (~50–100).
 - Render rate limits (per project per day).
 - ~~Trial-end behavior for existing share links~~ — decided Step 3: stay live.

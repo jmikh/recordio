@@ -244,6 +244,13 @@ Shipped as designed, with these divergences:
   distinguish 404 / 403 / 409-with-reason. Same semantics as §4's
   read-then-update, but one query on the happy path and the refusal reason can
   never be stale under a race.
+- **ProUpgradeModal redesigned** (user request, same day): AuthModal's layout —
+  centered logo, "Trial ended" eyebrow, feature-driven title ("Upgrade to unlock
+  {feature}"), full-width "Upgrade now", a "Pro includes" card (unlimited
+  transcriptions / 4K exports / background exports / team collaboration) with
+  "Not ready yet? Request a trial extension" inside it (canExtendTrial-gated),
+  price line, mailto support footer. Call sites pass lowercase feature names
+  ("publishing", "transcription").
 - **Surface audit found two more upgrade CTAs** — both included:
   `DashboardSidebar`'s at-cap "Upgrade to Pro for unlimited projects" upsell and
   `DownloadModal`'s cloud-render card. **`MembersPage`'s "Upgrade to Pro →"
@@ -270,3 +277,30 @@ Shipped as designed, with these divergences:
 Deploy checklist (not yet done): deploy server → webapp back-to-back. No
 migration, no env changes; old webapp bundles never show the link
 (`canExtendTrial` absent ⇒ falsy).
+
+## 12. Post-step rework: unified LeaveReviewModal (2026-09-02)
+
+The Step 3 review ask was reworked (user-directed, after Step 4):
+
+- **`TrialExtendedModal` deleted.** The grant confirmation is now a success
+  toast in `TrialExtendLink`; the review ask moved to a new global
+  **`LeaveReviewModal`** (`webapp/src/components/LeaveReviewModal.tsx`) —
+  personal (john.webp avatar, "Hi, I'm John"), three actions: ⭐ Leave a
+  review (opens CWS + persists), "I already left a review" (persists),
+  "Maybe later" (stores nothing, may reappear).
+- **Persistence is server-side, per user**: `user_profiles.reviewed_at`
+  (migration `20260901212020`), set by the idempotent `POST /user-review-set`
+  (first claim wins); `/user-profile-get` now returns `has_reviewed`, which
+  `maybeOpenLeaveReviewModal()` checks (cached per session) before showing.
+- **Triggers**: trial extension success, local export success, and background
+  (cloud) export completion — the DownloadModal effect fires even with the
+  modal UI closed. The old localStorage once-ever guard
+  (`LocalPreferences.hasShownReviewModal`) and the dead editor `ReviewModal`
+  were deleted.
+- **Mixpanel**: `review_modal_viewed` / `review_modal_review_clicked` /
+  `review_modal_already_reviewed_clicked` / `review_modal_maybe_later_clicked`,
+  each with `trigger: 'trial_extended' | 'export_completed'` (replaces the
+  Step 3 `trial_review_modal_*` pair and the never-fired `review_modal_shown`
+  trio).
+- **Deploy order**: migration BEFORE server (the profile route now selects
+  `reviewed_at`), then webapp.

@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../../../analytics';
 import { captureError } from '../../../lib/sentry';
+import type { ExportQuality } from '@shared/utils/exportQuality';
 
 export type CloudRenderPhase = 'idle' | 'saving' | 'queued' | 'rendering' | 'downloading' | 'completed' | 'failed';
 
@@ -112,7 +113,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
         }
     }, [onToast]);
 
-    const startCloudRender = useCallback(async (projectId: string, projectName: string) => {
+    const startCloudRender = useCallback(async (projectId: string, projectName: string, quality: ExportQuality = '1080p') => {
         if (phase !== 'idle' && phase !== 'failed') return;
 
         // Request notification permission early
@@ -152,7 +153,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
                 renderStoragePath: string | null;
                 error?: string;
                 message?: string;
-            }>('render-job-create', { projectId, cloudVersion });
+            }>('render-job-create', { projectId, cloudVersion, quality });
 
             if (error || data?.error) {
                 const msg = data?.message || data?.error || error?.message || 'Failed to start render';
@@ -207,6 +208,7 @@ export function useCloudRender({ onToast }: UseCloudRenderOptions) {
                     trackRenderInCloudCompleted({
                         project_id: projectId,
                         render_duration_s: Math.round((performance.now() - renderStartRef.current) / 1000),
+                        quality,
                         ...getProjectMeta(),
                     });
                     // completed ⇒ the worker stored the render (path set)

@@ -232,7 +232,6 @@ describe('CloudProjectService.listProjects', () => {
             updated_at: '2024-01-01',
             created_at: '2024-01-01',
             last_accessed_at: '2024-01-01',
-            expires_at: null,
             deleted_at: null,
             is_shared: false,
             cloud_version: 1,

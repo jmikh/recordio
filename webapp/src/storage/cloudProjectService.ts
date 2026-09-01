@@ -24,7 +24,8 @@ export interface ProjectListItem {
     updatedAt: string;
     createdAt: string;
     lastAccessedAt: string | null;
-    expiresAt: string | null;
+    /** Current owner — the free-plan project cap counts by owner (Step 4) */
+    ownerId: string;
     /** ISO date when the project was soft-deleted (null = active) */
     deletedAt: string | null;
     isShared: boolean;
@@ -515,7 +516,7 @@ export class CloudProjectService {
             updatedAt: s.updated_at,
             createdAt: s.created_at,
             lastAccessedAt: s.last_accessed_at,
-            expiresAt: s.expires_at,
+            ownerId: s.owner_id,
             deletedAt: s.deleted_at,
             isShared: s.is_shared,
             cloudVersion: s.cloud_version,

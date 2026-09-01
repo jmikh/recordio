@@ -464,7 +464,7 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- user2 · personal workspace
-INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms, expires_at)
+INSERT INTO public.projects (id, workspace_id, created_by, owner_id, name, project_data, upload_status, cloud_version, duration_ms)
 VALUES (
     'dddddddd-dddd-dddd-dddd-dddddddddddd',
     'eeeeeeee-0000-0000-0000-000000000005',
@@ -541,7 +541,6 @@ VALUES (
             "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
         }
     }'::jsonb,
-    'ready', 1, 3000,
-    NOW() + INTERVAL '7 days'
+    'ready', 1, 3000
 ) ON CONFLICT (id) DO NOTHING;
 

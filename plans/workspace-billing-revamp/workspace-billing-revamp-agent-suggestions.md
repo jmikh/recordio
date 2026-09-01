@@ -78,3 +78,50 @@ matters, sketch of the fix.
   e.g. hang `onMouseEnter`/`onMouseLeave` on the portal div too with a small
   close-delay timer, or drop the 8px gap and bridge with padding so the pointer
   path stays inside a hover region.
+
+## From Step 4 (2026-09-01)
+
+### 6. project-create-v2's upsert lets a member overwrite ANY project row by id
+
+- **Where:** `server/src/routes/projects/projectCreateV2.ts` — `ON CONFLICT (id)
+  DO UPDATE` rewrites `workspace_id`, `owner_id`, `project_data`, etc. with no
+  ownership check on the conflict path (edge-fn parity, pre-existing).
+- **Why it matters:** project ids are client-generated; any authenticated user
+  who learns/guesses an existing project's UUID can hijack the row — repoint it
+  to their own workspace and replace its contents. Step 4's membership check
+  narrows the blast radius (the caller must be a member of the TARGET
+  workspace they name) but does nothing to protect the existing row being
+  overwritten.
+- **Sketch:** add `WHERE projects.owner_id = EXCLUDED.owner_id` (or `= $3`) to
+  the `DO UPDATE`, so a conflict with someone else's row updates nothing; treat
+  the resulting 0-row upsert as a 409/403. Verify the import retry flow still
+  works (same owner ⇒ unaffected).
+
+### 7. Viewers can create projects — no role check on the create path
+
+- **Where:** `server/src/routes/projects/projectCreateV2.ts` uses
+  `isWorkspaceMember` (any role, Step 4); nothing distinguishes `viewer` from
+  `creator`/`admin` at project creation.
+- **Why it matters:** the product model says viewers are read-only (they don't
+  even consume seats). A viewer who lands on the import page can create
+  projects in the workspace. Low severity today (the client offers viewers no
+  record CTA in others' workspaces) but it contradicts the role semantics and
+  Step 6 makes viewers billing-relevant.
+- **Sketch:** a `isWorkspaceCreator` helper (owner OR member with role
+  creator/admin) used by project-create-v2; CapRecoveryPanel already filters
+  its workspace-switch list to creator/admin, so the client matches.
+
+### 8. Stale/broken test suites failing on master (pre-existing, verified at HEAD)
+
+- **Where:** (a) `webapp/src/storage/cloudProjectService.test.ts` — "passes
+  expected version to CloudStorage" expects a 4th `true` argument that
+  `saveProject` never passes; (b) `test/integration/edge-functions.test.ts` +
+  `test/integration/supabase-rpc.test.ts` — 32 failures, every request dies
+  with the local edge runtime's "Worker failed to boot" (the edge functions
+  were decommissioned 2026-07-24).
+- **Why it matters:** a permanently red baseline (33 failures) trains everyone
+  to ignore the suite — real regressions hide in the noise (Step 4's one real
+  test break was only findable by diffing against the stashed baseline).
+- **Sketch:** fix or delete the stale saveProject assertion; delete the two
+  edge-function integration suites (or gate them behind an env flag like the
+  DB tier's `hasTestDb()`), since the code they exercised is gone.

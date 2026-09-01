@@ -11,6 +11,7 @@ const PRO_ENTITLEMENTS: WorkspaceEntitlements = {
     canBackgroundExport: true,
     can4k: true,
     canInvite: true,
+    canRestore: true,
     projectCap: null,
     trialEndsAt: null,
     canExtendTrial: false,

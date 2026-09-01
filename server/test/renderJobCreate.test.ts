@@ -106,6 +106,8 @@ describe('POST /render-job-create (auth + validation, no db)', () => {
         ['null cloudVersion', { projectId: 'p-1', cloudVersion: null }],
         ['zero cloudVersion', { projectId: 'p-1', cloudVersion: 0 }],
         ['non-integer cloudVersion', { projectId: 'p-1', cloudVersion: 1.5 }],
+        ['unknown quality', { projectId: 'p-1', cloudVersion: 1, quality: '8K' }],
+        ['lowercase quality', { projectId: 'p-1', cloudVersion: 1, quality: '4k' }],
     ])('schema 400: %s', async (_name, payload) => {
         const { app, deps } = validationApp();
         const res = await post(app, payload, await ownerToken());
@@ -172,6 +174,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         status: string;
         render_storage_path: string | null;
         attempt_count: number;
+        quality: string;
     }
 
     async function jobRows(projectId: string): Promise<JobRow[]> {
@@ -249,6 +252,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
             cloud_version: 3,
             status: 'pending',
             render_storage_path: expectedPath,
+            quality: '1080p',
         });
 
         // All five media kinds presigned for download (1h), output for upload
@@ -303,6 +307,78 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         expect(await jobRows(project.id)).toHaveLength(1);
         expect(deps.s3.presignedDownloads).toHaveLength(0);
         expect(deps.s3.presignedUploads).toHaveLength(0);
+        expect(deps.renderWorker.submissions).toHaveLength(0);
+    });
+
+    it('quality 4K: row keyed by quality, suffixed storage path, worker dispatched at 4K', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+
+        const res = await post(
+            app,
+            { projectId: project.id, cloudVersion: 3, quality: '4K' },
+            await ownerToken(),
+        );
+        expect(res.statusCode).toBe(200);
+
+        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v3_4K.mp4`;
+        expect((res.json() as { renderStoragePath: string }).renderStoragePath).toBe(expectedPath);
+        expect((await jobRows(project.id))[0]).toMatchObject({
+            quality: '4K',
+            render_storage_path: expectedPath,
+        });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+        expect(deps.renderWorker.submissions[0]).toMatchObject({
+            quality: '4K',
+            uploadUrl: `https://fake-s3/put/${expectedPath}`,
+        });
+    });
+
+    it('a completed 1080p render is NOT a cache hit for a 4K request at the same version', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        await seedRenderJob(pool, {
+            projectId: project.id,
+            cloudVersion: 2,
+            status: 'completed',
+        });
+
+        const res = await post(
+            app,
+            { projectId: project.id, cloudVersion: 2, quality: '4K' },
+            await ownerToken(),
+        );
+        expect(res.statusCode).toBe(200);
+        expect((res.json() as { status: string }).status).toBe('pending');
+        expect(await jobRows(project.id)).toHaveLength(2);
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+        expect(deps.renderWorker.submissions[0].quality).toBe('4K');
+    });
+
+    it('cache hit at matching quality: completed 4K job returns its path, no dispatch', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v2_4K.mp4`;
+        const jobId = await seedRenderJob(pool, {
+            projectId: project.id,
+            cloudVersion: 2,
+            status: 'completed',
+            quality: '4K',
+            renderStoragePath: expectedPath,
+        });
+
+        const res = await post(
+            app,
+            { projectId: project.id, cloudVersion: 2, quality: '4K' },
+            await ownerToken(),
+        );
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({
+            jobId,
+            status: 'completed',
+            renderStoragePath: expectedPath,
+        });
+        expect(await jobRows(project.id)).toHaveLength(1);
         expect(deps.renderWorker.submissions).toHaveLength(0);
     });
 

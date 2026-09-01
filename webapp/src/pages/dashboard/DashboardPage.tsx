@@ -11,6 +11,7 @@ import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useEntitlements } from '../../billing/useEntitlements';
+import { ProUpgradeModal } from '../../billing/ProUpgradeModal';
 import { AuthManager } from '../../auth/AuthManager';
 import { invokeFunction } from '../../api/client';
 import { switchWorkspace } from '../../workspace/switchWorkspace';
@@ -33,7 +34,7 @@ export function DashboardPage() {
     const [activeView, setActiveView] = useState<DashboardView>('all');
 
     const { userId } = useUserStore();
-    const hasNonFreeAccess = useEntitlements().state !== 'free';
+    const entitlements = useEntitlements();
     const {
         workspaceId, workspaceName, workspaceRole,
         workspaceList, workspaceReady, setWorkspace, setWorkspaceList,
@@ -48,6 +49,7 @@ export function DashboardPage() {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const { addToast } = useToast();
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
+    const [showRestoreUpgradeModal, setShowRestoreUpgradeModal] = useState(false);
 
     // Sort, filter, search state (persisted to localStorage)
     const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
@@ -89,7 +91,7 @@ export function DashboardPage() {
 
         const checkout = params.get('checkout');
         if (checkout === 'monthly' || checkout === 'yearly') {
-            navigate('/workspace/settings?tab=billing', { replace: true });
+            navigate('/workspace/settings/billing', { replace: true });
             return;
         }
 
@@ -187,6 +189,12 @@ export function DashboardPage() {
 
     const sharedCount = useMemo(() => projects.filter(p => p.isShared).length, [projects]);
 
+    // The free-plan cap counts the CALLER's projects, not the workspace's
+    const ownedProjectCount = useMemo(
+        () => projects.filter(p => p.ownerId === userId).length,
+        [projects, userId],
+    );
+
     // Load the full workspace list once authenticated
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -207,8 +215,13 @@ export function DashboardPage() {
         navigate(`/editor?projectId=${item.id}`);
     };
 
-    // Restore from trash
+    // Restore from trash — the button always presses; free tier gets the
+    // upgrade modal instead (server enforces canRestore regardless)
     const handleRestore = async (projectId: string) => {
+        if (!entitlements.canRestore) {
+            setShowRestoreUpgradeModal(true);
+            return;
+        }
         const ok = await CloudProjectService.restoreProject(projectId);
         if (ok) {
             setAllProjects(prev => prev.map(p =>
@@ -305,7 +318,8 @@ export function DashboardPage() {
                     activeView={activeView}
                     onViewChange={setActiveView}
                     projectCount={projects.length}
-                    hasNonFreeAccess={hasNonFreeAccess}
+                    ownedProjectCount={ownedProjectCount}
+                    projectCap={entitlements.projectCap}
                     trashCount={trashProjects.length}
                     publishedCount={sharedCount}
                     onRecord={handleRecord}
@@ -363,7 +377,6 @@ export function DashboardPage() {
                                                 createdAt: item.createdAt,
                                                 updatedAt: item.updatedAt,
                                                 durationMs: item.durationMs,
-                                                expiresAt: item.expiresAt,
                                                 shareSlug: item.shareSlug,
                                             }}
                                             onOpen={() => handleOpen(item)}
@@ -413,7 +426,6 @@ export function DashboardPage() {
                                         }}
                                         onOpen={() => {}}
                                         onRestore={() => handleRestore(item.id)}
-                                        restoreGated={!hasNonFreeAccess}
                                     />
                                 ))}
                             </div>
@@ -464,6 +476,12 @@ export function DashboardPage() {
                 document.body
             )}
 
+            <ProUpgradeModal
+                isOpen={showRestoreUpgradeModal}
+                onClose={() => setShowRestoreUpgradeModal(false)}
+                feature="restoring deleted videos"
+                reason="restore"
+            />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
             <AuthModal
                 isOpen={isAuthModalOpen}

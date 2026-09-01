@@ -22,6 +22,7 @@ import { DownloadModal } from '../settings/DownloadModal';
 import { TbCloudUpload, TbDownload, TbLink } from 'react-icons/tb';
 import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
+import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
 import { invokeFunction } from '../../../api/client';
 import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
@@ -85,8 +86,8 @@ export const Header = () => {
         setIsDownloadModalOpen(true);
     };
 
-    const handleStartCloudRender = useCallback(() => {
-        cloudRender.startCloudRender(project.id, projectName);
+    const handleStartCloudRender = useCallback((quality: ExportQuality) => {
+        cloudRender.startCloudRender(project.id, projectName, quality);
     }, [cloudRender.startCloudRender, project.id, projectName]);
 
     const downloadBusy = cloudRender.isActive || isSyncingMedia;
@@ -382,17 +383,16 @@ export const Header = () => {
             <ProUpgradeModal
                 isOpen={isProModalOpen}
                 onClose={() => setIsProModalOpen(false)}
-                feature="Publishing"
+                feature="publishing"
+                reason="share"
             />
 
             <DownloadModal
                 isOpen={isDownloadModalOpen}
                 onClose={() => setIsDownloadModalOpen(false)}
-                hasNonFreeAccess={entitlements.canBackgroundExport}
                 cloudPhase={cloudRender.phase}
                 cloudProgress={cloudRender.progress}
                 onStartCloudRender={handleStartCloudRender}
-                onUpgrade={() => navigate('/workspace/settings?tab=billing')}
             />
         </div>
     );

@@ -52,7 +52,6 @@ export interface CloudProject {
     last_accessed_at: string;
     updated_at: string;
     created_at: string;
-    expires_at: string | null;
     thumbnail_storage_path: string | null;
     slug: string | null;
     share_policy: SharePolicy;
@@ -78,7 +77,6 @@ export interface CloudProjectSummary {
     last_accessed_at: string;
     updated_at: string;
     created_at: string;
-    expires_at: string | null;
     deleted_at: string | null;
     cloud_version: number;
     duration_ms: number | null;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { useExtensionBridge } from './useExtensionBridge';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
@@ -10,6 +11,7 @@ import { LogoLink, Button } from '@shared/components';
 import { AuthModal } from '../../auth/AuthModal';
 import { navigate } from '../../lib/navigate';
 import { invokeFunction } from '../../api/client';
+import { CapRecoveryPanel } from './CapRecoveryPanel';
 
 type ImportStatus =
     | 'init'
@@ -20,7 +22,27 @@ type ImportStatus =
     | 'error-no-id'
     | 'error-extension'
     | 'error-auth'
-    | 'error-upload';
+    | 'error-upload'
+    | 'error-cap';
+
+/**
+ * project-create-v2's 403 { error: 'project_cap_reached', cap } (revamp
+ * Step 4) — the only server refusal the import page branches on. Any
+ * other error shape returns null and takes the generic failure path.
+ */
+async function readProjectCapError(error: unknown): Promise<{ cap: number | null } | null> {
+    if (!(error instanceof FunctionsHttpError)) return null;
+    const response = (error as { context?: unknown }).context;
+    if (!(response instanceof Response)) return null;
+    try {
+        const body = await response.clone().json();
+        return body?.error === 'project_cap_reached'
+            ? { cap: typeof body.cap === 'number' ? body.cap : null }
+            : null;
+    } catch {
+        return null;
+    }
+}
 
 
 export function ImportPage() {
@@ -29,6 +51,9 @@ export function ImportPage() {
     const [hasStarted, setHasStarted] = useState(false);
     const [uploadPhase, setUploadPhase] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [capInfo, setCapInfo] = useState<{ cap: number | null } | null>(null);
+    // The recovery panel switches workspaces; retries follow the store
+    const storeWorkspaceId = useWorkspaceStore(s => s.workspaceId);
 
     // Auth modal state
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -191,6 +216,21 @@ export function ImportPage() {
             trackProjectCreatedSuccess(project);
             navigate(`/editor?projectId=${project.id}`);
         } catch (error: any) {
+            // The at-cap refusal is expected product behavior, not a failure —
+            // no Sentry, dedicated recovery UI (revamp Step 4)
+            const capRefusal = await readProjectCapError(error);
+            if (capRefusal) {
+                setCapInfo(capRefusal);
+                setStatus('error-cap');
+                trackImportFailed({
+                    recording_id: recordingId,
+                    phase: 'cap',
+                    error: 'project_cap_reached',
+                    is_offline: !navigator.onLine,
+                });
+                return;
+            }
+
             console.error('[ImportPage] Import failed:', error);
             captureImportError(error, {
                 recordingId,
@@ -310,6 +350,8 @@ export function ImportPage() {
                 return 'Sign in required';
             case 'error-upload':
                 return 'Failed to upload project';
+            case 'error-cap':
+                return 'Project limit reached';
         }
     };
 
@@ -324,10 +366,14 @@ export function ImportPage() {
     const progressPercent = status === 'uploading' ? uploadProgress : streamingPercent;
 
     return (
-        <div className="min-h-screen bg-surface-body text-text-main flex flex-col items-center justify-center">
-            <LogoLink />
+        <div className="min-h-screen bg-surface-body text-text-main">
+            {/* state-inactive wash tints the page in both themes so the card reads as a card
+                (light-theme surface tokens are all ~white — a bare card would blend in) */}
+            <div className="min-h-screen bg-state-inactive flex flex-col items-center justify-center px-4 py-10">
+                <div className="w-full max-w-md bg-surface-raised border border-border rounded-[var(--radius-lg)] shadow-float px-6 py-8 flex flex-col items-center">
+                    <LogoLink imgClassName="h-8" />
 
-            <div className="mt-8 text-center max-w-md">
+                    <div className="mt-8 text-center w-full">
                 <div className={`text-lg ${isError ? 'text-destructive' : 'text-text-main'}`}>
                     {getStatusMessage()}
                 </div>
@@ -341,7 +387,7 @@ export function ImportPage() {
                 {/* Progress bar */}
                 {!isError && status !== 'success' && (
                     <div className="mt-6 w-full">
-                        <div className="w-full h-2 bg-surface-raised rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-state-inactive rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-primary transition-all duration-300 ease-out"
                                 style={{ width: `${progressPercent}%` }}
@@ -360,7 +406,15 @@ export function ImportPage() {
                     </div>
                 )}
 
-                {isError && (
+                {status === 'error-cap' && capInfo && storeWorkspaceId && (
+                    <CapRecoveryPanel
+                        cap={capInfo.cap}
+                        workspaceId={storeWorkspaceId}
+                        onRetry={() => performUpload()}
+                    />
+                )}
+
+                {isError && status !== 'error-cap' && (
                     <div className="mt-4 flex flex-col items-center gap-2">
                         {status === 'error-upload' && state.recording && state.screenVideo && (
                             <Button
@@ -378,6 +432,8 @@ export function ImportPage() {
                         </Button>
                     </div>
                 )}
+                    </div>
+                </div>
             </div>
 
             {/* Auth modal — shown when blobs are received but user is not logged in */}

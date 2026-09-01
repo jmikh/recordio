@@ -11,7 +11,7 @@ export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
 export { LogoLink } from './LogoLink';
 export { Modal } from './Modal';
-export { MultiToggle } from './MultiToggle';
+export { MultiToggle, type MultiToggleOption } from './MultiToggle';
 export { ProBadge } from './ProBadge';
 export { ProgressModal } from './ProgressModal';
 export { Scrollbar } from './Scrollbar';

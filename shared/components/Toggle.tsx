@@ -9,6 +9,8 @@ interface ToggleProps {
     children?: ReactNode;
     className?: string;
     disabled?: boolean;
+    /** Accessible name for the switch — required when no `label` names it visually */
+    'aria-label'?: string;
 }
 
 const ANIMATION_DURATION = '200ms';
@@ -20,7 +22,8 @@ export const Toggle: React.FC<ToggleProps> = ({
     label,
     children,
     className = '',
-    disabled = false
+    disabled = false,
+    'aria-label': ariaLabel
 }) => {
     const handleClick = () => {
         if (!disabled) {
@@ -53,6 +56,7 @@ export const Toggle: React.FC<ToggleProps> = ({
             `}
             role="switch"
             aria-checked={value}
+            aria-label={ariaLabel ?? label}
         >
             {/* Sliding Knob */}
             <div

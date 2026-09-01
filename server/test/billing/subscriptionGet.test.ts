@@ -98,6 +98,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
             canBackgroundExport: true,
             can4k: true,
             canInvite: true,
+            canRestore: true,
             projectCap: null,
             trialEndsAt: null,
             canExtendTrial: false,
@@ -130,6 +131,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
             canBackgroundExport: false,
             can4k: false,
             canInvite: false,
+            canRestore: false,
             trialEndsAt: null,
             canExtendTrial: true, // expired unused trial, never-pro (Step 3)
         });
@@ -156,6 +158,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
                 canBackgroundExport: true,
                 can4k: true,
                 canInvite: false, // trials are solo
+                canRestore: true,
                 projectCap: null,
                 trialEndsAt: '2026-06-01T00:00:00.000Z',
                 canExtendTrial: false, // live trial — the offer is post-lapse only

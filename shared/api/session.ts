@@ -16,9 +16,19 @@ export type EmptyRequest = Record<string, never>;
  * user_profile_get's blob; the whole response is null if no profile row.
  * No trial_ends_at since revamp Step 2 — the trial lives on the
  * workspace and reaches the client via entitlements.trialEndsAt.
+ * has_reviewed: the user has (claimed to have) left a CWS review —
+ * gates the LeaveReviewModal; set via /user-review-set.
  */
 export interface UserProfile {
     name: string | null;
+    has_reviewed: boolean;
+}
+
+// ── POST /user-review-set ────────────────────────────────────────
+
+/** Empty body; idempotent (first claim wins). */
+export interface UserReviewSetResponse {
+    hasReviewed: true;
 }
 
 // ── POST /workspace-get-default ──────────────────────────────────

@@ -1,33 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal, XButton, Button } from '@shared/components';
+import { Modal, XButton, Button, MultiToggle, Toggle, type MultiToggleOption } from '@shared/components';
 import { HiOutlineBolt } from 'react-icons/hi2';
-import { TbDeviceDesktop, TbCloud } from 'react-icons/tb';
-import { PiWarningFill } from 'react-icons/pi';
+import { TbLock } from 'react-icons/tb';
 import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
-import { TrialExtendLink } from '../../../billing/TrialExtendLink';
+import { ProUpgradeModal } from '../../../billing/ProUpgradeModal';
+import { useEntitlements } from '../../../billing/useEntitlements';
 import type { CloudRenderPhase } from './useCloudRender';
-import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed } from '../../../analytics';
+import type { ExportQuality } from '@shared/utils/exportQuality';
+import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed, type UpgradeModalReason } from '../../../analytics';
+import { maybeOpenLeaveReviewModal } from '../../../components/LeaveReviewModal';
 
+/** Whole minutes, rounded up — 3.4 min shows as "4 min". */
 function formatDurationLabel(ms: number): string {
-    const totalSeconds = Math.round(ms / 1000);
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    if (m === 0) return `${s} sec`;
-    if (s === 0) return `${m} min`;
-    return `${m} min ${s} sec`;
+    return `${Math.max(1, Math.ceil(ms / 60000))} min`;
 }
 
-function formatResolution(height: number): string {
-    if (height >= 2160) return '4K';
-    if (height >= 1440) return '1440p';
-    if (height >= 1080) return '1080p';
-    if (height >= 720) return '720p';
-    if (height >= 480) return '480p';
-    return `${height}p`;
-}
+/** Selectable output qualities — 2K/4K are pro-gated (entitlements.can4k). */
+type RenderQuality = Extract<ExportQuality, '1080p' | '2K' | '4K'>;
+
+const QUALITY_LABELS: Record<RenderQuality, string> = {
+    '1080p': '1080p',
+    '2K': '1440p',
+    '4K': '4K',
+};
 
 /** Rough estimate for local render time based on video duration */
 function estimateLocalTime(durationMs: number): string {
@@ -41,27 +39,30 @@ type ModalView = 'choose' | 'local' | 'cloud';
 interface DownloadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    hasNonFreeAccess: boolean;
     cloudPhase: CloudRenderPhase;
     cloudProgress: number;
-    onStartCloudRender: () => void;
-    onUpgrade: () => void;
+    onStartCloudRender: (quality: ExportQuality) => void;
 }
 
 export function DownloadModal({
     isOpen,
     onClose,
-    hasNonFreeAccess,
     cloudPhase,
     cloudProgress,
     onStartCloudRender,
-    onUpgrade,
 }: DownloadModalProps) {
     // If cloud render is already in progress, skip choice screen
     const cloudActive = cloudPhase !== 'idle' && cloudPhase !== 'completed' && cloudPhase !== 'failed';
     const [view, setView] = useState<ModalView>(cloudActive ? 'cloud' : 'choose');
 
     const project = useProjectStore(s => s.project);
+    const entitlements = useEntitlements();
+    // Any setting is freely selectable; entitlements are checked on Export
+    const [quality, setQuality] = useState<RenderQuality>('1080p');
+    const [cloudExport, setCloudExport] = useState(true);
+    const [isProModalOpen, setIsProModalOpen] = useState(false);
+    const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>();
+    const [upgradeReason, setUpgradeReason] = useState<UpgradeModalReason>('export');
 
     // Reset view when modal reopens, and clear stale view on close
     useEffect(() => {
@@ -72,6 +73,12 @@ export function DownloadModal({
         }
     }, [isOpen, cloudActive]);
 
+    // Background export finished (fires even with the modal closed — the
+    // component stays mounted) — follow with the review ask
+    useEffect(() => {
+        if (cloudPhase === 'completed') void maybeOpenLeaveReviewModal('export_completed');
+    }, [cloudPhase]);
+
     if (!isOpen) return null;
 
     if (view === 'local') {
@@ -80,6 +87,7 @@ export function DownloadModal({
                 isOpen={isOpen}
                 onClose={onClose}
                 onBack={() => setView('choose')}
+                quality={quality}
             />
         );
     }
@@ -91,7 +99,7 @@ export function DownloadModal({
                 onClose={onClose}
                 phase={cloudPhase}
                 progress={cloudProgress}
-                onStartRender={onStartCloudRender}
+                onStartRender={() => onStartCloudRender(quality)}
             />
         );
     }
@@ -99,10 +107,44 @@ export function DownloadModal({
     // ─── Choice Screen ───────────────────────────────────────
 
     const durationMs = project.timeline.durationMs;
-    const outputHeight = project.settings.outputSize.height;
     const durationLabel = formatDurationLabel(durationMs);
-    const resolutionLabel = formatResolution(outputHeight);
+    const resolutionLabel = QUALITY_LABELS[quality];
     const localEstimate = estimateLocalTime(durationMs);
+
+    const lockIcon = entitlements.can4k ? undefined : <TbLock className="icon-sm" />;
+    const qualityOptions: MultiToggleOption<RenderQuality>[] = [
+        { value: '1080p', label: '1080p', tooltip: 'Full HD' },
+        { value: '2K', label: '1440p', icon: lockIcon, tooltip: entitlements.can4k ? 'QHD' : 'QHD — Pro' },
+        { value: '4K', label: '4K', icon: lockIcon, tooltip: entitlements.can4k ? 'Ultra HD' : 'Ultra HD — Pro' },
+    ];
+
+    // Entitlements gate on Export, not on selection: pick anything, and if
+    // the combination needs Pro the upgrade modal names what's missing
+    const handleExport = () => {
+        const needsHiRes = quality !== '1080p' && !entitlements.can4k;
+        const needsCloud = cloudExport && !entitlements.canBackgroundExport;
+        if (needsHiRes || needsCloud) {
+            setUpgradeFeature(
+                needsHiRes && needsCloud ? undefined
+                    : needsHiRes ? 'high-resolution exports'
+                    : 'cloud exports',
+            );
+            setUpgradeReason(
+                needsHiRes && needsCloud ? 'export'
+                    : needsHiRes ? 'export_4k'
+                    : 'background_export',
+            );
+            setIsProModalOpen(true);
+            return;
+        }
+        if (cloudExport) {
+            trackRenderInCloudClicked(project.id);
+            setView('cloud');
+        } else {
+            trackRenderLocallyClicked(project.id);
+            setView('local');
+        }
+    };
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-lg">
@@ -117,78 +159,46 @@ export function DownloadModal({
                     <XButton onClick={onClose} title="Close" />
                 </div>
 
-                <div className="flex flex-col gap-3">
-                    {/* Cloud card */}
-                    <div className="relative rounded-lg border-2 border-primary p-5">
-                        <span className="absolute -top-2.5 left-4 bg-primary text-text-on-primary text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                            Recommended
-                        </span>
-
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                                <TbCloud className="text-primary" size={22} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-sm font-semibold text-text-highlighted">Cloud render</p>
-                                </div>
-                                <p className="text-sm text-text-muted mt-1 leading-relaxed">
-                                    Renders in the background. Continue your work, get notified when it's ready.
-                                </p>
-
-                                {hasNonFreeAccess ? (
-                                    <Button
-                                        variant="primary"
-                                        onClick={() => { trackRenderInCloudClicked(project.id); setView('cloud'); }}
-                                        className="w-full mt-4"
-                                    >
-                                        Render in cloud
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <Button
-                                            variant="primary"
-                                            onClick={onUpgrade}
-                                            className="w-full mt-4"
-                                        >
-                                            Upgrade
-                                        </Button>
-                                        <TrialExtendLink
-                                            label="or extend your free trial"
-                                            className="w-full mt-2"
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Local card */}
-                    <div className="rounded-lg border border-border p-5">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-md bg-state-inactive flex items-center justify-center shrink-0">
-                                <TbDeviceDesktop className="text-text-muted" size={22} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-sm font-semibold text-text-highlighted">Local render</p>
-                                </div>
-                                <p className="text-sm text-text-muted mt-1 leading-relaxed">
-                                    Renders right here. Free, but you'll need to keep this tab in focus.
-                                </p>
-
-                                <Button
-                                    variant="base"
-                                    onClick={() => { trackRenderLocallyClicked(project.id); setView('local'); }}
-                                    className="w-full mt-4"
-                                >
-                                    Render locally
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-text-main">Resolution</span>
+                    <MultiToggle
+                        options={qualityOptions}
+                        value={quality}
+                        onChange={setQuality}
+                    />
                 </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-text-main">Cloud export</span>
+                        <Toggle
+                            value={cloudExport}
+                            onChange={setCloudExport}
+                            aria-label="Cloud export"
+                        />
+                    </div>
+                    <p className="subtext leading-relaxed">
+                        {cloudExport
+                            ? "Keep working while we make your video — we'll notify you when it's ready."
+                            : `Your video is made in this tab — keep it open and in focus (${localEstimate}).`}
+                    </p>
+                </div>
+
+                <Button
+                    variant="primary"
+                    onClick={handleExport}
+                    className="w-full"
+                >
+                    Export video
+                </Button>
             </div>
+
+            <ProUpgradeModal
+                isOpen={isProModalOpen}
+                onClose={() => setIsProModalOpen(false)}
+                feature={upgradeFeature}
+                reason={upgradeReason}
+            />
         </Modal>
     );
 }
@@ -303,10 +313,12 @@ function LocalRenderView({
     isOpen,
     onClose,
     onBack,
+    quality,
 }: {
     isOpen: boolean;
     onClose: () => void;
     onBack: () => void;
+    quality: ExportQuality;
 }) {
     const { addToast } = useToast();
     const project = useProjectStore(s => s.project);
@@ -317,6 +329,7 @@ function LocalRenderView({
     const { localRenderProgress, startOrCancel } = useLocalRender({
         project,
         projectName,
+        quality,
         videoDecodePreference,
         onDecodeFallback: () => setVideoDecodePreference('cpu'),
     });
@@ -340,8 +353,10 @@ function LocalRenderView({
                         render_duration_s: renderDurationS,
                         input_resolution: `${project.screenSource.size.width}x${project.screenSource.size.height}`,
                         output_resolution: `${project.settings.outputSize.width}x${project.settings.outputSize.height}`,
+                        quality,
                     });
                     onClose();
+                    void maybeOpenLeaveReviewModal('export_completed');
                 } else if (result.error) {
                     trackRenderLocallyFailed({
                         project_id: project.id,

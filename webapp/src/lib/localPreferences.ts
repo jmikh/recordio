@@ -12,7 +12,6 @@
 const THEME_KEY = 'recordio-theme';
 const LEGACY_THEME_KEY = 'recordio-user-storage';
 const SW_DECODE_KEY = 'recordio:prefer-software-decode';
-const REVIEW_TOAST_KEY = 'recordio-review-toast-shown';
 
 export class LocalPreferences {
     // ── Theme ────────────────────────────────────────────────────
@@ -50,15 +49,5 @@ export class LocalPreferences {
 
     static setPreferSoftwareDecode(value: boolean): void {
         localStorage.setItem(SW_DECODE_KEY, value ? 'true' : 'false');
-    }
-
-    // ── Review modal ─────────────────────────────────────────────
-
-    static hasShownReviewModal(): boolean {
-        return localStorage.getItem(REVIEW_TOAST_KEY) === 'true';
-    }
-
-    static markReviewModalShown(): void {
-        localStorage.setItem(REVIEW_TOAST_KEY, 'true');
     }
 }
