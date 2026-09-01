@@ -12,7 +12,7 @@
 -- Workspaces (user1)
 --   Personal          eeeeeeee-0001-...  free (no subscription row)
 --   Teams Workspace   eeeeeeee-0002-...  active subscription, seats = 5
---   Pro Team          eeeeeeee-0003-...  active subscription, no seats
+--   Pro Team          eeeeeeee-0003-...  active subscription, seats = 1
 --   Unpaid Team       eeeeeeee-0004-...  no subscription row
 
 -- ============================================================================
@@ -149,7 +149,7 @@ ON CONFLICT (user_id) DO NOTHING;
 -- 6. Subscriptions (workspace-scoped, workspace_id is now PK)
 --
 --   Teams Workspace → active, seats = 5  (teams tier)
---   Pro Team       → active, no seats   (pro tier)
+--   Pro Team       → active, seats = 1  (pro tier)
 --   Personal user2 → trialing
 --   (personal workspaces for user1/user3 and Unpaid Team have no subscription row)
 -- ============================================================================
@@ -170,7 +170,7 @@ VALUES
     NULL,
     5
 ),
--- user1 · Pro Team: active pro subscription, no seats
+-- user1 · Pro Team: active pro subscription, seats = 1
 (
     'eeeeeeee-0000-0000-0000-000000000003',
     '11111111-1111-1111-1111-111111111111',
@@ -181,7 +181,7 @@ VALUES
     'monthly',
     NOW() + INTERVAL '20 days',
     NULL,
-    NULL
+    1
 )
 -- user2 has no subscription row; their trial is tracked via workspaces.trial_ends_at
 ON CONFLICT (workspace_id) DO NOTHING;
