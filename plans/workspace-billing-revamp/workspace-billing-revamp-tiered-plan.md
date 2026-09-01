@@ -87,13 +87,17 @@ Notes:
 - Interim (Step 1, until Step 2 lands): the server derives a workspace's trial
   state from its OWNER's `user_profiles.trial_ends_at` — same behavior the client
   already had, now enforced server-side behind the entitlements service.
-- Self-serve extension, once: +7 days **from the extension date** (works even if the
-  trial already lapsed). Extension count is tracked. On extension, show a popup
-  inviting a Chrome Web Store review — the extension is granted unconditionally
-  *before* the ask (CWS policy forbids incentivized reviews; never condition the
-  grant on the review).
-- After the one self-serve extension, further extensions go through email to
-  john@recordio.io (manual grant).
+- Self-serve extension, once: +7 days **from the extension date**, offered only
+  **after the trial has ended** (decided 2026-09-01, Step 3 — extending mid-trial
+  would waste remaining time under from-extension-date semantics; both CTA and
+  endpoint refuse until lapse). Extension count is tracked. On extension, show a
+  popup inviting a Chrome Web Store review — the extension is granted
+  unconditionally *before* the ask (CWS policy forbids incentivized reviews;
+  never condition the grant on the review).
+- After the one self-serve extension there is **no further in-product path**
+  (decided 2026-09-01, Step 3 — the email-to-john CTA and manual-grant mechanism
+  were dropped): the CTA simply disappears. Any future "reach out for more time"
+  offer lives outside the product (landing page / support policy).
 
 **Projects & cap**
 - The 14-day project auto-expiry for unsubscribed workspaces is **removed**.
@@ -208,24 +212,25 @@ the trial attached.
 - Open for step doc: existing users who own multiple workspaces (lean: grandfather
   them, block new creation); signup-trigger vs lazy-bootstrap mechanics.
 
-### Step 3 — Trial + extension flow
-*Doc: `workspace-billing-revamp-step-3.md` — created when the step starts.*
+### Step 3 — Trial extension flow
+*Doc: [`workspace-billing-revamp-step-3.md`](workspace-billing-revamp-step-3.md) — planned 2026-09-01.*
 
-**Goal:** 7-day workspace trial, one self-serve extension with review ask, email
-path afterward.
+**Goal:** One self-serve trial extension with post-grant review ask. No email
+path, no banner (both decided 2026-09-01 during step planning).
 
-- Server: trial state in entitlements; extension endpoint (+7d from extension
-  date, increments count, idempotent); manual-grant path for email requests
-  (simplest possible internal mechanism — decide in step doc). Eligibility: the
-  one-way door (§3 Trial) — workspaces that are or have ever been pro are refused
-  extensions, self-serve and manual alike.
-- Frontend: trial banner/countdown; "extend trial" flow; post-grant Chrome Web
-  Store review popup (grant first, ask after — never conditional); after count=1,
-  the extend CTA becomes "email john@recordio.io". No extend CTA at all for
-  ever-pro workspaces.
-- Open for step doc: what the trial-end moment looks like in-product (modal? state
-  of now-locked features); whether existing share links created during trial keep
-  working after it ends (lean: existing links stay live, creating/updating blocked).
+- Server: entitlements payload gains `canExtendTrial: boolean` (true ⇔ trial
+  ended + extension unused + never-pro); `/trial-extend` endpoint — owner-only,
+  +7d from extension date, increments count, atomic conditional update
+  (idempotent). Eligibility: the one-way door (§3 Trial) plus trial-already-ended
+  plus count = 0.
+- Frontend: no banner — an "extend trial" hyperlink on **every upgrade surface**
+  (ProUpgradeModal, ProGate, BillingPage), gated on `canExtendTrial`; post-grant
+  success modal doubles as the Chrome Web Store review ask (grant first, ask
+  after — never conditional). After count=1 or for ever-pro workspaces the link
+  simply disappears.
+- Resolved in step doc: trial-end moment is banner/modal-free (existing Step 1
+  gate treatments carry the offer); existing share links created during trial
+  stay live after it ends (creating/updating stays blocked).
 
 ### Step 4 — Active-project cap (replaces 14-day expiry)
 *Doc: `workspace-billing-revamp-step-4.md` — created when the step starts.*
@@ -354,7 +359,7 @@ transfer-or-delete flow.
 - Free cap N (start 2–3 active projects).
 - Hidden viewer ceiling (~50–100).
 - Render rate limits (per project per day).
-- Trial-end behavior for existing share links (lean: stay live).
+- ~~Trial-end behavior for existing share links~~ — decided Step 3: stay live.
 - ETA threshold for the download upsell.
 - Soft-delete recovery window.
 
