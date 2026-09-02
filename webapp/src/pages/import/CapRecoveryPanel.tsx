@@ -8,7 +8,12 @@ import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import { timeAgo } from '../dashboard/timeAgo';
-import { trackImportCapRecovery } from '../../analytics';
+import {
+    trackDeleteProjectClicked,
+    trackImportProjectCapModalViewed,
+    trackSaveToWorkspaceClicked,
+    trackUpgradeToProClicked,
+} from '../../analytics';
 import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
 
 interface CapRecoveryPanelProps {
@@ -44,6 +49,10 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
     const [busyId, setBusyId] = useState<string | null>(null);
 
     useEffect(() => {
+        trackImportProjectCapModalViewed({ workspace_id: workspaceId });
+    }, [workspaceId]);
+
+    useEffect(() => {
         let cancelled = false;
         (async () => {
             const [projects, wsList] = await Promise.all([
@@ -70,10 +79,10 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
     }, [workspaceId, userId]);
 
     const handleDelete = async (projectId: string) => {
+        trackDeleteProjectClicked({ project_id: projectId, workspace_id: workspaceId });
         setBusyId(projectId);
         try {
             await CloudProjectService.deleteProject(projectId);
-            trackImportCapRecovery({ action: 'delete', workspace_id: workspaceId });
             // No auto-retry — the meter updates and "Save recording" takes over
             setOwnedProjects(prev => prev.filter(p => p.id !== projectId));
         } catch {
@@ -84,10 +93,10 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
     };
 
     const handleSwitch = async (ws: WorkspaceListItem) => {
+        trackSaveToWorkspaceClicked({ workspace_id: ws.id });
         setBusyId(ws.id);
         try {
             await switchWorkspace(ws, userId);
-            trackImportCapRecovery({ action: 'switch_workspace', workspace_id: ws.id });
             onRetry();
         } catch {
             setBusyId(null);
@@ -96,7 +105,7 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
     };
 
     const handleUpgrade = () => {
-        trackImportCapRecovery({ action: 'upgrade', workspace_id: workspaceId });
+        trackUpgradeToProClicked({ workspace_id: workspaceId });
         // New tab — this page still holds the recording
         window.open('/workspace/settings/billing', '_blank');
     };

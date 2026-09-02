@@ -435,12 +435,25 @@ export function trackImportFailed(params: BaseFailureParams & {
     trackEvent('import_failed', params);
 }
 
-/** Which exit the user took from the at-cap recovery panel (revamp Step 4). */
-export function trackImportCapRecovery(params: {
-    action: 'delete' | 'switch_workspace' | 'upgrade';
-    workspace_id: string | null;
+/** The at-cap recovery panel was shown (revamp Step 4). */
+export function trackImportProjectCapModalViewed(params: { workspace_id: string }) {
+    trackEvent('import_project_cap_modal_viewed', params);
+}
+
+export function trackDeleteProjectClicked(params: {
+    project_id: string;
+    workspace_id: string;
 }) {
-    trackEvent('import_cap_recovery', params);
+    trackEvent('delete_project_clicked', params);
+}
+
+/** "Save here" on the at-cap panel — workspace_id is the destination workspace. */
+export function trackSaveToWorkspaceClicked(params: { workspace_id: string }) {
+    trackEvent('save_to_workspace_clicked', params);
+}
+
+export function trackUpgradeToProClicked(params: { workspace_id: string }) {
+    trackEvent('upgrade_to_pro_clicked', params);
 }
 
 export function trackProjectCreationFailed(params: BaseFailureParams & {
