@@ -93,7 +93,7 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
                             { value: 'admin', label: 'Admin' },
                             { value: 'creator', label: 'Creator' },
                             { value: 'viewer', label: 'Viewer' },
-                            ...(canRemove ? [{ value: 'remove' as const, label: 'Remove member' }] : []),
+                            ...(canRemove ? [{ value: 'remove' as const, label: 'Remove', destructive: true }] : []),
                         ]}
                         value={member.role}
                         onChange={value => {

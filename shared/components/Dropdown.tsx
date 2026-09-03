@@ -8,6 +8,8 @@ export interface DropdownOption<T> {
     icon?: React.ReactNode;
     suffix?: React.ReactNode;
     disabled?: boolean;
+    /** Destructive action (e.g. delete/remove) — rendered in red */
+    destructive?: boolean;
 }
 
 interface DropdownProps<T> {
@@ -123,9 +125,11 @@ export function Dropdown<T>({
                             w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 rounded-md
                             ${isDisabled
                                 ? 'text-text-disabled cursor-default'
-                                : isSelected
-                                    ? 'bg-primary/20 text-primary-highlighted'
-                                    : 'text-text-main hover:bg-state-hover'
+                                : option.destructive
+                                    ? 'text-destructive hover:bg-destructive/10'
+                                    : isSelected
+                                        ? 'bg-primary/20 text-primary-highlighted'
+                                        : 'text-text-main hover:bg-state-hover'
                             }
                         `}
                     >

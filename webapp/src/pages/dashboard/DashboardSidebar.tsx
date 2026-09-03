@@ -115,7 +115,7 @@ export function DashboardSidebar({
                         className="w-full flex items-center gap-2 px-4 py-2 border-t border-border text-sm text-text-main hover:bg-state-hover transition-colors cursor-pointer rounded-b-[var(--radius-md)] text-left"
                     >
                         <LuUserPlus className="icon-sm text-text-muted shrink-0" />
-                        Invite teammates
+                        Invite Teammates
                     </button>
                 )}
             </div>
@@ -163,7 +163,7 @@ export function DashboardSidebar({
                         </span>
                         <SidebarNav className="mt-1">
                             <SidebarNavItem
-                                label="Workspace settings"
+                                label="Workspace Settings"
                                 active={activeView === 'settings'}
                                 onClick={() => onViewChange('settings')}
                                 icon={LuSettings}
