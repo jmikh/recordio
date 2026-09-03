@@ -1,6 +1,8 @@
 /**
  * POST /workspace-member-remove — removes a member, transferring their
- * projects in this workspace to the CALLING admin (Part 2 Batch 3).
+ * projects in this workspace to the CALLING admin (Part 2 Batch 3;
+ * seat auto-scaling revamp Step 6 — removing a creator/admin frees a
+ * billed seat, synced after the delete).
  * Ports workspace_member_remove inline in the SQL fn's write order:
  * transfer live projects → strip the member's project_editors rows in
  * this workspace → delete the membership. Owner unremovable; missing
@@ -19,6 +21,7 @@ import {
     WorkspaceMemberRemoveResponseSchema,
 } from '@shared/api/workspaces';
 import { isWorkspaceAdmin } from '../../services/projectAccess.js';
+import { syncSeatQuantity } from '../../services/seatBilling.js';
 
 export const workspaceMemberRemoveRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -54,6 +57,20 @@ export const workspaceMemberRemoveRoutes: FastifyPluginAsyncTypebox = async (app
                 return reply.code(409).send({ error: 'Cannot remove the workspace owner' });
             }
 
+            // Role + identity BEFORE the delete — the seat sync and its
+            // email need them after the row is gone (revamp Step 6).
+            const { rows: memberRows } = await db.query(
+                `SELECT wm.role, u.email,
+                        (SELECT name FROM user_profiles up WHERE up.user_id = wm.user_id) AS name
+                 FROM workspace_members wm
+                 JOIN auth.users u ON u.id = wm.user_id
+                 WHERE wm.workspace_id = $1 AND wm.user_id = $2`,
+                [workspaceId, targetUserId],
+            );
+            const member = memberRows[0] as
+                | { role: 'viewer' | 'creator' | 'admin'; email: string; name: string | null }
+                | undefined;
+
             const { rowCount: transferredCount } = await db.query(
                 `UPDATE projects SET owner_id = $3
                  WHERE workspace_id = $1 AND owner_id = $2 AND deleted_at IS NULL`,
@@ -74,6 +91,18 @@ export const workspaceMemberRemoveRoutes: FastifyPluginAsyncTypebox = async (app
             );
             if ((removed ?? 0) === 0) {
                 return reply.code(404).send({ error: 'Member not found in workspace' });
+            }
+
+            // A removed creator/admin frees a billed seat (revamp Step 6):
+            // recompute-and-set; removals credit unused time to the
+            // account balance. Never throws.
+            if (member && member.role !== 'viewer') {
+                await syncSeatQuantity(app.deps, workspaceId, {
+                    kind: 'removed',
+                    memberEmail: member.email,
+                    memberName: member.name,
+                    role: member.role,
+                }, req.log);
             }
 
             return { transferredCount: transferredCount ?? 0 };

@@ -1,9 +1,9 @@
 /**
  * POST /workspace-get — workspace details for the settings page
  * (Part 2 Batch 3). Ports workspace_get inline: any member of a live
- * workspace; blob with members, PENDING invitations, seats,
- * viewer_seats (seats × 10) and the caller's role. Snake_case jsonb
- * shape kept — no response schema.
+ * workspace; blob with members, PENDING invitations, seats and the
+ * caller's role (viewer_seats dropped in revamp Step 6 — no user-visible
+ * viewer math). Snake_case jsonb shape kept — no response schema.
  *
  * DOCUMENTED DIVERGENCE (live-bug fix, suggested_changes 2026-07-25):
  * the SQL fn filters invitations on `expires_at > now()`, but the
@@ -51,14 +51,12 @@ export const workspaceGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                         SELECT s.seats FROM subscriptions s
                         WHERE s.workspace_id = w.id LIMIT 1
                     ),
-                    'viewer_seats', (
-                        SELECT CASE WHEN s.seats IS NOT NULL THEN s.seats * 10 ELSE NULL END
-                        FROM subscriptions s
-                        WHERE s.workspace_id = w.id LIMIT 1
-                    ),
                     'members',     (
                         -- Owner first, synthesized (no workspace_members
                         -- row since revamp Step 2); member since creation.
+                        -- The owner_id filter below guards against stale
+                        -- pre-Step-2 owner rows, which would duplicate
+                        -- the owner and inflate seat counts.
                         SELECT jsonb_build_array(jsonb_build_object(
                             'user_id',    w.owner_id,
                             'role',       'admin',
@@ -76,6 +74,7 @@ export const workspaceGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                             FROM workspace_members wm
                             JOIN auth.users u ON u.id = wm.user_id
                             WHERE wm.workspace_id = w.id
+                              AND wm.user_id <> w.owner_id
                         )
                     ),
                     'invitations',  (

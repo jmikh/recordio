@@ -149,16 +149,7 @@ export function WorkspaceSettingsPage() {
             )}
 
             <section id="settings-billing" className="border-t border-border pt-10">
-                <BillingSection
-                    seatFloor={details
-                        ? Math.max(1,
-                            details.members.filter(m => m.role !== 'viewer').length +
-                            details.invitations.filter(i => i.role !== 'viewer').length
-                          )
-                        : 1
-                    }
-                    onGoToMembers={() => scrollTo('members')}
-                />
+                <BillingSection onGoToMembers={() => scrollTo('members')} />
             </section>
         </div>
     );

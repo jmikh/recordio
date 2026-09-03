@@ -140,7 +140,7 @@ export const useProjectStore = create<ProjectState>()(
                             gradientDirection: 135,
                             colorMode: 'gradient',
                             backgroundBlurPx: 0,
-                            imageUrl: 'https://cdn.recordio.io/backgrounds/bg10.avif',
+                            imageUrl: 'https://cdn.recordio.io/backgrounds/bg8.avif',
                         };
                     }
                     if (!(projectWithoutEvents.settings as any).zoom) {

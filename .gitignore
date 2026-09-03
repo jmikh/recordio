@@ -22,6 +22,7 @@ supabase/.temp/*
 
 dist.zip
 extension.zip
+.email-preview
 
 # Editor directories and files
 .vscode/*

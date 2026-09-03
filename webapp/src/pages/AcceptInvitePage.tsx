@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LuLoader, LuCircleCheck, LuCircleX } from 'react-icons/lu';
 import { Button, LogoLink } from '@shared/components';
 import { invokeFunction } from '../api/client';
@@ -16,6 +16,10 @@ export function AcceptInvitePage() {
     const [status, setStatus] = useState<Status>('waiting-auth');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [showAuthModal, setShowAuthModal] = useState(false);
+    // accept() can be triggered by both the isAuthenticated effect and the
+    // AuthModal onAuthSuccess callback — only the first call may proceed,
+    // or the loser's request 404s ("already used") after the winner accepts.
+    const acceptStarted = useRef(false);
 
     const accept = async () => {
         if (!token) {
@@ -23,6 +27,8 @@ export function AcceptInvitePage() {
             setStatus('error');
             return;
         }
+        if (acceptStarted.current) return;
+        acceptStarted.current = true;
 
         setStatus('accepting');
         try {
@@ -76,8 +82,13 @@ export function AcceptInvitePage() {
             <PageShell>
                 {status === 'waiting-auth' && (
                     <>
-                        <LuLoader className="text-primary mb-4 animate-spin" size={36} />
-                        <p className="text-sm text-text-muted">Waiting for sign-in…</p>
+                        <h1 className="heading-2 mb-2">You've been invited</h1>
+                        <p className="text-sm text-text-muted mb-6">Sign in to accept your invitation.</p>
+                        {showAuthModal ? (
+                            <LuLoader className="text-primary animate-spin" size={24} />
+                        ) : (
+                            <Button variant="primary" onClick={() => setShowAuthModal(true)}>Sign in</Button>
+                        )}
                     </>
                 )}
 
@@ -109,6 +120,9 @@ export function AcceptInvitePage() {
             <AuthModal
                 isOpen={showAuthModal && !isAuthenticated}
                 onClose={() => setShowAuthModal(false)}
+                eyebrow="You're invited"
+                title="Sign in to accept your invitation"
+                subtitle="Use the email address the invitation was sent to."
                 onAuthSuccess={() => {
                     setShowAuthModal(false);
                     accept();

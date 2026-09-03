@@ -65,8 +65,14 @@ export function startScheduler(
 
     async function tick(trigger: 'startup' | 'interval'): Promise<void> {
         for (const job of jobs) {
-            const period = periodKey(job.period, deps.clock.now());
+            const now = deps.clock.now();
+            const period = periodKey(job.period, now);
             if (lastRunPeriod.get(job.name) === period) continue;
+            // Not claimed: the job stays eligible for the first tick
+            // at/after the gate hour (see JobDefinition.notBeforeUtcHour)
+            if (job.notBeforeUtcHour !== undefined && now.getUTCHours() < job.notBeforeUtcHour) {
+                continue;
+            }
             // Claimed before running: a throwing job waits for the next
             // period instead of retrying every tick (matches the old
             // cron cadence; the work is idempotent catch-up anyway)

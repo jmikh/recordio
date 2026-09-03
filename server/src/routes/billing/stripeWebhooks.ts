@@ -46,6 +46,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import type { FastifyRequest } from 'fastify';
 import { logEvent } from '../../logging.js';
+import { computeBilledSeats } from '../../services/seatBilling.js';
 import type {
     StripeCheckoutSession,
     StripeSubscription,
@@ -197,6 +198,21 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
             'workspace.id': existing.workspace_id,
             'stripe.event_type': eventType,
         });
+
+        // Drift detector (revamp Step 6): Stripe's quantity should always
+        // match the computed billed-seat count — a mismatch means a seat
+        // sync was missed (it self-heals on the next seat event). Log-only.
+        const computed = await computeBilledSeats(app.deps.db, existing.workspace_id);
+        if (seats !== computed) {
+            req.log.warn(
+                {
+                    'workspace.id': existing.workspace_id,
+                    stripe_quantity: seats,
+                    computed_seats: computed,
+                },
+                'seat quantity drift between Stripe and member count',
+            );
+        }
     }
 
     async function handleSubscriptionDeleted(

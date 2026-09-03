@@ -1,13 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
-import { LuMail, LuLoader, LuX, LuEllipsis } from 'react-icons/lu';
-import { Button } from '@shared/components';
+import { useState } from 'react';
+import { LuMail, LuLoader, LuX } from 'react-icons/lu';
+import { Button, Dropdown } from '@shared/components';
 import { invokeFunction } from '../../api/client';
+import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useToast } from '../../components/Toast';
 import { trackWorkspaceInviteFailed } from '../../analytics';
 import { captureError } from '../../lib/sentry';
+import { PRICE_MONTHLY, PRICE_YEARLY } from '../../billing/prices';
 import type { WorkspaceDetails, WorkspaceMember } from './types';
-
-const VIEWER_SEATS_PER_CREATOR = 10;
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
@@ -22,103 +22,6 @@ function Avatar({ name, email }: { name: string | null; email: string }) {
     return (
         <div className="w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-bold shrink-0">
             {initials || '?'}
-        </div>
-    );
-}
-
-// ── Seat panel ────────────────────────────────────────────────────────────────
-
-function SeatPanel({ label, sublabel, used, pending, total, note }: {
-    label: string;
-    sublabel: string;
-    used: number;
-    pending: number;
-    total: number;
-    note?: string;
-}) {
-    const activePct  = Math.min((used / Math.max(total, 1)) * 100, 100);
-    const pendingPct = Math.min(((used + pending) / Math.max(total, 1)) * 100, 100);
-    const available  = Math.max(total - used - pending, 0);
-
-    return (
-        <div>
-            <p className="flex items-baseline gap-1.5 mb-3">
-                <span className="text-eyebrow">{label}</span>
-                <span className="text-xs text-text-muted">· {sublabel}</span>
-            </p>
-            <div className="flex items-baseline justify-between mb-2">
-                <div>
-                    <span className="text-2xl font-bold text-text-highlighted">{used}</span>
-                    <span className="text-sm text-text-muted"> of {total}</span>
-                </div>
-                <span className="text-sm text-text-muted">{available} available</span>
-            </div>
-            <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden relative mb-2">
-                <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-primary/30 transition-all"
-                    style={{ width: `${pendingPct}%` }}
-                />
-                <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all"
-                    style={{ width: `${activePct}%` }}
-                />
-            </div>
-            {note ? (
-                <p className="text-xs text-text-muted">{note}</p>
-            ) : (
-                <div className="flex items-center gap-4 text-xs text-text-muted">
-                    <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-xs bg-primary inline-block shrink-0" />
-                        {used} active
-                    </span>
-                    {pending > 0 && (
-                        <span className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-xs bg-primary/30 inline-block shrink-0" />
-                            {pending} pending
-                        </span>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ── Member action menu ────────────────────────────────────────────────────────
-
-function MemberActionMenu({ onRemove, removing }: { onRemove: () => void; removing: boolean }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!open) return;
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, [open]);
-
-    return (
-        <div className="relative" ref={ref}>
-            <Button
-                variant="icon"
-                icon={removing ? LuLoader : LuEllipsis}
-                onClick={() => setOpen(prev => !prev)}
-                disabled={removing}
-            />
-            {open && (
-                <div className="absolute right-0 top-full mt-1 bg-surface-raised border border-border rounded-md shadow-float py-1 z-10 min-w-37">
-                    <button
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-state-hover cursor-pointer"
-                        onClick={() => { setOpen(false); onRemove(); }}
-                    >
-                        Remove member
-                    </button>
-                </div>
-            )}
         </div>
     );
 }
@@ -165,8 +68,6 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
         }
     };
 
-    const inputClass = "text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main outline-none focus:border-primary transition-colors py-1.5 pl-2.5 pr-7 appearance-none cursor-pointer";
-
     return (
         <div className="flex items-center gap-3 px-4 py-3 bg-surface">
             <Avatar name={member.name} email={member.email} />
@@ -180,43 +81,36 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
                             You
                         </span>
                     )}
-                    {isPlanOwner && (
-                        <span className="text-badge text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wide shrink-0">
-                            Plan Owner
-                        </span>
-                    )}
                 </div>
                 {member.name && (
                     <p className="text-xs text-text-muted truncate">{member.email}</p>
                 )}
             </div>
-            <div className="relative shrink-0">
+            <div className="shrink-0">
                 {canChangeRole ? (
-                    <>
-                        <select
-                            value={member.role}
-                            disabled={updatingRole}
-                            onChange={e => handleRoleChange(e.target.value as 'viewer' | 'creator' | 'admin')}
-                            className={inputClass}
-                        >
-                            <option value="admin">Admin</option>
-                            <option value="creator">Creator</option>
-                            <option value="viewer">Viewer</option>
-                        </select>
-                        {updatingRole && (
-                            <LuLoader className="icon-sm animate-spin absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                    <Dropdown<'viewer' | 'creator' | 'admin' | 'remove'>
+                        options={[
+                            { value: 'admin', label: 'Admin' },
+                            { value: 'creator', label: 'Creator' },
+                            { value: 'viewer', label: 'Viewer' },
+                            ...(canRemove ? [{ value: 'remove' as const, label: 'Remove member' }] : []),
+                        ]}
+                        value={member.role}
+                        onChange={value => {
+                            if (value === 'remove') { onRemove(member.user_id); return; }
+                            handleRoleChange(value);
+                        }}
+                        ariaLabel="Member role"
+                        fullWidth={false}
+                        className={updatingRole || removing ? 'pointer-events-none opacity-50' : ''}
+                        suffix={(updatingRole || removing) && (
+                            <LuLoader className="icon-sm animate-spin text-text-muted" />
                         )}
-                    </>
+                    />
                 ) : (
-                    <span className="text-sm text-text-muted capitalize px-2">{member.role}</span>
+                    <span className="text-sm text-text-muted capitalize px-2">{isPlanOwner ? 'Owner' : member.role}</span>
                 )}
             </div>
-            {canRemove ? (
-                <MemberActionMenu onRemove={() => onRemove(member.user_id)} removing={removing} />
-            ) : (
-                /* preserve layout alignment */
-                <div className="w-8" />
-            )}
         </div>
     );
 }
@@ -234,6 +128,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     onGoToBilling?: () => void;
 }) {
     const { addToast }                    = useToast();
+    const { subscription }                = useWorkspaceStore();
     const [inviteEmail, setInviteEmail]   = useState('');
     const [inviteRole, setInviteRole]     = useState<'viewer' | 'creator'>('creator');
     const [inviting, setInviting]         = useState(false);
@@ -241,19 +136,15 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     const [rescindingId, setRescindingId] = useState<string | null>(null);
     const [resendingId, setResendingId]   = useState<string | null>(null);
 
-    const isAdmin       = details.role === 'admin';
-    const creatorSeats  = details.seats ?? 0;
-    const viewerSeats   = details.viewer_seats ?? creatorSeats * VIEWER_SEATS_PER_CREATOR;
+    const isAdmin = details.role === 'admin';
 
-    const creatorMembers  = details.members.filter(m => m.role === 'creator' || m.role === 'admin');
-    const viewerMembers   = details.members.filter(m => m.role === 'viewer');
-    const creatorPending  = details.invitations.filter(i => i.role === 'creator' || i.role === 'admin');
-    const viewerPending   = details.invitations.filter(i => i.role === 'viewer');
-
-    const availCreator = Math.max(creatorSeats - creatorMembers.length - creatorPending.length, 0);
-    const availViewer  = Math.max(viewerSeats  - viewerMembers.length  - viewerPending.length,  0);
-    const availForRole = inviteRole === 'viewer' ? availViewer : availCreator;
-    const canInvite    = details.seats != null && availForRole > 0;
+    // Seats are invite-driven derived state (billing revamp Step 6):
+    // billed = creator/admin members (the owner is synthesized into the
+    // list as admin); viewers are free; each accepted seat invite bills.
+    const billedMembers = details.members.filter(m => m.role === 'creator' || m.role === 'admin');
+    const viewerMembers = details.members.filter(m => m.role === 'viewer');
+    const pendingSeats  = details.invitations.filter(i => i.role !== 'viewer').length;
+    const seatPrice     = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
 
     const inputClass = "px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
@@ -280,7 +171,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inviteEmail.trim() || !canInvite) return;
+        if (!inviteEmail.trim()) return;
         setInviting(true);
         try {
             const { error } = await invokeFunction('workspace-invite', {
@@ -369,68 +260,68 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                 <p className="text-sm text-text-muted mt-0.5">Invite teammates and manage their access.</p>
             </div>
 
-            {/* Seat panels */}
-            <div className="border border-border rounded-md p-5 grid grid-cols-2 gap-5">
-                <SeatPanel
-                    label="Creator Seats"
-                    sublabel="record & edit"
-                    used={creatorMembers.length}
-                    pending={creatorPending.length}
-                    total={creatorSeats}
-                />
-                <div className="border-l border-border pl-5">
-                    <SeatPanel
-                        label="Viewer Seats"
-                        sublabel="library access only"
-                        used={viewerMembers.length}
-                        pending={viewerPending.length}
-                        total={viewerSeats}
-                        note={`${VIEWER_SEATS_PER_CREATOR} viewer seats per creator on Teams. Included free.`}
-                    />
+            {/* Seat summary — seats are invite-driven (billing revamp Step 6) */}
+            <div className="border border-border rounded-md p-5 flex flex-col gap-2">
+                <div className="flex items-baseline justify-between gap-4">
+                    <div>
+                        <span className="text-2xl font-bold text-text-highlighted">{billedMembers.length}</span>
+                        <span className="text-sm text-text-muted">
+                            {' '}{billedMembers.length === 1 ? 'seat' : 'seats'} ·
+                            {' '}${billedMembers.length * seatPrice}/mo
+                            {subscription?.billingInterval === 'yearly' ? ', billed yearly' : ''}
+                        </span>
+                    </div>
+                    {viewerMembers.length > 0 && (
+                        <span className="text-sm text-text-muted">
+                            {viewerMembers.length} viewer{viewerMembers.length !== 1 ? 's' : ''} · free
+                        </span>
+                    )}
                 </div>
+                <p className="text-xs text-text-muted">
+                    Seats adjust automatically as members join or leave.
+                    {pendingSeats > 0 && ` ${pendingSeats} pending invite${pendingSeats !== 1 ? 's' : ''} — each adds a seat when accepted.`}
+                </p>
             </div>
 
-            {/* Invite form */}
-            {isAdmin && (
+            {/* Invite form — admin/owner only (billing grows on acceptance) */}
+            {isAdmin ? (
                 <div className="border border-border rounded-md p-5">
                     <h3 className="text-sm font-bold text-text-highlighted mb-3">Invite a teammate</h3>
                     <form onSubmit={handleInvite} className="flex gap-2">
                         <input
                             type="email"
+                            aria-label="Teammate email"
                             placeholder="colleague@example.com"
                             value={inviteEmail}
                             onChange={e => setInviteEmail(e.target.value)}
                             className={`${inputClass} flex-1`}
                         />
-                        <select
+                        <Dropdown<'creator' | 'viewer'>
+                            options={[
+                                { value: 'creator', label: 'Creator' },
+                                { value: 'viewer', label: 'Viewer' },
+                            ]}
                             value={inviteRole}
-                            onChange={e => setInviteRole(e.target.value as 'viewer' | 'creator')}
-                            className={`${inputClass} pr-8`}
-                        >
-                            <option value="creator">Creator</option>
-                            <option value="viewer">Viewer</option>
-                        </select>
+                            onChange={setInviteRole}
+                            ariaLabel="Invite role"
+                            fullWidth={false}
+                        />
                         <Button
                             type="submit"
                             variant="primary"
-                            disabled={inviting || !inviteEmail.trim() || !canInvite}
+                            disabled={inviting || !inviteEmail.trim()}
                         >
                             {inviting ? 'Sending…' : 'Send Invite'}
                         </Button>
                     </form>
-                    {!canInvite && (
-                        <p className="text-sm text-text-muted mt-2">
-                            No {inviteRole} seats available.{' '}
-                            <button
-                                type="button"
-                                className="text-primary hover:underline cursor-pointer"
-                                onClick={onGoToBilling}
-                            >
-                                Upgrade seats →
-                            </button>
-                        </p>
-                    )}
+                    <p className="text-xs text-text-muted mt-2">
+                        {inviteRole === 'viewer'
+                            ? 'Viewers are free — library access only.'
+                            : `Each creator seat adds $${seatPrice}/mo, prorated from the day they join.`}
+                    </p>
                 </div>
+            ) : (
+                <p className="text-sm text-text-muted">Only workspace admins can invite members.</p>
             )}
 
             {/* Active members */}

@@ -2,39 +2,35 @@
  * POST /subscription-change — ports the edge function of the same name
  * (Wave A #3, 3/3). First migrated route with a DB WRITE.
  *
- * Previews (dryRun) or applies a seat/interval change on a workspace
- * subscription — single plan since billing revamp Step 1, so there is
- * no plan change anymore; this is also the ONLY legitimate seat-change
- * path until Step 6 replaces manual seat management with invite-driven
- * auto-scaling. Caller must be a workspace admin. Proration is
- * always_invoice: upgrades charge immediately, reductions credit the next
- * invoice. On apply, the DB row is updated immediately so the client's
- * refreshSubscription() reflects the change before the Stripe webhook
- * (which stays authoritative) syncs again.
+ * INTERVAL-ONLY since billing revamp Step 6: seats are invite-driven
+ * derived state (services/seatBilling.ts) — the manual seat path is
+ * gone. `newSeats` is still ACCEPTED but ignored with a log warn (stale
+ * webapp bundles during the deploy window; the field is deleted from
+ * the contract in Step 8). The quantity sent to Stripe is always the
+ * computed billed-seat count, even here. Caller must be a workspace
+ * admin. Proration is always_invoice. On apply, the DB row is updated
+ * immediately so the client's refreshSubscription() reflects the change
+ * before the Stripe webhook (which stays authoritative) syncs again.
  *
  * The edge fn's `subscription_workspace_get` RPC (SECURITY DEFINER, admin
  * check via assert_workspace_admin/auth.uid()) is EXCLUSIVE to that edge
  * fn — its logic is ported inline below and the SQL function becomes a
  * decommission-checklist orphan. Its 403/404 split is preserved: the RPC
  * raised PT403 for non-admin/deleted-workspace (edge fn → 403) but
- * returned NULL for admin-with-no-subscription (→ 404). The edge fn's
- * second, service-role read of the same subscriptions row is collapsed
- * into the same query — over the pg pool there is no user-vs-service-role
- * client split.
+ * returned NULL for admin-with-no-subscription (→ 404).
  *
- * Schema divergences (documented in the migration plan): newSeats is an
- * integer >= 1, and dryRun is REQUIRED — the edge fn treated a missing
- * dryRun as falsy and silently APPLIED the change; failing 400 beats
- * defaulting to the destructive branch. Business-rule 400s keep their
- * exact edge-fn bodies.
+ * dryRun stays REQUIRED — the edge fn treated a missing dryRun as falsy
+ * and silently APPLIED the change; failing 400 beats defaulting to the
+ * destructive branch. Business-rule 400s keep their exact bodies.
  *
- * Request:  { workspaceId, newSeats, newInterval?, dryRun }
+ * Request:  { workspaceId, newInterval?, dryRun, newSeats? (ignored) }
  * Response: { immediateCharge, nextRenewalAmount, billingInterval,
  *             nextRenewalDate, currency }      (dryRun)
  *           { success, seats, billingInterval } (apply)
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { computeBilledSeats } from '../../services/seatBilling.js';
 import type { StripePriceIds } from './stripeCheckout.js';
 
 interface SubscriptionRow {
@@ -61,7 +57,10 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
             schema: {
                 body: Type.Object({
                     workspaceId: Type.String({ minLength: 1 }),
-                    newSeats: Type.Integer({ minimum: 1 }),
+                    /** DEPRECATED (revamp Step 6): accepted-and-ignored for
+                     *  stale webapp bundles; removed from the contract in
+                     *  Step 8. Seats are invite-driven derived state. */
+                    newSeats: Type.Optional(Type.Integer({ minimum: 1 })),
                     newInterval: Type.Optional(
                         Type.Union([Type.Literal('monthly'), Type.Literal('yearly')]),
                     ),
@@ -99,11 +98,17 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
             const { priceIds } = opts;
             if (!priceIds) throw new Error('subscriptionChangeRoutes: priceIds not configured');
 
-            const { workspaceId, newSeats, newInterval, dryRun } = req.body;
+            const { workspaceId, newInterval, dryRun } = req.body;
             req.logCtx.set({
                 'workspace.id': workspaceId,
                 'stripe.dry_run': dryRun,
             });
+            if (req.body.newSeats !== undefined) {
+                req.log.warn(
+                    { 'workspace.id': workspaceId, new_seats: req.body.newSeats },
+                    'subscription-change: deprecated newSeats ignored (seats are invite-driven, revamp Step 6)',
+                );
+            }
 
             // Admin check + subscription in one query, keeping the RPC's
             // 403/404 split: no row = not owner/admin (or deleted
@@ -148,12 +153,13 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                     .send({ error: 'Downgrade from yearly to monthly billing is not supported' });
             }
 
-            // No-op guard — same seats, same interval
+            // No-op guard — interval is the only changeable thing left
+            // (exact legacy body kept for stale webapp bundles)
             const targetInterval = (newInterval ?? sub.billing_interval ?? 'monthly') as
                 | 'monthly'
                 | 'yearly';
             req.logCtx.set({ 'stripe.interval': targetInterval });
-            if (sub.seats === newSeats && sub.billing_interval === targetInterval) {
+            if (sub.billing_interval === targetInterval) {
                 return reply
                     .code(400)
                     .send({ error: 'No change in seats or billing interval' });
@@ -165,19 +171,9 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                     .send({ error: 'No Stripe subscription linked to this workspace' });
             }
 
-            // Seat floor: never fewer seats than current members. +1 is
-            // the owner's seat — they have no workspace_members row
-            // (revamp Step 2) but always occupy a seat.
-            const { rows: countRows } = await app.deps.db.query(
-                'SELECT COUNT(*)::int + 1 AS count FROM workspace_members WHERE workspace_id = $1',
-                [workspaceId],
-            );
-            const memberCount = (countRows[0] as { count: number } | undefined)?.count ?? 1;
-            if (newSeats < memberCount) {
-                return reply.code(400).send({
-                    error: `Cannot set fewer seats than current member count (${memberCount})`,
-                });
-            }
+            // Quantity is derived state everywhere (revamp Step 6): even
+            // an interval change carries the computed billed-seat count.
+            const billedSeats = await computeBilledSeats(app.deps.db, workspaceId);
 
             const stripeSub = await app.deps.stripe.getSubscription(sub.stripe_subscription_id, {
                 expandItemPrices: true,
@@ -199,7 +195,7 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                     subscription: sub.stripe_subscription_id,
                     item: {
                         id: item.id,
-                        quantity: newSeats,
+                        quantity: billedSeats,
                         ...(newPriceId ? { price: newPriceId } : {}),
                     },
                     proration_behavior: 'always_invoice',
@@ -216,7 +212,7 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                 const targetPriceId = newPriceId ?? currentPriceId;
                 if (!targetPriceId) throw new Error('Stripe subscription item has no price');
                 const targetPrice = await app.deps.stripe.getPrice(targetPriceId);
-                const nextRenewalAmount = ((targetPrice.unit_amount ?? 0) * newSeats) / 100;
+                const nextRenewalAmount = ((targetPrice.unit_amount ?? 0) * billedSeats) / 100;
 
                 // Our API version keeps current_period_end on the ITEM (the
                 // edge fn's pinned 2024 version had it on the subscription)
@@ -238,7 +234,7 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                 items: [
                     {
                         id: item.id,
-                        quantity: newSeats,
+                        quantity: billedSeats,
                         ...(newPriceId ? { price: newPriceId } : {}),
                     },
                 ],
@@ -251,12 +247,12 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                 `UPDATE subscriptions
                  SET seats = $2, billing_interval = $3, updated_at = now()
                  WHERE workspace_id = $1`,
-                [workspaceId, newSeats, targetInterval],
+                [workspaceId, billedSeats, targetInterval],
             );
 
             return {
                 success: true as const,
-                seats: newSeats,
+                seats: billedSeats,
                 billingInterval: targetInterval,
             };
         },

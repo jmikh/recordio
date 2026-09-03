@@ -19,7 +19,9 @@ import {
     WorkspaceInviteRequestSchema,
     WorkspaceInviteResponseSchema,
 } from '@shared/api/workspaces';
+import { getWorkspaceEntitlements } from '../../services/entitlements.js';
 import { isWorkspaceAdmin } from '../../services/projectAccess.js';
+import { VIEWER_CEILING } from '../../services/seatBilling.js';
 import { sendWorkspaceInviteEmail } from '../../services/workspaceInviteEmail.js';
 
 export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -45,6 +47,36 @@ export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
 
             if (!await isWorkspaceAdmin(db, workspaceId, userId)) {
                 return reply.code(403).send({ error: 'Requires admin role in this workspace' });
+            }
+
+            // Collaboration is Pro-only (revamp Step 6) — free AND trial
+            // workspaces are strictly solo; dunning (past_due) keeps rights.
+            const entitlements = await getWorkspaceEntitlements(db, app.deps.clock, workspaceId);
+            if (!entitlements.canInvite) {
+                return reply
+                    .code(403)
+                    .send({ error: 'Inviting members requires an active subscription' });
+            }
+
+            // Hidden viewer ceiling (abuse backstop, revamp Step 6) —
+            // accepted viewers + pending viewer invites both count, or the
+            // ceiling is trivially bypassed by mass-inviting.
+            if (role === 'viewer') {
+                const { rows: viewerRows } = await db.query(
+                    `SELECT
+                        (SELECT COUNT(*) FROM workspace_members wm
+                         WHERE wm.workspace_id = $1 AND wm.role = 'viewer')
+                      + (SELECT COUNT(*) FROM workspace_invitations wi
+                         WHERE wi.workspace_id = $1 AND wi.status = 'pending'
+                           AND wi.role = 'viewer' AND wi.email <> $2) AS count`,
+                    [workspaceId, email],
+                );
+                const viewerCount = Number((viewerRows[0] as { count: string | number }).count);
+                if (viewerCount >= VIEWER_CEILING) {
+                    return reply
+                        .code(403)
+                        .send({ error: 'Viewer limit reached — contact support to increase it' });
+                }
             }
 
             // The owner has no workspace_members row (revamp Step 2), so

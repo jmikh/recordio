@@ -121,10 +121,25 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
         ]);
     });
 
-    it('non-admin membership roles also pass the membership check (RPC parity: any member)', async () => {
+    it.each(['viewer', 'creator'] as const)(
+        'non-admin member (%s): 403 — the portal is admin/owner-only (revamp Step 6), no Stripe call',
+        async (role) => {
+            const { app, deps } = testApp();
+            const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
+            await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role });
+            await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+
+            const res = await post(app, validBody(ws.id), await memberToken());
+            expect(res.statusCode).toBe(403);
+            expect(res.json()).toEqual({ error: 'Requires admin role in this workspace' });
+            expect(deps.stripe.portalSessions).toHaveLength(0);
+        },
+    );
+
+    it('invited ADMIN member: 200 (admin authority equals the owner here)', async () => {
         const { app } = testApp();
         const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'viewer' });
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
 
         const res = await post(app, validBody(ws.id), await memberToken());

@@ -1,5 +1,8 @@
 /**
- * POST /workspace-member-remove — Part 2 Batch 3.
+ * POST /workspace-member-remove — Part 2 Batch 3; revamp Step 6:
+ * removing a creator/admin frees a billed seat — the Stripe quantity
+ * syncs DOWN to the computed count after the delete; viewers don't
+ * touch billing.
  * The transfer pin: the removed member's LIVE projects in this
  * workspace repoint to the CALLING admin (not the workspace owner),
  * their project_editors rows in the workspace are stripped, and the
@@ -9,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { buildApp, type App } from '../../src/app.js';
-import { createFakeDeps } from '../fakes/index.js';
+import { createFakeDeps, type FakeDeps } from '../fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from '../helpers/tokens.js';
 import {
     createTestPool,
@@ -22,6 +25,7 @@ import {
     seedAuthUser,
     seedProject,
     seedProjectEditor,
+    seedSubscription,
     seedWorkspace,
     seedWorkspaceMember,
 } from '../helpers/db.js';
@@ -144,5 +148,65 @@ describe.runIf(hasTestDb())('POST /workspace-member-remove (e2e, real Postgres)'
             [ws.id, member.id],
         );
         expect(memberRows).toEqual([]);
+    });
+
+    it('removing a creator syncs the Stripe quantity DOWN and emails the plan owner', async () => {
+        const ws = await workspaceWithAdmin();
+        const member = await seedAuthUser(pool);
+        createdUsers.push(member.id);
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: member.id, role: 'creator' });
+        const stripeSubscriptionId = `sub_remove_${randomUUID().slice(0, 8)}`;
+        await seedSubscription(pool, { workspaceId: ws.id, stripeSubscriptionId, seats: 2 });
+
+        const deps = createFakeDeps({ db: pool }) as FakeDeps;
+        deps.stripe.subscriptions.set(stripeSubscriptionId, {
+            id: stripeSubscriptionId,
+            status: 'active',
+            customer: 'cus_remove_test',
+            items: {
+                data: [{
+                    id: 'si_remove_1',
+                    quantity: 2,
+                    current_period_end: 1800000000,
+                    price: { id: 'price_m', unit_amount: 1500, recurring: { interval: 'month' } },
+                }],
+            },
+        });
+        const app = buildApp(deps, { supabaseJwtSecret: TEST_JWT_SECRET, logLevel: 'silent' });
+
+        const res = await post(app, { workspaceId: ws.id, userId: member.id },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+
+        expect(deps.stripe.subscriptionUpdates).toEqual([{
+            id: stripeSubscriptionId,
+            params: {
+                items: [{ id: 'si_remove_1', quantity: 1 }],
+                proration_behavior: 'always_invoice',
+            },
+        }]);
+        const { rows } = await pool.query(
+            'SELECT seats FROM subscriptions WHERE workspace_id = $1', [ws.id]);
+        expect(rows).toEqual([{ seats: 1 }]);
+        expect(deps.email.sent).toHaveLength(1);
+        expect(deps.email.sent[0].to).toBe('user1@gmail.com');
+        expect(deps.email.sent[0].subject).toContain('your plan is now 1 seat');
+    });
+
+    it('removing a viewer never touches Stripe', async () => {
+        const ws = await workspaceWithAdmin();
+        const member = await seedAuthUser(pool);
+        createdUsers.push(member.id);
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: member.id, role: 'viewer' });
+        await seedSubscription(pool, { workspaceId: ws.id });
+
+        const deps = createFakeDeps({ db: pool }) as FakeDeps;
+        const app = buildApp(deps, { supabaseJwtSecret: TEST_JWT_SECRET, logLevel: 'silent' });
+
+        const res = await post(app, { workspaceId: ws.id, userId: member.id },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+        expect(deps.stripe.subscriptionUpdates).toEqual([]);
+        expect(deps.email.sent).toEqual([]);
     });
 });

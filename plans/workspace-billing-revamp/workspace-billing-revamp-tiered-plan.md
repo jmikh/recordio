@@ -1,6 +1,7 @@
 # Workspace Permissions & Billing Revamp — High-Level Design
 
-**Status:** In progress — Steps 1–4 shipped 2026-09-01 (see Step log).
+**Status:** In progress — Steps 1–4 shipped 2026-09-01, Step 6 shipped
+2026-09-04 (Step 5 deferred; see Step log).
 **Purpose:** Umbrella reference for the billing/permissions revamp. Each step gets its own
 step doc in this folder (`workspace-billing-revamp-step-N.md`), created when that step
 starts — not upfront, since earlier steps' outcomes change later steps.
@@ -61,6 +62,20 @@ Notes:
 - Viewers never consume a seat. A hidden internal viewer ceiling exists as an abuse
   backstop (not shown in product); at the ceiling the admin sees "viewer limit
   reached — contact support". No `seats * 10` math anywhere user-visible.
+- Billing & invite authority (decided 2026-09-03): invitations and every
+  billing mutation — checkout, Stripe portal, plan changes — are admin/owner
+  only, server-enforced; the UI says so explicitly to other roles.
+  `/subscription-get` stays member-readable (entitlements are for everyone).
+  Step 6 closes the pre-existing gaps (portal was member-gated, checkout had
+  no workspace check).
+- Seat-change notification (decided 2026-09-03): every billed-quantity change
+  (invite acceptance +1, member removal / creator→viewer downgrade −1) sends one
+  transactional email to the plan owner — new seat count, new monthly total, and
+  the proration hitting the next invoice. Email only; in-app notification
+  rejected as needless complexity. The invite form's delta preview covers the
+  "before" moment; Stripe receipts stay on as the invoice-level record but are
+  not relied on for the change moment (prorations surface on the next invoice,
+  weeks later).
 
 **Workspace lifecycle**
 - One owned workspace per account, created at signup, undeletable, ownership
@@ -178,7 +193,7 @@ Notes:
 | Share gate | client-only (`Header.tsx`); `/project-share` had no tier check | server-side trial/Pro gate | ✅ Step 1 |
 | Cloud render gate | client-only (`DownloadModal.tsx`); `/render-job-create`, `/mux-video-create` unchecked | server-side gate + rate limits | gate ✅ Step 1; rate limits Step 5 |
 | Download UX | two-button local/cloud modal | one button, tier-decided, ETA + contextual upsell | Step 5 |
-| Seats | `/workspace-seats-set` manual, teams-only | auto-scale on invite accept/remove, route removed | route removed ✅ Step 1 (early — see Step log); auto-scale Step 6 |
+| Seats | `/workspace-seats-set` manual, teams-only | auto-scale on invite accept/remove, route removed | route removed ✅ Step 1 (early — see Step log); auto-scale ✅ Step 6 |
 | Member removal | auto-transfer to caller | transfer-to-self / transfer-to-other / delete choice | Step 7 |
 | Sharing model (`share_policy` private/workspace/public, `project_editors`) | exists | unchanged — already matches target | — |
 
@@ -284,8 +299,10 @@ export as the Pro perk with contextual upsell.
 - Open for step doc: ETA threshold for showing the upsell; notification mechanism
   when a background export completes; behavior when a cached render is stale.
 
-### Step 6 — Seats, invitations & checkout
-*Doc: `workspace-billing-revamp-step-6.md` — created when the step starts.*
+### Step 6 — Seats, invitations & checkout ✅
+*Doc: [`workspace-billing-revamp-step-6.md`](workspace-billing-revamp-step-6.md) — **implemented
+2026-09-04** (pulled forward ahead of Step 5, which is deferred — its gates
+are already server-side since Step 1; Steps 3–7 are parallelizable).*
 
 **Goal:** Upgrade-first, invite-driven auto-scaling billing.
 
@@ -297,9 +314,16 @@ export as the Pro perk with contextual upsell.
   admins change seats via `/subscription-change`, which does Stripe + DB.)
 - Frontend: invite flow shows the billing delta ("adds $X/mo, prorated $Y today");
   workspace settings shows seat count + per-seat price; viewer-limit notice.
-- Open for step doc: race/failure handling between invite acceptance and Stripe
-  update; exact viewer ceiling number; whether admins get an email/receipt on
-  seat changes.
+- Seat-change notification (decided 2026-09-03, pre-step): transactional email
+  to the plan owner on every seat-count change, per §3 Plan & billing — one
+  template, sent from the accept and remove/downgrade paths where the Stripe
+  quantity changes; no in-app notification.
+- Resolved in step doc (2026-09-03 planning): race/failure handling — Stripe
+  quantity is *derived state* (always recomputed as owner + creator/admin rows
+  and set, never incremented; DB commits first, a failed Stripe sync never
+  blocks membership and self-heals on the next seat event). Viewer ceiling: 50.
+  Seat adds invoice immediately; removals credit unused time as account
+  balance (never cash). Invite-form delta is static copy, not a live preview.
 
 ### Step 7 — Lapse handling & member lifecycle
 *Doc: `workspace-billing-revamp-step-7.md` — created when the step starts.*
@@ -418,10 +442,28 @@ transfer-or-delete flow.
   - `expires_at`: no longer written, stale values nulled by migration
     `20260901163840`; column drop stays in Step 8 (deploy-order safety).
 
+- **Step 6 — completed 2026-09-04** ([`workspace-billing-revamp-step-6.md`](workspace-billing-revamp-step-6.md)).
+  Implemented ahead of Step 5 (deferred). Verified: full server suite green
+  (533 tests — new seatBilling service suite, gating/sync pins on
+  invite/accept/remove/role-change, checkout e2e tier, portal authority
+  split, webhook drift detector), server + webapp typecheck, webapp +
+  extension dev builds. Outstanding: manual browser smoke; prod deploy
+  (server → webapp — no migration). Design changes made during
+  implementation (details in the step doc §11):
+  - Seat-change email sends from inside `syncSeatQuantity` (no separate
+    service file); accept-route atomicity via one data-modifying-CTE
+    statement (the Db port has no transaction surface).
+  - The removed seat stepper turned out to be `/subscription-change`'s ONLY
+    webapp caller (there never was an active-sub interval switch UI) — the
+    route is now API-only until an interval UI exists.
+  - Webapp: shared `billing/prices.ts` price constants; Members page seat
+    summary card replaces both SeatPanels; `viewer_seats`/`seats × 10`
+    display fully gone.
+
 ## 7. Global open knobs (tuning, not blockers)
 
 - ~~Free cap N (start 2–3 active projects)~~ — decided Step 4: **5** (`FREE_PROJECT_CAP`).
-- Hidden viewer ceiling (~50–100).
+- ~~Hidden viewer ceiling (~50–100)~~ — decided Step 6 planning (2026-09-03): **50** (`VIEWER_CEILING`), support can raise.
 - Render rate limits (per project per day).
 - ~~Trial-end behavior for existing share links~~ — decided Step 3: stay live.
 - ETA threshold for the download upsell.

@@ -373,6 +373,43 @@ describe.runIf(hasTestDb())('POST /stripe-webhooks (e2e, real Postgres)', () => 
         expect(row.stripe_event_at?.toISOString()).toBe(EVENT_CREATED_ISO);
     });
 
+    it('DRIFT DETECTOR (revamp Step 6): quantity ≠ computed member count logs a warn; sync still applies', async () => {
+        const lines: Record<string, unknown>[] = [];
+        const deps = createFakeDeps({ db: pool });
+        const app = buildApp(deps, {
+            supabaseJwtSecret: TEST_JWT_SECRET,
+            supabaseUrl: TEST_SUPABASE_URL,
+            logStream: {
+                write(chunk: string) {
+                    for (const line of chunk.split('\n')) {
+                        if (line.trim()) lines.push(JSON.parse(line));
+                    }
+                },
+            },
+        });
+        const ws = await seedWs(); // solo owner → computed billed seats = 1
+        const customer = `cus_${randomUUID().slice(0, 8)}`;
+        await seedSubscription(pool, {
+            workspaceId: ws.id, status: 'active', stripeCustomerId: customer, stripeEventAt: null,
+        });
+
+        const res = await post(
+            app,
+            makeEvent('customer.subscription.updated',
+                subPayload(customer, { quantity: 7, periodEnd: 1_787_875_200 })),
+            signed,
+        );
+        expect(res.statusCode).toBe(200);
+
+        // Sync applied as delivered (Stripe is authoritative for the row)…
+        const [row] = await subRows(ws.id);
+        expect(row.seats).toBe(7);
+        // …and the mismatch versus the computed count is warned (log-only —
+        // the next seat event self-heals)
+        const warn = lines.find((l) => l.msg === 'seat quantity drift between Stripe and member count');
+        expect(warn).toMatchObject({ stripe_quantity: 7, computed_seats: 1 });
+    });
+
     it('subscription.updated for an unknown customer → 500 (Stripe retries; covers the checkout race)', async () => {
         const { app } = testApp();
         const res = await post(

@@ -123,6 +123,32 @@ describe('scheduler', () => {
         expect(triggers).toEqual(['startup', 'startup', 'interval', 'interval', 'interval']);
     });
 
+    it('notBeforeUtcHour: earlier ticks skip without claiming; runs on the first tick at/after the hour, once per day', async () => {
+        const deps = createFakeDeps(); // fake clock starts at 2026-01-01T00:00Z
+        const gated = stubJob('test.gated', 'daily');
+        gated.notBeforeUtcHour = 13;
+        const { handle: s } = start(deps, [gated]);
+
+        await s.startup;
+        expect(gated.runs).toBe(0); // 00:00 — skipped, day not claimed
+
+        deps.clock.advance(12 * HOUR);
+        await s.tick();
+        expect(gated.runs).toBe(0); // 12:00 — still before the gate
+
+        deps.clock.advance(HOUR);
+        await s.tick();
+        expect(gated.runs).toBe(1); // 13:00 — runs
+
+        deps.clock.advance(HOUR);
+        await s.tick();
+        expect(gated.runs).toBe(1); // 14:00 — same day, already claimed
+
+        deps.clock.advance(DAY);
+        await s.tick();
+        expect(gated.runs).toBe(2); // next day, past the gate
+    });
+
     it('a fresh scheduler instance re-runs the current period (accepted deploy behavior, by design)', async () => {
         const deps = createFakeDeps();
         const daily = stubJob('test.daily', 'daily');

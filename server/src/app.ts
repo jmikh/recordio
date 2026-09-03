@@ -21,7 +21,6 @@ import { muxVideoCreateRoutes } from './routes/muxVideoCreate.js';
 import { renderJobWebhookRoutes } from './routes/renderJobWebhook.js';
 import { muxVideoWebhookRoutes } from './routes/muxVideoWebhook.js';
 import { stripeWebhooksRoutes } from './routes/billing/stripeWebhooks.js';
-import { sendWelcomeEmailRoutes } from './routes/sendWelcomeEmail.js';
 import { sendWorkspaceInviteEmailRoutes } from './routes/sendWorkspaceInviteEmail.js';
 import { transcribeRoutes } from './routes/transcribe.js';
 import { assetListRoutes } from './routes/assets/assetList.js';
@@ -181,7 +180,6 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(renderJobWebhookRoutes, { renderSecret: opts.renderSecret });
     app.register(muxVideoWebhookRoutes);
     app.register(stripeWebhooksRoutes);
-    app.register(sendWelcomeEmailRoutes, { serviceBearerSecret: opts.serviceRoleKey });
     app.register(sendWorkspaceInviteEmailRoutes, { serviceBearerSecret: opts.serviceRoleKey });
 
     // Part 2 routes — client RPCs ported inline, batch by batch

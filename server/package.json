@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "dev": "tsx --env-file=.env.local src/server.ts",
     "dev:prod": "tsx --env-file=.env.prod src/server.ts",
+    "email:preview": "tsx scripts/previewEmails.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

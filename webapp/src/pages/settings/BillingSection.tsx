@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LuLoader, LuCheck, LuCreditCard, LuShieldCheck, LuExternalLink } from 'react-icons/lu';
+import { LuCheck, LuCreditCard, LuShieldCheck, LuExternalLink } from 'react-icons/lu';
 import { MARKETING_ORIGIN } from '@shared/urls';
 import { Button } from '@shared/components';
 import { AuthManager } from '../../auth/AuthManager';
@@ -9,14 +9,11 @@ import { useUserStore } from '../../auth/useUserStore';
 import { useEntitlements } from '../../billing/useEntitlements';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import { useToast } from '../../components/Toast';
-import { StripeService, SubscriptionChangePreview } from '../../billing/StripeService';
+import { StripeService } from '../../billing/StripeService';
+import { PRICE_MONTHLY, PRICE_YEARLY } from '../../billing/prices';
 import type { BillingInterval } from './types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-// Single per-seat plan (billing revamp Step 1)
-const PRICE_MONTHLY = 15;
-const PRICE_YEARLY  = 12;
 
 // Pro-only highlights shown here; the full Free/Pro matrix lives on the marketing site
 const PRO_HIGHLIGHTS = [
@@ -29,31 +26,15 @@ const PRO_HIGHLIGHTS = [
     'Restore deleted videos for 30 days',
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function daysUntil(isoDate: string): number {
-    return Math.max(1, Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86_400_000));
-}
-
-function prorationLabel(seatDelta: number, nextRenewalDate: string): string {
-    const days = daysUntil(nextRenewalDate);
-    const abs  = Math.abs(seatDelta);
-    const prefix = seatDelta > 0 ? `+${abs}` : `-${abs}`;
-    return `${prefix} seat${abs !== 1 ? 's' : ''} · ${days} day${days !== 1 ? 's' : ''} remaining`;
-}
-
-function formatCurrency(amount: number, currency = 'usd') {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency.toUpperCase(),
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(amount);
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: number; onGoToMembers?: () => void }) {
+/**
+ * No seat stepper since billing revamp Step 6 — seats are invite-driven
+ * derived state (each accepted creator/admin invite bills, removals
+ * credit); the section shows them read-only. Billing mutations
+ * (checkout, portal) are admin/owner-only.
+ */
+export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }) {
     const { hasActivePlan, subscription, workspaceId, workspaceRole } = useWorkspaceStore();
     const entitlements = useEntitlements();
     const { userId, email, isAuthenticated } = useUserStore();
@@ -71,49 +52,10 @@ export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: n
     // ── Manage portal state ───────────────────────────────────────────────────
     const [manageLoading, setManageLoading] = useState(false);
 
-    // ── Seat change state ─────────────────────────────────────────────────────
-    const [pendingSeats,   setPendingSeats]   = useState<number | null>(null);
-    const [preview,        setPreview]        = useState<SubscriptionChangePreview | null>(null);
-    const [previewLoading, setPreviewLoading] = useState(false);
-    const [changeApplying, setChangeApplying] = useState(false);
-    const [changeError,    setChangeError]    = useState<string | null>(null);
-    const [changeSuccess,  setChangeSuccess]  = useState(false);
-
     const isTrialing = entitlements.state === 'trial';
     const isActive   = hasActivePlan && subscription?.status === 'active';
 
-    const currentSeats   = subscription?.seats ?? 1;
-    const displaySeats   = pendingSeats ?? currentSeats;
-    const hasPendingChange = isActive && pendingSeats !== null && pendingSeats !== currentSeats;
-
-    // ── Fetch preview whenever pending seat count changes ────────────────────
-    useEffect(() => {
-        if (!workspaceId) return;
-        if (!hasPendingChange) {
-            setPreview(null);
-            return;
-        }
-
-        setPreviewLoading(true);
-        setPreview(null);
-        setChangeError(null);
-
-        const timer = setTimeout(async () => {
-            const result = await StripeService.subscriptionChange({
-                workspaceId,
-                newSeats: pendingSeats!,
-                dryRun:   true,
-            });
-            setPreviewLoading(false);
-            if (result.preview) {
-                setPreview(result.preview);
-            } else {
-                setChangeError(result.error?.message ?? 'Failed to load preview');
-            }
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [pendingSeats, hasPendingChange, workspaceId]);
+    const currentSeats = subscription?.seats ?? 1;
 
     // ── Poll for checkout activation ──────────────────────────────────────────
     useEffect(() => {
@@ -159,43 +101,9 @@ export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: n
         window.open(url, '_blank');
     };
 
-    const handleConfirmChange = async () => {
-        if (!workspaceId || pendingSeats === null) return;
-        setChangeApplying(true);
-        setChangeError(null);
-        const result = await StripeService.subscriptionChange({
-            workspaceId,
-            newSeats: pendingSeats,
-            dryRun:   false,
-        });
-        setChangeApplying(false);
-        if (result.error) {
-            setChangeError(result.error.message ?? 'Failed to apply change');
-            return;
-        }
-        setChangeSuccess(true);
-        setPendingSeats(null);
-        setPreview(null);
-        await AuthManager.refreshSubscription();
-        setTimeout(() => setChangeSuccess(false), 4000);
-    };
-
-    const handleCancelChange = () => {
-        setPendingSeats(null);
-        setPreview(null);
-        setChangeError(null);
-    };
-
-    const confirmLabel = () => {
-        if (!pendingSeats) return 'Confirm';
-        const delta = pendingSeats - currentSeats;
-        return delta > 0
-            ? `Add ${delta} seat${delta !== 1 ? 's' : ''}`
-            : `Remove ${Math.abs(delta)} seat${Math.abs(delta) !== 1 ? 's' : ''}`;
-    };
-
-    const seatPrice = billingInterval === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
-    const savings   = Math.round((1 - PRICE_YEARLY / PRICE_MONTHLY) * 100);
+    const seatPrice     = billingInterval === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
+    const savings       = Math.round((1 - PRICE_YEARLY / PRICE_MONTHLY) * 100);
+    const planSeatPrice = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
 
     return (
         <div className="w-full flex flex-col gap-8">
@@ -233,7 +141,7 @@ export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: n
                             </p>
                         )}
                     </div>
-                    {hasActivePlan && subscription?.stripeCustomerId && (
+                    {hasActivePlan && subscription?.stripeCustomerId && isAdmin && (
                         <Button variant="base" onClick={handleManage} disabled={manageLoading}>
                             <LuCreditCard className="icon-sm" />
                             {manageLoading ? 'Loading…' : 'Manage billing'}
@@ -241,98 +149,30 @@ export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: n
                     )}
                 </div>
 
-                {/* ── Seat stepper ── */}
-                {isActive && isAdmin && !changeSuccess && (
-                    <div className="flex flex-col gap-3 pt-1 border-t border-border">
+                {/* ── Seats (read-only — invite-driven since revamp Step 6) ── */}
+                {isActive && (
+                    <div className="flex flex-col gap-1.5 pt-4 border-t border-border">
                         <div className="flex items-center justify-between">
                             <span className="text-xs text-text-muted">Seats</span>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setPendingSeats(Math.max(seatFloor, displaySeats - 1))}
-                                    disabled={displaySeats <= seatFloor}
-                                    className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-sm text-text-main hover:bg-state-hover disabled:opacity-30 disabled:cursor-default transition-colors"
-                                >−</button>
-                                <span className="text-sm font-bold text-text-highlighted w-6 text-center">{displaySeats}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setPendingSeats(displaySeats + 1)}
-                                    className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-sm text-text-main hover:bg-state-hover transition-colors"
-                                >+</button>
-                            </div>
+                            <span className="text-sm font-bold text-text-highlighted">
+                                {currentSeats} × ${planSeatPrice} = ${currentSeats * planSeatPrice}/mo
+                                {subscription?.billingInterval === 'yearly' ? ', billed yearly' : ''}
+                            </span>
                         </div>
-                        {displaySeats <= seatFloor && seatFloor > 1 && (
-                            <p className="text-xs text-text-muted">
-                                {seatFloor} seat{seatFloor !== 1 ? 's' : ''} in use.{' '}
-                                <button type="button" onClick={onGoToMembers} className="underline hover:text-text-main">
-                                    Remove members
-                                </button>{' '}
-                                to reduce seats.
-                            </p>
-                        )}
-
-                        {/* Preview panel */}
-                        {hasPendingChange && (
-                            <div className="bg-surface-raised border border-border rounded-lg p-4 flex flex-col gap-3">
-                                {previewLoading && (
-                                    <p className="text-xs text-text-muted flex items-center gap-1.5">
-                                        <LuLoader className="icon-sm animate-spin" /> Calculating…
-                                    </p>
-                                )}
-                                {preview && !previewLoading && (
-                                    <div className="flex flex-col gap-1.5">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-text-muted">
-                                                {preview.immediateCharge > 0 ? 'Charged today' : preview.immediateCharge < 0 ? 'Credit applied' : 'No charge today'}
-                                                {(() => {
-                                                    const delta = (pendingSeats ?? currentSeats) - currentSeats;
-                                                    return delta > 0 && (
-                                                        <span className="block text-2xs opacity-70">
-                                                            {prorationLabel(delta, preview.nextRenewalDate)}
-                                                        </span>
-                                                    );
-                                                })()}
-                                            </span>
-                                            <span className="font-bold text-text-highlighted">
-                                                {preview.immediateCharge !== 0
-                                                    ? formatCurrency(Math.abs(preview.immediateCharge), preview.currency)
-                                                    : '—'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-text-muted">
-                                                Next renewal · {new Date(preview.nextRenewalDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                            </span>
-                                            <span className="font-bold text-text-highlighted">
-                                                {formatCurrency(preview.nextRenewalAmount, preview.currency)}/{preview.billingInterval === 'yearly' ? 'yr' : 'mo'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                                {changeError && (
-                                    <p className="text-xs text-destructive">{changeError}</p>
-                                )}
-                                <div className="flex items-center gap-2 pt-1">
-                                    <Button variant="ghost" onClick={handleCancelChange} disabled={changeApplying}>Cancel</Button>
-                                    <Button
-                                        variant="primary"
-                                        onClick={handleConfirmChange}
-                                        disabled={changeApplying || previewLoading || !preview}
-                                    >
-                                        {changeApplying ? 'Applying…' : confirmLabel()}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+                        <p className="text-xs text-text-muted">
+                            Seats adjust automatically as members join or leave.{' '}
+                            {isAdmin && (
+                                <button type="button" onClick={onGoToMembers} className="underline hover:text-text-main cursor-pointer">
+                                    Manage members
+                                </button>
+                            )}
+                        </p>
                     </div>
                 )}
 
-                {/* ── Success feedback ── */}
-                {changeSuccess && (
-                    <div className="bg-success/10 border border-success/30 rounded-md px-3 py-2 text-xs text-success flex items-center gap-2">
-                        <LuCheck className="icon-sm shrink-0" />
-                        Seats updated successfully.
-                    </div>
+                {/* Non-admins can see the plan, not manage it (revamp Step 6) */}
+                {hasActivePlan && !isAdmin && (
+                    <p className="text-xs text-text-muted">Only workspace admins can manage billing.</p>
                 )}
 
                 {/* ── Checkout polling / success ── */}
@@ -354,8 +194,12 @@ export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: n
                 )}
             </div>
 
-            {/* ── Upgrade — compact; the full comparison lives on the marketing site ── */}
-            {!hasActivePlan && (
+            {/* ── Upgrade — compact; the full comparison lives on the marketing site.
+                 Admin/owner-only: checkout is a billing mutation (revamp Step 6) ── */}
+            {!hasActivePlan && !isAdmin && (
+                <p className="text-sm text-text-muted">Only workspace admins can manage billing.</p>
+            )}
+            {!hasActivePlan && isAdmin && (
                 <div className="border border-border rounded-lg p-5 flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-4">
                         <div>

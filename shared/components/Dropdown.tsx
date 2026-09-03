@@ -142,6 +142,7 @@ export function Dropdown<T>({
         <div ref={dropdownRef} className={`relative ${fullWidth ? 'w-full' : ''} ${className}`}>
             {/* Trigger Button */}
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 aria-label={ariaLabel}
                 aria-haspopup="listbox"

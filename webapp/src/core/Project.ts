@@ -99,7 +99,7 @@ const createDefaultSettings = (): ProjectSettings => ({
         gradientDirection: 135,
         colorMode: 'gradient',
         backgroundBlurPx: 0,
-        imageUrl: `${CDN_ORIGIN}/backgrounds/bg10.avif`
+        imageUrl: `${CDN_ORIGIN}/backgrounds/bg8.avif`
     },
 
     captions: {

@@ -75,7 +75,7 @@ describe.runIf(hasTestDb())('POST /workspace-get (e2e, real Postgres)', () => {
         expect(res.statusCode).toBe(403);
     });
 
-    it('returns details: caller role, seats, viewer_seats, members (owner synthesized first), and PENDING invitations with NULL expires_at (bug pin)', async () => {
+    it('returns details: caller role, seats, members (owner synthesized first), and PENDING invitations with NULL expires_at (bug pin)', async () => {
         const ws = await seedWorkspace(pool, { name: 'Details ws' });
         createdWorkspaces.push(ws.id);
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
@@ -101,8 +101,10 @@ describe.runIf(hasTestDb())('POST /workspace-get (e2e, real Postgres)', () => {
             owner_id: SEEDED_USER_ID,
             role: 'creator', // the CALLER's role
             seats: 3,
-            viewer_seats: 30,
         });
+        // viewer_seats (seats * 10) dropped in revamp Step 6 — no
+        // user-visible viewer math
+        expect(body).not.toHaveProperty('viewer_seats');
 
         // Owner leads, synthesized (no workspace_members row since revamp
         // Step 2); member-since = workspace creation
@@ -115,6 +117,22 @@ describe.runIf(hasTestDb())('POST /workspace-get (e2e, real Postgres)', () => {
         expect(body.invitations[0]).toMatchObject({ email: 'invitee@example.com', role: 'viewer' });
         expect(body.invitations[0]).not.toHaveProperty('expires_at');
         expect(body.invitations.map((i) => i.id)).not.toContain(accepted.id);
+    });
+
+    it('a stale owner membership row does not duplicate the owner (pre-Step-2 data pin)', async () => {
+        // The Step 2 migration deleted owner rows, but a pre-Step-2 server
+        // build re-created some via its lazy bootstrap before it was
+        // restarted — the owner must still appear exactly once.
+        const ws = await seedWorkspace(pool, { name: 'Stale owner row ws' });
+        createdWorkspaces.push(ws.id);
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
+
+        const res = await post(testApp(), { workspaceId: ws.id },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+
+        const body = res.json() as { members: Array<Record<string, unknown>> };
+        expect(body.members.map((m) => m.user_id)).toEqual([SEEDED_USER_ID]);
     });
 
     it('null for a deleted workspace is unreachable via the member gate (403 first)', async () => {

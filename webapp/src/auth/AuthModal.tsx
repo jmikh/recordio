@@ -8,9 +8,20 @@ interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
     onAuthSuccess?: () => void;
+    /** Context copy overrides (e.g. the invite-accept flow) */
+    eyebrow?: string;
+    title?: string;
+    subtitle?: string;
 }
 
-export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
+export function AuthModal({
+    isOpen,
+    onClose,
+    onAuthSuccess,
+    eyebrow = 'Welcome back',
+    title = 'Sign in to keep recording',
+    subtitle = 'Pick up where you left off — your projects are waiting.',
+}: AuthModalProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [devEmail, setDevEmail] = useState('');
@@ -60,13 +71,13 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                 <LogoLink imgClassName="h-8" className="mb-12" />
 
                 <p className="text-eyebrow text-primary mb-3">
-                    Welcome back
+                    {eyebrow}
                 </p>
                 <h2 className="heading-1 mb-2">
-                    Sign in to keep recording
+                    {title}
                 </h2>
                 <p className="text-sm text-text-muted mb-10">
-                    Pick up where you left off — your projects are waiting.
+                    {subtitle}
                 </p>
 
                 {error && (

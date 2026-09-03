@@ -51,7 +51,7 @@ export interface DomainLogFields {
     'asset.type'?: string;
     'storage.path_count'?: number;
     'storage.bytes'?: number;
-    'email.template'?: 'welcome' | 'workspace-invite';
+    'email.template'?: 'welcome' | 'workspace-invite' | 'seat-change';
     error_type?: ErrorType;
 }
 

@@ -62,15 +62,17 @@ export interface WorkspaceInvitationRow {
     created_at: string;
 }
 
-/** workspace_get's blob: details + members + pending invitations. */
+/**
+ * workspace_get's blob: details + members + pending invitations.
+ * viewer_seats (seats * 10) dropped in revamp Step 6 — no viewer-seat
+ * math is user-visible; the viewer ceiling is a hidden server backstop.
+ */
 export interface WorkspaceDetails {
     id: string;
     name: string;
     owner_id: string;
     role: WorkspaceRole;
     seats: number | null;
-    /** Derived server-side: seats * 10 */
-    viewer_seats: number | null;
     members: WorkspaceMemberRow[];
     invitations: WorkspaceInvitationRow[];
     created_at: string;

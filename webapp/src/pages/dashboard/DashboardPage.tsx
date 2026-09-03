@@ -7,7 +7,7 @@ import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
 import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
 import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
 import { XButton, Modal, Button } from '@shared/components';
-import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
+import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
 import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
@@ -24,10 +24,6 @@ import { trackProjectOpened, trackDashboardPageLoaded, trackProjectDeleteFailed,
 import { captureError } from '../../lib/sentry';
 
 import { navigate } from '../../lib/navigate';
-
-const EXTENSION_ID = import.meta.env.DEV
-    ? 'lpponocoanighhephabalkejmdbjlhmi'
-    : 'bbcdpipjplklaneplfmlhhibnllhinii';
 
 /** `showSettings` renders the workspace settings page in the content area (same sidebar). */
 export function DashboardPage({ showSettings = false }: { showSettings?: boolean }) {
@@ -94,17 +90,7 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
 
     const handleRecord = () => {
         trackNewRecordingClicked(workspaceId);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chr = (window as any).chrome;
-        if (!chr?.runtime?.sendMessage) {
-            window.open(CHROME_EXTENSION_URL, '_blank');
-            return;
-        }
-        chr.runtime.sendMessage(EXTENSION_ID, { type: BRIDGE_MSG.OPEN_CONTROLLER }, (response: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-            if (chr.runtime.lastError || !response?.success) {
-                window.open(CHROME_EXTENSION_URL, '_blank');
-            }
-        });
+        window.open(CHROME_EXTENSION_URL, '_blank');
     };
 
     useEffect(() => {

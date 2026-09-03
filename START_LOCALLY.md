@@ -43,6 +43,11 @@ insert into storage.buckets (id, name) values ('project-media', 'project-media')
 ```bash
 # Render worker (needed for export/render features)
 PORT=8090 npx tsx --env-file=render-worker/.env.local render-worker/src/server.ts
+
+# Email previews — renders every template (welcome, invite, seat change)
+# with sample data to server/.email-preview/ and opens them in the
+# browser; nothing is sent
+(cd server && npm run email:preview)
 ```
 
 ### Media storage (local)
