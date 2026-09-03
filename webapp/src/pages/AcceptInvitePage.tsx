@@ -64,7 +64,7 @@ export function AcceptInvitePage() {
         return (
             <PageShell>
                 <LuCircleX className="text-destructive mb-4" size={40} />
-                <h1 className="text-xl font-bold text-text-highlighted mb-2">Invalid link</h1>
+                <h1 className="heading-2 mb-2">Invalid link</h1>
                 <p className="text-sm text-text-muted mb-6">This invitation link is missing a token.</p>
                 <Button variant="primary" onClick={() => { window.location.href = '/'; }}>Go to Dashboard</Button>
             </PageShell>
@@ -91,7 +91,7 @@ export function AcceptInvitePage() {
                 {status === 'success' && (
                     <>
                         <LuCircleCheck className="text-success mb-4" size={40} />
-                        <h1 className="text-xl font-bold text-text-highlighted mb-2">You're in!</h1>
+                        <h1 className="heading-2 mb-2">You're in!</h1>
                         <p className="text-sm text-text-muted">Taking you to your workspace…</p>
                     </>
                 )}
@@ -99,7 +99,7 @@ export function AcceptInvitePage() {
                 {status === 'error' && (
                     <>
                         <LuCircleX className="text-destructive mb-4" size={40} />
-                        <h1 className="text-xl font-bold text-text-highlighted mb-2">Invitation failed</h1>
+                        <h1 className="heading-2 mb-2">Invitation failed</h1>
                         <p className="text-sm text-text-muted mb-6">{errorMsg}</p>
                         <Button variant="primary" onClick={() => { window.location.href = '/'; }}>Go to Dashboard</Button>
                     </>

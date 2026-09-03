@@ -1,18 +1,21 @@
-import { LuLayoutGrid, LuShare2, LuTrash2, LuPlus } from 'react-icons/lu';
+import { LuLayoutGrid, LuShare2, LuTrash2, LuPlus, LuSettings, LuUsers, LuUserPlus } from 'react-icons/lu';
 import { MdOutlineBugReport } from 'react-icons/md';
-import { Button } from '@shared/components';
+import { Button, ProBadge, LogoLink, SidebarNav, SidebarNavItem } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
 import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
+import type { WorkspaceEntitlementsState } from '@shared/api/entitlements';
 
-export type DashboardView = 'all' | 'published' | 'trash';
+export type DashboardView = 'all' | 'workspace' | 'published' | 'trash' | 'settings';
 
 interface DashboardSidebarProps {
     activeView: DashboardView;
     onViewChange: (view: DashboardView) => void;
     projectCount: number;
+    /** Videos shared within the workspace or publicly */
+    workspaceCount: number;
     /** The caller's own live projects — the set the free cap counts (Step 4) */
     ownedProjectCount: number;
     /** Server-sourced cap from entitlements; null = uncapped (trial/pro) */
@@ -28,7 +31,11 @@ interface DashboardSidebarProps {
     currentWorkspaceName: string | null;
     currentRole: 'viewer' | 'creator' | 'admin' | null;
     onSwitchWorkspace: (workspaceId: string) => void;
-    onOpenWorkspaceSettings: () => void;
+    planState: WorkspaceEntitlementsState;
+    /** Active member count from workspace-get; null while loading */
+    memberCount: number | null;
+    onInviteTeammates: () => void;
+    onOpenBilling: () => void;
 }
 
 interface NavItem {
@@ -42,6 +49,7 @@ export function DashboardSidebar({
     activeView,
     onViewChange,
     projectCount,
+    workspaceCount,
     ownedProjectCount,
     projectCap,
     trashCount,
@@ -55,75 +63,120 @@ export function DashboardSidebar({
     currentWorkspaceName,
     currentRole,
     onSwitchWorkspace,
-    onOpenWorkspaceSettings,
+    planState,
+    memberCount,
+    onInviteTeammates,
+    onOpenBilling,
 }: DashboardSidebarProps) {
 
     const libraryItems: NavItem[] = [
-        { icon: LuLayoutGrid, label: 'All Recordings', view: 'all', count: projectCount },
+        { icon: LuLayoutGrid, label: 'Your Videos', view: 'all', count: projectCount },
+        { icon: LuUsers, label: 'Workspace', view: 'workspace', count: workspaceCount },
         { icon: LuShare2, label: 'Published', view: 'published', count: publishedCount },
         { icon: LuTrash2, label: 'Trash', view: 'trash', count: trashCount },
     ];
 
     return (
         <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col">
-            {/* Workspace */}
-            <div className="px-4 pt-4 pb-3">
-                <WorkspaceDropdown
-                    workspaces={workspaces}
-                    currentWorkspaceId={currentWorkspaceId}
-                    currentWorkspaceName={currentWorkspaceName}
-                    currentRole={currentRole}
-                    onSwitch={onSwitchWorkspace}
-                    onOpenSettings={onOpenWorkspaceSettings}
-                />
+            {/* Logo */}
+            <div className="px-3 pt-3">
+                <Button
+                    variant="ghost"
+                    onClick={() => onViewChange('all')}
+                    aria-label="Go to dashboard"
+                    className="w-fit"
+                >
+                    <LogoLink imgClassName="h-6" />
+                </Button>
             </div>
 
-            {/* New Recording */}
-            <div className="px-4 pb-2">
-                <Button variant="primary" size="sm" icon={LuPlus} onClick={onRecord} className="w-full">
-                    New recording
+            {/* Workspace card */}
+            <div className="mx-3 mt-3 mb-3 border border-border rounded-[var(--radius-md)] bg-surface-raised shadow-sm">
+                <div className="px-2 pt-1.5">
+                    <WorkspaceDropdown
+                        workspaces={workspaces}
+                        currentWorkspaceId={currentWorkspaceId}
+                        currentWorkspaceName={currentWorkspaceName}
+                        onSwitch={onSwitchWorkspace}
+                    />
+                </div>
+                <div className="flex items-center gap-2 px-4 pb-2.5 pt-0.5">
+                    <ProBadge variant={planState} />
+                    {memberCount != null && (
+                        <span className="text-xs text-text-muted">
+                            {memberCount} member{memberCount !== 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
+                {currentRole === 'admin' && (
+                    <button
+                        type="button"
+                        onClick={onInviteTeammates}
+                        className="w-full flex items-center gap-2 px-4 py-2 border-t border-border text-sm text-text-main hover:bg-state-hover transition-colors cursor-pointer rounded-b-[var(--radius-md)] text-left"
+                    >
+                        <LuUserPlus className="icon-sm text-text-muted shrink-0" />
+                        Invite teammates
+                    </button>
+                )}
+            </div>
+
+            {/* New Recording — bleeds from the left edge like the nav items (Loom-style) */}
+            <div className="pr-3 pb-2">
+                <Button variant="primary" icon={LuPlus} onClick={onRecord} className="w-full justify-start rounded-l-none rounded-r-lg pl-4">
+                    New Recording
                 </Button>
             </div>
 
             {/* Scrollable middle — bottom bar stays pinned */}
             <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
                 {/* Library */}
-                <div className="px-2 mt-2">
-                    <span className="text-[11px] text-text-muted uppercase tracking-wider px-3 mb-1 block">
+                <div className="mt-2">
+                    <span className="text-eyebrow px-4 mb-1 block">
                         Library
                     </span>
-                    <nav className="flex flex-col gap-0.5 mt-1">
+                    <SidebarNav className="mt-1">
                         {libraryItems.map(item => {
                             const isActive = item.view != null && item.view === activeView;
                             return (
-                                <button
+                                <SidebarNavItem
                                     key={item.label}
-                                    type="button"
+                                    label={item.label}
+                                    active={isActive}
                                     onClick={() => item.view && onViewChange(item.view)}
-                                    className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer text-left ${
-                                        isActive
-                                            ? 'bg-primary/10 text-primary font-medium'
-                                            : 'text-text-main hover:bg-state-hover'
-                                    }`}
-                                >
-                                    <item.icon className="icon-sm shrink-0" />
-                                    <span className="flex-1 truncate">{item.label}</span>
-                                    {item.count !== undefined && (
+                                    icon={item.icon}
+                                    trailing={item.count !== undefined && (
                                         <span className={`text-xs ${isActive ? 'text-primary' : 'text-text-muted'}`}>
                                             {item.count}
                                         </span>
                                     )}
-                                </button>
+                                />
                             );
                         })}
-                    </nav>
+                    </SidebarNav>
                 </div>
+
+                {/* Manage — settings entry, admins only (matches the old dropdown gate) */}
+                {currentRole === 'admin' && (
+                    <div className="mt-4">
+                        <span className="text-eyebrow px-4 mb-1 block">
+                            Manage
+                        </span>
+                        <SidebarNav className="mt-1">
+                            <SidebarNavItem
+                                label="Workspace settings"
+                                active={activeView === 'settings'}
+                                onClick={() => onViewChange('settings')}
+                                icon={LuSettings}
+                            />
+                        </SidebarNav>
+                    </div>
+                )}
 
                 {/* Free plan usage — cap and count come from the server (Step 4) */}
                 {projectCap != null && (
                     <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
                         <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-medium text-text-main">
+                            <span className="text-xs text-text-main">
                                 {ownedProjectCount} of {projectCap} projects used
                             </span>
                         </div>
@@ -137,27 +190,33 @@ export function DashboardSidebar({
                         </div>
                         {ownedProjectCount >= projectCap && (
                             <>
-                                <p className="text-[11px] text-text-muted mt-1.5">
+                                <button
+                                    type="button"
+                                    onClick={onOpenBilling}
+                                    className="text-xs text-primary hover:underline mt-1.5 cursor-pointer block text-left"
+                                >
                                     Upgrade to Pro for unlimited projects
-                                </p>
-                                <TrialExtendLink label="or extend free trial" className="mt-1 text-[11px]" />
+                                </button>
+                                <TrialExtendLink label="or extend free trial" className="mt-1 text-xs" />
                             </>
                         )}
                     </div>
                 )}
             </div>
 
-            {/* Bottom */}
-            <div className="px-3 py-3 border-t border-border flex items-center gap-1">
-                <Button variant="icon" icon={MdOutlineBugReport} onClick={onOpenSupport} title="Report a Bug" />
-                <ThemeToggle />
-                <div className="flex-1" />
+            {/* Bottom — account row; bug report + theme live inside the menu */}
+            <div className="px-2 py-2 border-t border-border">
                 {isAuthenticated ? (
-                    <UserMenu openDirection="up" />
+                    <UserMenu openDirection="up" variant="row" onOpenSupportModal={onOpenSupport} />
                 ) : (
-                    <Button variant="ghost" size="sm" onClick={onOpenAuthModal}>
-                        Sign In
-                    </Button>
+                    <div className="flex items-center gap-1 px-1">
+                        <Button variant="icon" icon={MdOutlineBugReport} onClick={onOpenSupport} title="Report a Bug" />
+                        <ThemeToggle />
+                        <div className="flex-1" />
+                        <Button variant="ghost" size="sm" onClick={onOpenAuthModal}>
+                            Sign In
+                        </Button>
+                    </div>
                 )}
             </div>
         </aside>

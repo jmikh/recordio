@@ -7,5 +7,4 @@ export type {
     WorkspaceDetails,
 } from '@shared/api';
 
-export type Tab = 'general' | 'members' | 'billing';
 export type BillingInterval = 'monthly' | 'yearly';

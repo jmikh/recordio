@@ -248,7 +248,7 @@ function Editor() {
             {/* Error modal — only shown on load failure */}
             <Modal isOpen={!!loadError} maxWidth="max-w-sm">
                 <div className="flex flex-col items-center gap-4 text-center py-2">
-                    <div className="text-text-highlighted font-semibold text-lg">Failed to Load Project</div>
+                    <div className="heading-2">Failed to Load Project</div>
                     <p className="text-text-main text-sm">{loadError}</p>
                     <div className="flex gap-3 mt-2">
                         <button

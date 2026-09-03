@@ -13,7 +13,7 @@ export function UninstallPage() {
             <div className="max-w-md text-center px-6">
                 <img src={logoBackground} alt="Recordio" className="w-14 h-14 mx-auto mb-6" />
 
-                <h1 className="text-2xl font-semibold text-text-highlighted mb-3">
+                <h1 className="heading-1 mb-3">
                     Sad to see you go
                 </h1>
 

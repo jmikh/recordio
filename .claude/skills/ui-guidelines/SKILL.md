@@ -12,6 +12,8 @@ description: UI design system reference for this codebase — covers design toke
 - **Check `shared/components/` before building anything custom** — most common UI needs are already covered
 - **No `style={{}}` for layout/theming** — Tailwind classes only; inline styles are acceptable only for dynamically computed values (positions, widths from state, user color pickers)
 - **Use shadow utilities** (`shadow-sm`, `shadow-float`) — not inline `boxShadow`; these are the only two shadow tokens
+- **Never use arbitrary font sizes** (`text-[10px]` etc.) — the scale is `text-2xs/xs/sm/base` plus `heading-1/2`; see Typography. If you come across an existing arbitrary size (`text-[13px]` and the like) in code you're touching, flag it and suggest replacing it with the nearest scale token
+- **Never use `font-medium`, `font-semibold`, `font-normal`, or any weight other than `font-bold`** — default weight is 500 globally; `font-bold` (700) is the only other weight
 - **Every interactive/status element must be addressable by accessible semantics** — see Labels & Testability below
 
 ---
@@ -49,6 +51,7 @@ All in `shared/components/` (barrel-exported from `@shared/components`). Read th
 | `Checkbox` | Styled checkbox with label |
 | `Slider` | Input range controls |
 | `ProBadge` | Pro/Free tier badge |
+| `SidebarNav` / `SidebarNavItem` | Sidebar navigation lists (dashboard sidebar, editor settings nav): full-bleed left, right margin, sliding accent bar; hover previews the selected look |
 
 ---
 
@@ -99,6 +102,44 @@ Defined in `shared/theme/index.css`. Light and dark themes are fully covered —
 
 ---
 
+## Typography
+
+Global font: Satoshi (Fontshare, weights 400/500/700 only — 400 exists solely for the canvas timeline ruler). Default weight is **500**, applied globally on `html/body/#root` — write nothing for normal text.
+
+### Size scale
+
+`text-xs` is redefined to 13px and `text-2xs` (11px) is added in `@theme` (`shared/theme/index.css`); the rest are Tailwind stock.
+
+| Class | Size / line-height | Usage |
+|---|---|---|
+| `text-2xs` | 11px / 16px | Dense editor chrome only: timecodes, timeline labels; also inside `text-badge`/`text-eyebrow` |
+| `text-xs` | 13px / 18px | Helper/secondary text, metadata, tooltips |
+| `text-sm` | 14px / 20px | Default for almost all normal-sized text: buttons, inputs, menu items, list rows, tabs, card titles |
+| `text-base` | 16px / 24px | Bigger emphasis text on very uncrowded pages: hero/main copy with lots of breathing room |
+| `text-lg` / `text-2xl` | 18px / 24px | Only via `heading-2` / `heading-1` — don't use raw |
+
+Rule of thumb: almost everything → `sm` · main text on a sparse, uncrowded page → `base` · titles → `heading-2`/`heading-1` · helper/metadata → `xs` · dense editor chrome → `2xs`.
+
+### Weights
+
+Exactly two: **500 (default, write nothing)** and **`font-bold` (700)** for headings/emphasis. Never `font-medium` (no-op), `font-semibold`, `font-normal`, or any other weight class. Don't nest lighter-weight text inside a bold/eyebrow element — there is no weight-reset utility; restructure into sibling elements instead.
+
+### Role classes
+
+Use these instead of hand-rolling the combos:
+
+| Class | Definition | Usage |
+|---|---|---|
+| `heading-1` | `text-2xl font-bold text-text-highlighted` | Hero modal/page titles (auth, upgrade) |
+| `heading-2` | `text-lg font-bold text-text-highlighted` | All page titles, modal titles, section headings |
+| `text-eyebrow` | `text-2xs font-bold uppercase tracking-widest text-text-muted` | Tiny uppercase group label above a section (sidebar groups, settings list headers). Never hand-roll `uppercase tracking-widest` |
+| `text-badge` | `text-2xs font-bold leading-none` | Pill/chip/counter typography; bg, padding, and radius stay local |
+| `subtext` | `text-xs text-text-muted text-left` | Helper text in settings panels |
+
+Color overrides compose: `text-eyebrow text-primary` works (utilities beat `@layer components`).
+
+---
+
 ## Icon Sizing
 
 All icons use standardized CSS classes instead of inline `size` props. Defined in `@layer components` in `shared/theme/index.css`.
@@ -134,6 +175,10 @@ Defined in `@layer components` in `shared/theme/index.css`.
 | `scrollbar-hide` | Hides scrollbar cross-browser |
 | `scrollbar-thin` | Thin styled scrollbar |
 | `subtext` | `text-xs text-text-muted text-left` |
+| `heading-1` | Hero modal/page title (see Typography) |
+| `heading-2` | Page/modal/section title (see Typography) |
+| `text-eyebrow` | Uppercase group label (see Typography) |
+| `text-badge` | Pill/chip text (see Typography) |
 
 > These are consumed by `Button` — don't apply `interactive-*` directly on raw elements.
 

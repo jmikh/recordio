@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ScreenSettings } from './ScreenSettings';
@@ -7,7 +7,7 @@ import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
 import { DEVICE_FRAMES } from '@shared/utils/deviceFrames';
-import { Scrollbar } from '@shared/components';
+import { Scrollbar, SidebarNav, SidebarNavItem } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
@@ -53,7 +53,7 @@ export const SettingsPanelButton: React.FC<SettingsPanelButtonProps> = ({
             `}
         >
             <span className="flex">{icon}</span>
-            {label && <span className="text-base font-medium">{label}</span>}
+            {label && <span className="text-base">{label}</span>}
             {isActive && <LuChevronRight className={`icon-sm ${isPrimary ? 'text-white ml-auto' : 'text-primary ml-auto'}`} />}
         </button>
     );
@@ -63,9 +63,6 @@ export const SettingsPanel = () => {
     const activeTab = useUIStore(s => s.settingsPanelActiveTab);
     const setActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
     const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
-    const [accentTop, setAccentTop] = useState(0);
-    const [accentHeight, setAccentHeight] = useState(0);
-    const navRef = useRef<HTMLElement>(null);
 
     // Tooltip state for disabled tabs
     const [hoveredDisabledTab, setHoveredDisabledTab] = useState<string | null>(null);
@@ -82,41 +79,31 @@ export const SettingsPanel = () => {
     };
 
     const navItems = useMemo(() => {
-        const items: { id: SettingsPanelTab; label: string; icon: React.ReactNode; disabled?: boolean; disabledTooltip?: string }[] = [
+        const items: { id: SettingsPanelTab; label: string; icon: React.ComponentType<{ className?: string }>; disabled?: boolean; disabledTooltip?: string }[] = [
 
-            { id: 'background', label: 'Background', icon: <TbBackground className="icon-lg" /> },
-            { id: 'screen', label: 'Screen', icon: <TbDeviceDesktop className="icon-lg" /> },
-            { id: 'effects', label: 'Effects', icon: <TbClick className="icon-lg" /> },
+            { id: 'background', label: 'Background', icon: TbBackground },
+            { id: 'screen', label: 'Screen', icon: TbDeviceDesktop },
+            { id: 'effects', label: 'Effects', icon: TbClick },
             {
                 id: 'camera',
                 label: 'Camera',
-                icon: <PiWebcamBold className="icon-lg" />,
+                icon: PiWebcamBold,
                 disabled: !hasCameraSource,
                 disabledTooltip: 'No camera detected'
             },
             {
                 id: 'captions',
                 label: 'Captions',
-                icon: <TbArticle className="icon-lg" />,
+                icon: TbArticle,
             },
             {
                 id: 'audio',
                 label: 'Audio',
-                icon: <TbMusic className="icon-lg" />,
+                icon: TbMusic,
             },
         ];
         return items;
     }, [hasCameraSource, hasMicrophone]);
-
-    // Calculate accent bar position when active tab changes
-    useEffect(() => {
-        if (!navRef.current) return;
-        const activeButton = navRef.current.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement;
-        if (activeButton) {
-            setAccentTop(activeButton.offsetTop);
-            setAccentHeight(activeButton.offsetHeight);
-        }
-    }, [activeTab, navItems]);
 
     // Check if any timeline item is selected
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
@@ -143,26 +130,18 @@ export const SettingsPanel = () => {
         <div id="settings-panel" className="flex flex-col h-full border-r border-border bg-surface">
             <div className="flex flex-1 min-h-0">
             {/* Sidebar Navigation */}
-            <nav id="settings-nav" ref={navRef} className="relative w-44 flex flex-col py-6 pl-0 pr-3 border-r border-border">
-                <div className="flex flex-col gap-0.5 flex-1">
-                {/* Sliding accent bar — hidden when inspector is active */}
-                {!hasSelection && (
-                    <div
-                        className="absolute left-0 w-[3px] bg-primary rounded-r-sm transition-all duration-200 ease-out"
-                        style={{ top: accentTop, height: accentHeight }}
-                    />
-                )}
-
+            <SidebarNav id="settings-nav" className="w-44 py-6 border-r border-border">
                 {navItems.map((item) => {
-                    const isActive = activeTab === item.id;
                     const isDisabled = item.disabled;
-
-                    const showActive = isActive && !hasSelection;
+                    const showActive = activeTab === item.id && !hasSelection;
 
                     return (
-                        <button
+                        <SidebarNavItem
                             key={item.id}
-                            data-tab={item.id}
+                            label={item.label}
+                            icon={item.icon}
+                            active={showActive}
+                            disabled={isDisabled}
                             onClick={() => !isDisabled && handleTabChange(item.id)}
                             onMouseEnter={(e) => {
                                 if (isDisabled && item.disabledTooltip) {
@@ -175,35 +154,10 @@ export const SettingsPanel = () => {
                                 }
                             }}
                             onMouseLeave={() => setHoveredDisabledTab(null)}
-                            className={`group flex items-center gap-4 py-3 px-4 border-none rounded-r-lg transition-colors duration-200 ${isDisabled
-                                ? 'opacity-50 bg-transparent'
-                                : showActive
-                                    ? 'bg-primary/15 cursor-pointer'
-                                    : 'bg-transparent cursor-pointer hover:bg-surface-hover'
-                                }`}
-                        >
-                            <span className={`flex transition-all ${isDisabled
-                                ? 'text-text-disabled'
-                                : showActive
-                                    ? 'text-primary scale-110'
-                                    : 'text-text-muted group-hover:text-text-main'
-                                }`}>
-                                {item.icon}
-                            </span>
-                            <span className={`text-sm transition-colors ${isDisabled
-                                ? 'text-text-disabled font-medium'
-                                : showActive
-                                    ? 'text-text-highlighted font-semibold'
-                                    : 'text-text-muted font-medium group-hover:text-text-main'
-                                }`}>
-                                {item.label}
-                            </span>
-                        </button>
+                        />
                     );
                 })}
-
-                </div>
-            </nav>
+            </SidebarNav>
 
             {/* Content Area */}
             <div id="settings-content" className="w-80 flex flex-row relative h-full bg-surface-body">

@@ -83,6 +83,8 @@ export interface CloudProjectSummary {
     slug: string | null;
     share_policy: SharePolicy;
     is_shared: boolean;
+    /** Whether the calling user has a project_editors row (project shared with them) */
+    is_editor: boolean;
 }
 
 export interface ProjectListResponse {

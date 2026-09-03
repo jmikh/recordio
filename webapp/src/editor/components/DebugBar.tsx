@@ -29,9 +29,9 @@ export const DebugBar = () => {
 
     return (
         <div className="h-8 flex items-center px-4 gap-2 border-t border-border bg-background">
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mr-2">Debug</span>
+            <span className="text-eyebrow mr-2">Debug</span>
             <button
-                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
+                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-2xs rounded cursor-pointer border border-blue-800"
                 onClick={() => console.log(useProjectStore.getState().project)}
                 title={`Project ID: ${project.id}`}
             >
@@ -39,7 +39,7 @@ export const DebugBar = () => {
             </button>
 
             <button
-                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
+                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-2xs rounded cursor-pointer border border-blue-800"
                 onClick={() => console.log('User Events:', useProjectStore.getState().userEvents)}
                 title="Log user events from store"
             >
@@ -47,7 +47,7 @@ export const DebugBar = () => {
             </button>
 
             <button
-                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-[10px] rounded cursor-pointer border border-blue-800"
+                className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-2xs rounded cursor-pointer border border-blue-800"
                 onClick={() => {
                     const s = useProjectStore.getState();
                     const areas = getAllFocusAreas(s.userEvents, s.project.screenSource.size, s.project.screenSource.durationMs);
@@ -63,7 +63,7 @@ export const DebugBar = () => {
 
             {/* Toggle Button for Debug Overlays */}
             <button
-                className={`px-2 py-0.5 text-[10px] rounded cursor-pointer border ${showDebugOverlays
+                className={`px-2 py-0.5 text-2xs rounded cursor-pointer border ${showDebugOverlays
                     ? 'bg-yellow-600 hover:bg-yellow-700 text-yellow-100 border-yellow-500'
                     : 'bg-gray-700/50 hover:bg-gray-600 text-gray-300 border-gray-600'
                     }`}
@@ -81,11 +81,11 @@ export const DebugBar = () => {
             <div className="w-px h-4 bg-gray-700 mx-2" />
 
             {/* Toast Test Buttons */}
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Toasts</span>
+            <span className="text-eyebrow">Toasts</span>
             {TOAST_TYPES.map(({ type, label, emoji }) => (
                 <button
                     key={type}
-                    className="px-2 py-0.5 bg-purple-900/50 hover:bg-purple-800 text-purple-200 text-[10px] rounded cursor-pointer border border-purple-800"
+                    className="px-2 py-0.5 bg-purple-900/50 hover:bg-purple-800 text-purple-200 text-2xs rounded cursor-pointer border border-purple-800"
                     onClick={() => showTestToast(type)}
                     title={`Show ${type} toast for 5s`}
                 >

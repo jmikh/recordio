@@ -59,10 +59,10 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
             <div className="flex flex-col items-center text-center py-6 px-4">
                 <LogoLink imgClassName="h-8" className="mb-12" />
 
-                <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
+                <p className="text-eyebrow text-primary mb-3">
                     Welcome back
                 </p>
-                <h2 className="text-2xl font-bold text-text-highlighted mb-2">
+                <h2 className="heading-1 mb-2">
                     Sign in to keep recording
                 </h2>
                 <p className="text-sm text-text-muted mb-10">
@@ -79,7 +79,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                     type="button"
                     onClick={handleGoogleSignIn}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-surface hover:bg-state-hover text-text-highlighted font-medium rounded-lg border border-border shadow-sm transition-colors disabled:opacity-50 group"
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-surface hover:bg-state-hover text-text-highlighted rounded-lg border border-border shadow-sm transition-colors disabled:opacity-50 group"
                 >
                     {loading ? (
                         <div className="h-5 w-5 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin"></div>
@@ -91,7 +91,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
                 {import.meta.env.DEV && (
                     <form onSubmit={handleDevSignIn} className="w-full mt-6 border border-border rounded-md p-4 text-left">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-3">Dev login</p>
+                        <p className="text-eyebrow mb-3">Dev login</p>
                         <div className="flex flex-col gap-2 mb-3">
                             <input
                                 type="email"
@@ -113,11 +113,11 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
                         <Button type="submit" variant="primary" disabled={loading || !devEmail || !devPassword} className="w-full">
                             {loading ? 'Signing in…' : 'Sign in / Create account'}
                         </Button>
-                        <p className="text-[10px] text-text-muted mt-2">Account is auto-created on first sign-in.</p>
+                        <p className="subtext mt-2">Account is auto-created on first sign-in.</p>
                     </form>
                 )}
 
-                <p className="text-[11px] text-text-muted mt-6 px-4">
+                <p className="text-xs text-text-muted mt-6 px-4">
                     By continuing, you agree to our{' '}
                     <a href={`${MARKETING_ORIGIN}/terms`} target="_blank" rel="noopener noreferrer" className="underline hover:text-text-highlighted">Terms</a>
                     {' '}and{' '}
@@ -126,7 +126,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
 
                 <div className="mt-12 text-xs text-text-muted">
                     Need help?{' '}
-                    <a href={`mailto:${SUPPORT_EMAIL}`} target="_blank" rel="noopener noreferrer" className="text-text-highlighted font-medium hover:underline">
+                    <a href={`mailto:${SUPPORT_EMAIL}`} target="_blank" rel="noopener noreferrer" className="text-text-highlighted hover:underline">
                         Contact support
                     </a>
                 </div>

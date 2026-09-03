@@ -290,7 +290,7 @@ export function PreRecordingView() {
                     <span className={`${micEnabled ? 'text-primary' : 'text-text-muted'}`}>
                         {micEnabled ? <BiMicrophone className="icon-md" /> : <BiMicrophoneOff className="icon-md" />}
                     </span>
-                    {!micEnabled && <span className="text-sm font-medium text-text-main w-20 shrink-0">Microphone</span>}
+                    {!micEnabled && <span className="text-sm text-text-main w-20 shrink-0">Microphone</span>}
                     {micEnabled ? <AudioLevelBar level={audioLevel} /> : <div className="flex-1" />}
                     <Toggle value={micEnabled} onChange={handleMicToggle} />
                 </div>
@@ -314,7 +314,7 @@ export function PreRecordingView() {
                     <span className={`${camEnabled ? 'text-primary' : 'text-text-muted'}`}>
                         {camEnabled ? <PiWebcamBold className="icon-md" /> : <PiWebcamSlashBold className="icon-md" />}
                     </span>
-                    <span className="text-sm font-medium text-text-main w-20 shrink-0">Camera</span>
+                    <span className="text-sm text-text-main w-20 shrink-0">Camera</span>
                     <div className="flex-1" />
                     <Toggle value={camEnabled} onChange={handleCamToggle} />
                 </div>

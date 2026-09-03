@@ -41,7 +41,7 @@ export function RecordingPhase({ hasAudio, hasCamera, recordingState, onPauseRes
                 {/* Timer row */}
                 <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 bg-destructive rounded-full shrink-0 ${isPaused ? '' : 'animate-pulse'}`} />
-                    <span className="text-3xl font-semibold tabular-nums tracking-wide text-text-highlighted">
+                    <span className="text-3xl font-bold tabular-nums tracking-wide text-text-highlighted">
                         {formatTime(elapsed)}
                     </span>
                     <div className="flex items-center gap-2 ml-2">

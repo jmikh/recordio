@@ -61,7 +61,7 @@ export function WelcomeApp() {
 
                 {/* Logo + heading */}
                 <div className="flex flex-col items-center gap-4">
-                    <h1 className="text-3xl font-semibold text-text-highlighted flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-text-highlighted flex items-center gap-3">
                         <img src={logoIcon} alt="Recordio" className="h-8 w-8" />
                         Welcome to Recordio
                     </h1>
@@ -124,9 +124,9 @@ function StepCard({ number, title, description, bare = false, children }: {
         <div className="flex flex-col gap-4 bg-surface rounded-lg border border-border p-5">
             <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-semibold text-primary">{number}</span>
+                    <span className="text-xs font-bold text-primary">{number}</span>
                 </div>
-                <span className="text-sm font-semibold text-text-highlighted">{title}</span>
+                <span className="text-sm font-bold text-text-highlighted">{title}</span>
             </div>
             {bare ? children : (
                 <div className="w-full">
@@ -150,14 +150,14 @@ function PermissionRow({ label, state, requesting, icon, onRequest }: {
             <span className={state === 'granted' ? 'text-primary' : 'text-text-muted'}>
                 {icon}
             </span>
-            <span className="text-xs font-medium text-text-main flex-1">{label}</span>
+            <span className="text-xs text-text-main flex-1">{label}</span>
             {state === 'granted' ? (
-                <span className="flex items-center gap-1 text-xs text-success font-medium">
+                <span className="flex items-center gap-1 text-xs text-success">
                     <MdCheckCircle className="icon-sm" />
                     Allowed
                 </span>
             ) : state === 'denied' ? (
-                <span className="text-xs text-destructive font-medium">Denied</span>
+                <span className="text-xs text-destructive">Denied</span>
             ) : (
                 <Button variant="base" onClick={onRequest} disabled={requesting}>
                     {requesting ? 'Requesting…' : 'Allow'}

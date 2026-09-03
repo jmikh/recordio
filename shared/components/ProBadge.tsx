@@ -17,7 +17,7 @@ const variantLabels = {
 
 export function ProBadge({ variant = 'pro', className = '' }: ProBadgeProps) {
     return (
-        <span className={`${variantStyles[variant]} text-text-on-primary text-[10px] font-bold px-2 py-0.5 rounded leading-none uppercase ${className}`}>
+        <span className={`${variantStyles[variant]} text-text-on-primary text-badge px-2 py-0.5 rounded uppercase ${className}`}>
             {variantLabels[variant]}
         </span>
     );

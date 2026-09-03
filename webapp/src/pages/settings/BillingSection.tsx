@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { LuLoader, LuCheck, LuX, LuCreditCard, LuShieldCheck } from 'react-icons/lu';
+import { LuLoader, LuCheck, LuCreditCard, LuShieldCheck, LuExternalLink } from 'react-icons/lu';
+import { MARKETING_ORIGIN } from '@shared/urls';
 import { Button } from '@shared/components';
 import { AuthManager } from '../../auth/AuthManager';
 import { invokeFunction } from '../../api/client';
@@ -10,13 +11,23 @@ import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import { useToast } from '../../components/Toast';
 import { StripeService, SubscriptionChangePreview } from '../../billing/StripeService';
 import type { BillingInterval } from './types';
-import { trackBillingPageLoaded } from '../../analytics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 // Single per-seat plan (billing revamp Step 1)
 const PRICE_MONTHLY = 15;
 const PRICE_YEARLY  = 12;
+
+// Pro-only highlights shown here; the full Free/Pro matrix lives on the marketing site
+const PRO_HIGHLIGHTS = [
+    'Background & 4K export',
+    'Share videos by link',
+    'Team workspace with roles',
+    'Captions-based editing & word-by-word highlights',
+    'Custom background uploads',
+    'OpenAI transcription',
+    'Restore deleted videos for 30 days',
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,7 +53,7 @@ function formatCurrency(amount: number, currency = 'usd') {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: number; onGoToMembers?: () => void }) {
+export function BillingSection({ seatFloor = 1, onGoToMembers }: { seatFloor?: number; onGoToMembers?: () => void }) {
     const { hasActivePlan, subscription, workspaceId, workspaceRole } = useWorkspaceStore();
     const entitlements = useEntitlements();
     const { userId, email, isAuthenticated } = useUserStore();
@@ -74,8 +85,6 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
     const currentSeats   = subscription?.seats ?? 1;
     const displaySeats   = pendingSeats ?? currentSeats;
     const hasPendingChange = isActive && pendingSeats !== null && pendingSeats !== currentSeats;
-
-    useEffect(() => { trackBillingPageLoaded(workspaceId); }, []);
 
     // ── Fetch preview whenever pending seat count changes ────────────────────
     useEffect(() => {
@@ -189,9 +198,9 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
     const savings   = Math.round((1 - PRICE_YEARLY / PRICE_MONTHLY) * 100);
 
     return (
-        <div className="w-full max-w-3xl flex flex-col gap-8">
+        <div className="w-full flex flex-col gap-8">
             <div>
-                <h2 className="text-base font-semibold text-text-highlighted mb-1">Plans & Billing</h2>
+                <h2 className="heading-2 mb-1">Plans & Billing</h2>
                 <p className="text-sm text-text-muted">Manage your plan and payment details.</p>
             </div>
 
@@ -201,11 +210,11 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                 {/* Plan name + manage button */}
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex flex-col gap-1">
-                        <p className="text-xs text-text-muted uppercase tracking-wide font-medium">Current plan</p>
-                        <p className="text-sm font-semibold text-text-highlighted">
+                        <p className="text-xs text-text-muted uppercase tracking-wide">Current plan</p>
+                        <p className="text-sm font-bold text-text-highlighted">
                             {isTrialing ? 'Pro (Trial)' : entitlements.state === 'free' ? 'Free' : 'Pro'}
                             {hasActivePlan && subscription != null && (
-                                <span className="text-text-muted font-normal ml-1.5">· {subscription.seats} seat{subscription.seats !== 1 ? 's' : ''}</span>
+                                <span className="text-text-muted ml-1.5">· {subscription.seats} seat{subscription.seats !== 1 ? 's' : ''}</span>
                             )}
                         </p>
                         {isTrialing && entitlements.trialEndsAt && (
@@ -236,7 +245,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                 {isActive && isAdmin && !changeSuccess && (
                     <div className="flex flex-col gap-3 pt-1 border-t border-border">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-text-muted font-medium">Seats</span>
+                            <span className="text-xs text-text-muted">Seats</span>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
@@ -244,7 +253,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                     disabled={displaySeats <= seatFloor}
                                     className="w-7 h-7 rounded-md border border-border flex items-center justify-center text-sm text-text-main hover:bg-state-hover disabled:opacity-30 disabled:cursor-default transition-colors"
                                 >−</button>
-                                <span className="text-sm font-semibold text-text-highlighted w-6 text-center">{displaySeats}</span>
+                                <span className="text-sm font-bold text-text-highlighted w-6 text-center">{displaySeats}</span>
                                 <button
                                     type="button"
                                     onClick={() => setPendingSeats(displaySeats + 1)}
@@ -278,13 +287,13 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                                 {(() => {
                                                     const delta = (pendingSeats ?? currentSeats) - currentSeats;
                                                     return delta > 0 && (
-                                                        <span className="block text-[10px] opacity-70">
+                                                        <span className="block text-2xs opacity-70">
                                                             {prorationLabel(delta, preview.nextRenewalDate)}
                                                         </span>
                                                     );
                                                 })()}
                                             </span>
-                                            <span className="font-semibold text-text-highlighted">
+                                            <span className="font-bold text-text-highlighted">
                                                 {preview.immediateCharge !== 0
                                                     ? formatCurrency(Math.abs(preview.immediateCharge), preview.currency)
                                                     : '—'}
@@ -294,7 +303,7 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                                             <span className="text-text-muted">
                                                 Next renewal · {new Date(preview.nextRenewalDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                             </span>
-                                            <span className="font-semibold text-text-highlighted">
+                                            <span className="font-bold text-text-highlighted">
                                                 {formatCurrency(preview.nextRenewalAmount, preview.currency)}/{preview.billingInterval === 'yearly' ? 'yr' : 'mo'}
                                             </span>
                                         </div>
@@ -345,144 +354,77 @@ export function BillingPage({ seatFloor = 1, onGoToMembers }: { seatFloor?: numb
                 )}
             </div>
 
-            {/* ── Pricing header: label + interval toggle ── */}
-            <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-text-highlighted">Change your plan</h3>
-                <div className="flex items-center gap-1 bg-state-inactive rounded-full p-1">
-                    {(['monthly', 'yearly'] as BillingInterval[]).map(iv => (
-                        <button
-                            key={iv}
-                            onClick={() => setBillingInterval(iv)}
-                            className={`py-1.5 px-4 text-xs font-medium rounded-full transition-all flex items-center gap-1.5 ${
-                                billingInterval === iv
-                                    ? 'bg-primary text-text-on-primary shadow-sm'
-                                    : 'text-text-muted hover:text-text-main'
-                            }`}
+            {/* ── Upgrade — compact; the full comparison lives on the marketing site ── */}
+            {!hasActivePlan && (
+                <div className="border border-border rounded-lg p-5 flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-sm font-bold text-text-highlighted">Upgrade to Pro</h3>
+                            <p className="text-xs text-text-muted mt-0.5">
+                                ${seatPrice} / seat / month · {billingInterval === 'yearly' ? 'billed annually' : 'billed monthly'}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-1 bg-state-inactive rounded-full p-1 shrink-0">
+                            {(['monthly', 'yearly'] as BillingInterval[]).map(iv => (
+                                <button
+                                    key={iv}
+                                    type="button"
+                                    onClick={() => setBillingInterval(iv)}
+                                    className={`py-1 px-3 text-xs rounded-full transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        billingInterval === iv
+                                            ? 'bg-primary text-text-on-primary shadow-sm'
+                                            : 'text-text-muted hover:text-text-main'
+                                    }`}
+                                >
+                                    {iv === 'monthly' ? 'Monthly' : 'Annual'}
+                                    {iv === 'yearly' && (
+                                        <span className={`text-badge px-1.5 py-0.5 rounded-full ${
+                                            billingInterval === 'yearly'
+                                                ? 'bg-text-on-primary/20 text-text-on-primary'
+                                                : 'bg-primary/15 text-primary'
+                                        }`}>
+                                            -{savings}%
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Pro-only highlights */}
+                    <ul className="flex flex-col gap-1.5">
+                        {PRO_HIGHLIGHTS.map(feature => (
+                            <li key={feature} className="flex items-center gap-2 text-sm text-text-main">
+                                <LuCheck className="icon-sm text-success shrink-0" />
+                                {feature}
+                            </li>
+                        ))}
+                    </ul>
+
+                    <Button
+                        variant="primary"
+                        fullWidth
+                        onClick={handleCheckout}
+                        disabled={checkoutLoading || checkingStatus}
+                    >
+                        {checkoutLoading ? 'Loading…' : checkingStatus ? 'Waiting…' : 'Upgrade to Pro'}
+                    </Button>
+
+                    <div className="flex items-center justify-between gap-4 text-xs text-text-muted">
+                        <span className="flex items-center gap-1">
+                            <LuShieldCheck className="icon-sm" /> Secure with Stripe · Cancel anytime
+                        </span>
+                        <a
+                            href={`${MARKETING_ORIGIN}/pricing`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-primary hover:underline shrink-0"
                         >
-                            {iv === 'monthly' ? 'Monthly' : 'Annual'}
-                            {iv === 'yearly' && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                                    billingInterval === 'yearly'
-                                        ? 'bg-text-on-primary/20 text-text-on-primary'
-                                        : 'bg-primary/15 text-primary'
-                                }`}>
-                                    -{savings}%
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* ── Pricing cards ── */}
-            <div className="grid grid-cols-2 gap-4">
-
-                {/* Free */}
-                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${entitlements.state === 'free' ? 'border-primary' : 'border-border'}`}>
-                    {entitlements.state === 'free' && (
-                        <span className="absolute -top-3 right-4 bg-primary text-text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
-                            Current plan
-                        </span>
-                    )}
-                    <div>
-                        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Free</h3>
-                        <div className="mb-0.5">
-                            <span className="text-2xl font-bold text-text-highlighted">$0</span>
-                            <span className="text-xs text-text-muted ml-1">/ forever</span>
-                        </div>
-                        <p className="text-xs text-text-muted">No card needed</p>
+                            Compare all plans <LuExternalLink className="icon-sm" />
+                        </a>
                     </div>
-                    {entitlements.state !== 'free' && (
-                        <div className="py-1.5 px-3 rounded-full bg-state-inactive text-text-disabled text-xs font-medium text-center">
-                            Not available
-                        </div>
-                    )}
-                    <p className="text-xs text-text-muted">For one-off projects</p>
                 </div>
-
-                {/* Pro */}
-                <div className={`border-2 rounded-xl p-5 flex flex-col gap-4 relative ${isActive ? 'border-primary' : 'border-border'}`}>
-                    {isActive && (
-                        <span className="absolute -top-3 right-4 bg-primary text-text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
-                            Current plan
-                        </span>
-                    )}
-                    <div>
-                        <h3 className="text-xs font-semibold text-primary uppercase tracking-wide mb-3">Pro</h3>
-                        <div className="mb-0.5">
-                            <span className="text-2xl font-bold text-text-highlighted">${seatPrice}</span>
-                            <span className="text-xs text-text-muted ml-1">/ seat / month</span>
-                        </div>
-                        <p className="text-xs text-text-muted">{billingInterval === 'yearly' ? 'Billed annually' : 'Billed monthly'}</p>
-                    </div>
-                    {!hasActivePlan ? (
-                        <Button variant="primary" fullWidth onClick={handleCheckout} disabled={checkoutLoading || checkingStatus}>
-                            {checkoutLoading ? 'Loading…' : checkingStatus ? 'Waiting…' : 'Upgrade to Pro'}
-                        </Button>
-                    ) : (
-                        <div className="py-1.5 px-3 rounded-full bg-state-inactive text-text-muted text-xs font-medium text-center">
-                            Current plan
-                        </div>
-                    )}
-                    <p className="text-xs text-text-muted">Solo or with your team — seats scale as you invite</p>
-                </div>
-            </div>
-
-            {/* ── Feature comparison table ── */}
-            <div className="border border-border rounded-xl overflow-hidden">
-                <div className="grid grid-cols-3 px-4 py-3 bg-surface-raised border-b border-border">
-                    <span className="text-xs font-semibold text-text-highlighted">Feature</span>
-                    <span className="text-xs font-semibold text-text-muted text-center">Free</span>
-                    <span className="text-xs font-semibold text-primary text-center">Pro</span>
-                </div>
-                {[
-                    { category: 'Recording' },
-                    { label: 'Record + edit',                  free: true,      pro: true      },
-                    { label: 'DOM-aware auto-zoom',            free: true,      pro: true      },
-                    { category: 'Rendering & Transcription' },
-                    { label: 'In-browser export (1080p)',      free: true,      pro: true      },
-                    { label: 'Background export',              free: false,     pro: true      },
-                    { label: '4K export',                      free: false,     pro: true      },
-                    { label: 'Transcription',                  free: 'Local',   pro: 'OpenAI'  },
-                    { label: 'Restore deleted videos',         free: false,     pro: '30 days' },
-                    { category: 'Editing' },
-                    { label: 'Remove silences',                free: true,      pro: true      },
-                    { label: 'Background presets',             free: true,      pro: true      },
-                    { label: 'Custom background upload',       free: false,     pro: true      },
-                    { label: 'Captions-based editing',         free: false,     pro: true      },
-                    { label: 'Word-by-word caption highlight', free: false,     pro: true      },
-                    { category: 'Sharing & Collaboration' },
-                    { label: 'Share video by link',            free: false,     pro: true      },
-                    { label: 'Team workspace',                 free: false,     pro: true      },
-                    { label: 'Role-based access',              free: false,     pro: true      },
-                ].map((row, i) => {
-                    if ('category' in row) {
-                        return (
-                            <div key={i} className="px-4 py-2 bg-surface-raised border-b border-border">
-                                <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">{row.category}</span>
-                            </div>
-                        );
-                    }
-                    const cell = (val: string | boolean) => {
-                        if (val === true)  return <LuCheck className="icon-sm text-success mx-auto" />;
-                        if (val === false) return <LuX className="icon-sm text-text-disabled mx-auto" />;
-                        return <span className="text-xs text-text-main">{val}</span>;
-                    };
-                    return (
-                        <div key={i} className="grid grid-cols-3 px-4 py-2.5 border-b border-border last:border-b-0 items-center hover:bg-state-hover transition-colors">
-                            <span className="text-xs text-text-main">{row.label}</span>
-                            <div className="flex justify-center">{cell(row.free)}</div>
-                            <div className="flex justify-center">{cell(row.pro)}</div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Trust line */}
-            <div className="flex items-center gap-4 text-xs text-text-muted">
-                <span className="flex items-center gap-1"><LuShieldCheck className="icon-sm" /> Secure with Stripe</span>
-                <span>Cancel anytime</span>
-            </div>
+            )}
         </div>
     );
 }

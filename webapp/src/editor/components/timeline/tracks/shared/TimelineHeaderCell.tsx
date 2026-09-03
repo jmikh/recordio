@@ -56,8 +56,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                         )}
                         {titleElement ?? (
                             <span
-                                className={`truncate select-none ${disabled ? 'text-text-muted' : 'text-text-main'}`}
-                                style={{ fontSize: 14 }}
+                                className={`truncate select-none text-sm ${disabled ? 'text-text-muted' : 'text-text-main'}`}
                                 title={title}
                             >
                                 {title}

@@ -212,16 +212,12 @@ export function trackDashboardPageLoaded(workspaceId: string | null) {
     trackEvent('dashboard_page_loaded', { workspace_id: workspaceId });
 }
 
-export function trackBillingPageLoaded(workspaceId: string | null) {
-    trackEvent('billing_page_loaded', { workspace_id: workspaceId });
+export function trackNewRecordingClicked(workspaceId: string | null) {
+    trackEvent('new_recording_clicked', { workspace_id: workspaceId });
 }
 
-export function trackMembersPageLoaded(workspaceId: string | null) {
-    trackEvent('members_page_loaded', { workspace_id: workspaceId });
-}
-
-export function trackGeneralSettingsPageLoaded(workspaceId: string | null) {
-    trackEvent('general_settings_page_loaded', { workspace_id: workspaceId });
+export function trackWorkspaceSettingsPageLoaded(workspaceId: string | null) {
+    trackEvent('workspace_settings_page_loaded', { workspace_id: workspaceId });
 }
 
 export function trackExtensionUninstalled() {

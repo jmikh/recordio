@@ -197,12 +197,12 @@ export const ProjectCard = ({
                         className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
                     >
                         <LuRotateCcw className="w-4 h-4 text-white" />
-                        <span className="text-white text-sm font-medium">Restore</span>
+                        <span className="text-white text-sm">Restore</span>
                     </button>
                 )}
 
                 {/* Duration Badge */}
-                <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-[10px] px-1.5 py-0.5 rounded">
+                <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded">
                     {formatDuration(project.durationMs ?? 0)}
                 </div>
             </div>
@@ -222,10 +222,10 @@ export const ProjectCard = ({
                                 if (e.key === 'Escape') setIsRenaming(false);
                             }}
                             onClick={e => e.stopPropagation()}
-                            className="font-normal text-text-highlighted text-sm min-w-0 mr-2 w-full bg-surface border border-primary rounded px-1 py-0 outline-none"
+                            className="text-text-highlighted text-sm min-w-0 mr-2 w-full bg-surface border border-primary rounded px-1 py-0 outline-none"
                         />
                     ) : (
-                        <h3 className="font-normal truncate text-text-highlighted text-sm min-w-0 mr-2">
+                        <h3 className="truncate text-text-highlighted text-sm min-w-0 mr-2">
                             {project.name}
                         </h3>
                     )}
@@ -235,7 +235,7 @@ export const ProjectCard = ({
                                 {shareUrl ? (
                                     <CopyLinkButton url={shareUrl} title="Copy published link" />
                                 ) : (
-                                    <span className="text-[10px] text-text-muted">Draft</span>
+                                    <span className="text-2xs text-text-muted">Draft</span>
                                 )}
                                 {isActive && <span className="chosen-dot"></span>}
                             </>

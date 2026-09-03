@@ -14,7 +14,7 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <MdOutlineBugReport className="icon-lg text-text-highlighted" />
-                        <h2 className="text-lg font-semibold text-text-highlighted">Report a Bug</h2>
+                        <h2 className="heading-2">Report a Bug</h2>
                     </div>
                     <XButton onClick={onClose} />
                 </div>
@@ -31,7 +31,7 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
                         href={`mailto:${SUPPORT_EMAIL}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary hover:underline font-medium"
+                        className="text-primary hover:underline"
                     >
                         {SUPPORT_EMAIL}
                     </a>

@@ -125,7 +125,7 @@ export const ColorSettings = ({
                                 style={{ backgroundColor: safeGradient.colors[0] }}
                             />
                         </div>
-                        <span className="text-[10px] font-bold text-text-main">
+                        <span className="text-2xs font-bold text-text-main">
                             Start
                         </span>
                     </div>
@@ -151,7 +151,7 @@ export const ColorSettings = ({
                                 style={{ backgroundColor: safeGradient.colors[1] }}
                             />
                         </div>
-                        <span className="text-[10px] font-bold text-text-main">
+                        <span className="text-2xs font-bold text-text-main">
                             End
                         </span>
                     </div>
@@ -161,13 +161,13 @@ export const ColorSettings = ({
             {/* Color Palette */}
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <div className="text-[10px] text-text-main font-semibold">Palette</div>
+                    <div className="text-2xs text-text-main font-bold">Palette</div>
                     <button
                         onClick={() => {
                             resetPalette();
                             setSelectedPaletteIndex(null);
                         }}
-                        className="text-[9px] text-text-muted hover:text-text-main transition-colors"
+                        className="text-2xs text-text-muted hover:text-text-main transition-colors"
                         title="Reset palette to defaults"
                     >
                         Reset
@@ -210,7 +210,7 @@ export const ColorSettings = ({
 
             {/* Hex Input */}
             <div className="space-y-1">
-                <div className="text-[10px] text-text-main font-semibold">Hex Color</div>
+                <div className="text-2xs text-text-main font-bold">Hex Color</div>
                 <div className={`flex bg-surface border rounded px-2 py-1.5 items-center gap-2 ${isValidHex(`#${hexInput}`) ? 'border-border' : 'border-destructive'}`}>
                     <span className="text-text-main mr-2 select-none">#</span>
                     <input
@@ -230,7 +230,7 @@ export const ColorSettings = ({
                     <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: activeColorValue }} />
                 </div>
                 {!isValidHex(`#${hexInput}`) && (
-                    <div className="text-[10px] text-destructive">Invalid hex color</div>
+                    <div className="text-2xs text-destructive">Invalid hex color</div>
                 )}
             </div>
 
@@ -334,7 +334,7 @@ function DirectionDial({ angle, gradient, onAngleChange }: DirectionDialProps) {
                 />
             </div>
             {/* Degree label - same style as Start/End labels */}
-            <span className="text-[10px] font-bold text-text-main">
+            <span className="text-2xs font-bold text-text-main">
                 {angle}°
             </span>
         </div>

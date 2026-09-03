@@ -16,6 +16,7 @@ import {
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
     seedProject,
+    seedProjectEditor,
     seedWorkspace,
     seedWorkspaceMember,
 } from '../helpers/db.js';
@@ -125,12 +126,33 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
             cloud_version: 1,
             deleted_at: null,
             is_shared: true, // seedProject defaults a slug
+            is_editor: false, // no project_editors row for the caller
         });
 
         expect(lines.find((l) => l.msg === 'request')).toMatchObject({
             'http.route': '/project-list',
             'workspace.id': ws.id,
         });
+    });
+
+    it('flags is_editor on projects shared with the caller via project_editors', async () => {
+        const ws = await seedOwnWorkspace();
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+        const theirs = await seedProject(pool, {
+            workspaceId: ws.id, ownerId: SEEDED_USER_2_ID, uploadStatus: 'ready' });
+        const mine = await seedProject(pool, {
+            workspaceId: ws.id, uploadStatus: 'ready' });
+        await seedProjectEditor(pool, { projectId: theirs.id, userId: SEEDED_USER_ID });
+
+        const { app } = testApp();
+        const res = await post(app, { workspaceId: ws.id },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+
+        const { projects } = res.json() as { projects: Array<Record<string, unknown>> };
+        const byId = new Map(projects.map((p) => [p.id, p]));
+        expect(byId.get(theirs.id)?.is_editor).toBe(true);
+        expect(byId.get(mine.id)?.is_editor).toBe(false);
     });
 
     it('returns { projects: [] } for an empty workspace', async () => {

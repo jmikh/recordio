@@ -119,7 +119,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                     </div>
                 )}
 
-                <span className="text-sm font-medium text-text-highlighted mr-4 shrink-0">
+                <span className="text-sm text-text-highlighted mr-4 shrink-0">
                     {title}
                 </span>
 

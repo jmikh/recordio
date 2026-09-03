@@ -17,7 +17,7 @@ export function UploadProgressToast() {
     if (mediaUploadError) {
         return (
             <div className="fixed bottom-4 right-4 z-50 w-80 bg-surface-raised border border-destructive/30 rounded-[var(--radius-lg)] shadow-float p-4">
-                <div className="text-sm font-medium text-text-highlighted truncate">
+                <div className="text-sm text-text-highlighted truncate">
                     Upload failed
                 </div>
                 <div className="text-xs text-text-muted truncate mt-1">
@@ -56,7 +56,7 @@ export function UploadProgressToast() {
 
     return (
         <div className="fixed bottom-4 right-4 z-50 w-80 bg-surface-raised border border-border rounded-[var(--radius-lg)] shadow-float p-4">
-            <div className="text-sm font-medium text-text-highlighted truncate">
+            <div className="text-sm text-text-highlighted truncate">
                 Uploading recording
             </div>
             <div className="text-xs text-text-muted truncate mt-1">

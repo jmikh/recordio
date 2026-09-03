@@ -67,7 +67,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
             ctx.fillStyle = textColor;
             ctx.strokeStyle = tickColor;
-            ctx.font = `10px ${fontFamily}`;
+            ctx.font = `500 10px ${fontFamily}`;
             ctx.textBaseline = 'top';
 
             let majorInterval = 1000;
@@ -98,7 +98,16 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
                 if (t % majorInterval === 0) {
                     ctx.moveTo(x, 0);
                     ctx.lineTo(x, height);
-                    ctx.fillText(formatTimeCode(t), x + 4, 2);
+                    const label = formatTimeCode(t);
+                    ctx.fillText(label, x + 4, 2);
+                    // Satoshi only ships 500/700 — 700 is too heavy here, so a
+                    // hairline stroke fakes the in-between weight.
+                    ctx.save();
+                    ctx.strokeStyle = textColor;
+                    ctx.lineWidth = 0.35;
+                    ctx.lineJoin = 'round';
+                    ctx.strokeText(label, x + 4, 2);
+                    ctx.restore();
                 } else {
                     ctx.moveTo(x, height - 6);
                     ctx.lineTo(x, height);
@@ -114,7 +123,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
         // document.fonts.load() returns a promise that resolves only once the
         // font data is actually usable (unlike .check() which only tests if
         // an @font-face rule is registered).
-        const fontSpec = '10px Satoshi';
+        const fontSpec = '500 10px Satoshi';
         document.fonts.load(fontSpec).then(() => {
             if (!cancelled) draw();
         });

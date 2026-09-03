@@ -238,6 +238,7 @@ describe('CloudProjectService.listProjects', () => {
             duration_ms: 5000,
             slug: null,
             share_policy: 'public',
+            is_editor: true,
         }]);
 
         const items = await CloudProjectService.listProjects('workspace-1');
@@ -247,5 +248,7 @@ describe('CloudProjectService.listProjects', () => {
         expect(items[0].name).toBe('Test');
         expect(items[0].thumbnailStoragePath).toBe('path/thumb.webp');
         expect(items[0].durationMs).toBe(5000);
+        expect(items[0].sharePolicy).toBe('public');
+        expect(items[0].isEditor).toBe(true);
     });
 });

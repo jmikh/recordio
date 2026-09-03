@@ -1,24 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuCheck, LuSettings, LuChevronDown } from 'react-icons/lu';
+import { LuCheck, LuChevronDown } from 'react-icons/lu';
 import type { WorkspaceListItem } from '../workspace/useWorkspaceStore';
 
 interface WorkspaceDropdownProps {
     workspaces: WorkspaceListItem[];
     currentWorkspaceId: string | null;
     currentWorkspaceName: string | null;
-    currentRole: 'viewer' | 'creator' | 'admin' | null;
     onSwitch: (workspaceId: string) => void;
-    onOpenSettings: () => void;
 }
 
 export function WorkspaceDropdown({
     workspaces,
     currentWorkspaceId,
     currentWorkspaceName,
-    currentRole,
     onSwitch,
-    onOpenSettings,
 }: WorkspaceDropdownProps) {
     const [open, setOpen] = useState(false);
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 0 });
@@ -45,8 +41,6 @@ export function WorkspaceDropdown({
         return () => document.removeEventListener('mousedown', handleClick);
     }, [open]);
 
-    const isAdmin = currentRole === 'admin';
-
     return (
         <>
             <button
@@ -56,8 +50,7 @@ export function WorkspaceDropdown({
                 className="flex items-center gap-1.5 w-full group rounded-md px-2 py-1 hover:bg-state-hover transition-colors cursor-pointer"
             >
                 <div className="flex flex-col flex-1 min-w-0 text-left overflow-hidden leading-tight">
-                    <span className="text-[11px] text-text-muted">Workspace</span>
-                    <span className="text-sm font-semibold text-text-highlighted truncate">{currentWorkspaceName ?? 'My Workspace'}</span>
+                    <span className="text-sm text-text-highlighted truncate">{currentWorkspaceName ?? 'My Workspace'}</span>
                 </div>
                 <LuChevronDown className={`icon-sm shrink-0 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
@@ -87,21 +80,6 @@ export function WorkspaceDropdown({
                             )}
                         </button>
                     ))}
-
-                    {/* Settings — visible for admins */}
-                    {isAdmin && (
-                        <>
-                            <div className="h-px bg-border my-1" />
-                            <button
-                                type="button"
-                                onClick={() => { setOpen(false); onOpenSettings(); }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-main hover:bg-state-hover cursor-pointer"
-                            >
-                                <LuSettings className="icon-sm shrink-0 text-text-muted" />
-                                Workspace Settings
-                            </button>
-                        </>
-                    )}
                 </div>,
                 document.body
             )}

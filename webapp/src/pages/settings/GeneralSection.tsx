@@ -1,13 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@shared/components';
 import { invokeFunction } from '../../api/client';
 import { useToast } from '../../components/Toast';
-import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
-import { trackGeneralSettingsPageLoaded } from '../../analytics';
 import { captureError } from '../../lib/sentry';
 import type { WorkspaceDetails } from './types';
 
-export function GeneralPage({ details, isAdmin, onRenamed }: {
+export function GeneralSection({ details, isAdmin, onRenamed }: {
     details: WorkspaceDetails;
     isAdmin: boolean;
     onRenamed: (name: string) => void;
@@ -15,7 +13,6 @@ export function GeneralPage({ details, isAdmin, onRenamed }: {
     const [name, setName]     = useState(details.name);
     const [saving, setSaving] = useState(false);
     const { addToast }        = useToast();
-    useEffect(() => { trackGeneralSettingsPageLoaded(useWorkspaceStore.getState().workspaceId); }, []);
 
     const handleSave = async () => {
         const trimmed = name.trim();
@@ -40,8 +37,8 @@ export function GeneralPage({ details, isAdmin, onRenamed }: {
     const inputClass = "w-full px-3 py-2 text-sm bg-surface border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
     return (
-        <div className="w-full max-w-lg">
-            <h2 className="text-base font-semibold text-text-highlighted mb-6">General</h2>
+        <div className="w-full">
+            <h2 className="heading-2 mb-6">General</h2>
             <div className="flex flex-col gap-1.5">
                 <label className="text-sm text-text-main">Workspace Name</label>
                 <div className="flex gap-2">

@@ -16,7 +16,7 @@ export function SyncFailedModal({ onRetry }: { onRetry: () => void }) {
         <Modal isOpen onClose={() => {}} maxWidth="max-w-[460px]">
             <div className="flex items-center gap-3 mb-4">
                 <TbCloudOff className="icon-lg text-destructive shrink-0" />
-                <h2 className="text-lg font-semibold text-text-highlighted">
+                <h2 className="heading-2">
                     Failed to sync project
                 </h2>
             </div>

@@ -29,7 +29,7 @@ export const ProgressModal = ({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <img src={logoSvg} alt="" className="w-7 h-7" />
-                        <h2 className="text-text-highlighted font-semibold text-lg">{title}</h2>
+                        <h2 className="heading-2">{title}</h2>
                     </div>
                     <div className="spinner w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>

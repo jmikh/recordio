@@ -95,7 +95,7 @@ export function LeaveReviewModal() {
                 />
             </div>
 
-            <h2 className="text-xl font-bold text-text-highlighted text-center mb-2">
+            <h2 className="heading-2 text-center mb-2">
                 Hi, I'm John 👋
             </h2>
             <p className="text-sm text-text-muted text-center mb-6 leading-relaxed">
@@ -106,7 +106,7 @@ export function LeaveReviewModal() {
                 variant="primary"
                 onClick={handleReview}
                 fullWidth
-                className="py-3 text-base font-semibold rounded-lg"
+                className="py-3 text-base font-bold rounded-lg"
             >
                 ⭐ Leave a review
             </Button>

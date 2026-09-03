@@ -5,6 +5,7 @@ import { CloudProjectService, type ProjectListItem } from '../../storage/cloudPr
 import { ProjectCard } from './ProjectCard';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
 import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
+import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
 import { XButton, Modal, Button } from '@shared/components';
 import { BRIDGE_MSG, CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
@@ -19,7 +20,7 @@ import { switchWorkspace } from '../../workspace/switchWorkspace';
 import { SupportModal } from '../../components/SupportModal';
 import { AuthModal } from '../../auth/AuthModal';
 import { useToast } from '../../components/Toast';
-import { trackProjectOpened, trackDashboardPageLoaded, trackProjectDeleteFailed } from '../../analytics';
+import { trackProjectOpened, trackDashboardPageLoaded, trackProjectDeleteFailed, trackNewRecordingClicked } from '../../analytics';
 import { captureError } from '../../lib/sentry';
 
 import { navigate } from '../../lib/navigate';
@@ -28,10 +29,20 @@ const EXTENSION_ID = import.meta.env.DEV
     ? 'lpponocoanighhephabalkejmdbjlhmi'
     : 'bbcdpipjplklaneplfmlhhibnllhinii';
 
-export function DashboardPage() {
+/** `showSettings` renders the workspace settings page in the content area (same sidebar). */
+export function DashboardPage({ showSettings = false }: { showSettings?: boolean }) {
     const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeView, setActiveView] = useState<DashboardView>('all');
+
+    const handleViewChange = (view: DashboardView) => {
+        if (view === 'settings') {
+            navigate('/workspace/settings');
+            return;
+        }
+        setActiveView(view);
+        if (showSettings) navigate('/');
+    };
 
     const { userId } = useUserStore();
     const entitlements = useEntitlements();
@@ -42,9 +53,24 @@ export function DashboardPage() {
 
     // Split into active and trashed
     const projects = useMemo(() => allProjects.filter(p => !p.deletedAt), [allProjects]);
-    const trashProjects = useMemo(() => allProjects.filter(p => !!p.deletedAt), [allProjects]);
+    // Your Videos — owned by the caller or shared with them directly (project_editors)
+    const yourProjects = useMemo(
+        () => projects.filter(p => p.ownerId === userId || p.isEditor),
+        [projects, userId],
+    );
+    // Workspace — videos shared to the whole workspace or publicly
+    const workspaceProjects = useMemo(
+        () => projects.filter(p => p.sharePolicy === 'workspace' || p.sharePolicy === 'public'),
+        [projects],
+    );
+    // Trash only shows the caller's own trashed videos
+    const trashProjects = useMemo(
+        () => allProjects.filter(p => !!p.deletedAt && p.ownerId === userId),
+        [allProjects, userId],
+    );
 
     const isAuthenticated = !!userId;
+    const [memberCount, setMemberCount] = useState<number | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const { addToast } = useToast();
@@ -67,6 +93,7 @@ export function DashboardPage() {
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     const handleRecord = () => {
+        trackNewRecordingClicked(workspaceId);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chr = (window as any).chrome;
         if (!chr?.runtime?.sendMessage) {
@@ -81,7 +108,7 @@ export function DashboardPage() {
     };
 
     useEffect(() => {
-        trackDashboardPageLoaded(workspaceId);
+        if (!showSettings) trackDashboardPageLoaded(workspaceId);
 
         const params = new URLSearchParams(window.location.search);
         const error = params.get('error');
@@ -140,11 +167,14 @@ export function DashboardPage() {
 
     // View-filtered base list
     const viewProjects = useMemo(() => {
+        if (activeView === 'workspace') {
+            return workspaceProjects;
+        }
         if (activeView === 'published') {
             return projects.filter(p => p.shareSlug);
         }
-        return projects;
-    }, [projects, activeView]);
+        return yourProjects;
+    }, [projects, yourProjects, workspaceProjects, activeView]);
 
     // Data pipeline: search → filter → sort → group
     const searchFiltered = useMemo(() => {
@@ -182,10 +212,10 @@ export function DashboardPage() {
     // Counts for header
     const under1MinCount = useMemo(() => {
         const base = searchQuery.trim()
-            ? projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-            : projects;
+            ? viewProjects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            : viewProjects;
         return base.filter(p => (p.durationMs ?? 0) < 60000).length;
-    }, [projects, searchQuery]);
+    }, [viewProjects, searchQuery]);
 
     const sharedCount = useMemo(() => projects.filter(p => p.isShared).length, [projects]);
 
@@ -202,6 +232,17 @@ export function DashboardPage() {
             if (!error && data) setWorkspaceList(data.workspaces);
         });
     }, [isAuthenticated]);
+
+    // Member count for the sidebar workspace card
+    useEffect(() => {
+        setMemberCount(null);
+        if (!isAuthenticated || !workspaceId) return;
+        let cancelled = false;
+        invokeFunction('workspace-get', { workspaceId }).then(({ data, error }) => {
+            if (!cancelled && !error && data) setMemberCount(data.members.length);
+        });
+        return () => { cancelled = true; };
+    }, [isAuthenticated, workspaceId]);
 
     const handleSwitchWorkspace = async (newWorkspaceId: string) => {
         const ws = workspaceList.find(w => w.id === newWorkspaceId);
@@ -315,9 +356,10 @@ export function DashboardPage() {
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
                 <DashboardSidebar
-                    activeView={activeView}
-                    onViewChange={setActiveView}
-                    projectCount={projects.length}
+                    activeView={showSettings ? 'settings' : activeView}
+                    onViewChange={handleViewChange}
+                    projectCount={yourProjects.length}
+                    workspaceCount={workspaceProjects.length}
                     ownedProjectCount={ownedProjectCount}
                     projectCap={entitlements.projectCap}
                     trashCount={trashProjects.length}
@@ -331,12 +373,19 @@ export function DashboardPage() {
                     currentWorkspaceName={workspaceName}
                     currentRole={workspaceRole}
                     onSwitchWorkspace={handleSwitchWorkspace}
-                    onOpenWorkspaceSettings={() => navigate('/workspace/settings')}
+                    planState={entitlements.state}
+                    memberCount={memberCount}
+                    onInviteTeammates={() => navigate('/workspace/settings#members')}
+                    onOpenBilling={() => navigate('/workspace/settings#billing')}
                 />
 
                 {/* Main Content */}
                 <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                    {activeView !== 'trash' ? (
+                    {showSettings ? (
+                        <main className="flex-1 overflow-y-auto p-8">
+                            <WorkspaceSettingsPage />
+                        </main>
+                    ) : activeView !== 'trash' ? (
                         <>
                             <DashboardHeader
                                 searchQuery={searchQuery}
@@ -396,7 +445,7 @@ export function DashboardPage() {
                     /* Trash View */
                     <main className="flex-1 overflow-y-auto p-6">
                         <div className="mb-6">
-                            <h1 className="text-lg font-semibold text-text-highlighted">Trash</h1>
+                            <h1 className="heading-2">Trash</h1>
                             <p className="text-sm text-text-muted mt-1">
                                 Projects in trash are permanently deleted after 30 days.
                             </p>
@@ -439,7 +488,7 @@ export function DashboardPage() {
             {selectMode && createPortal(
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[var(--z-index-overlay)] animate-in slide-in-from-bottom-4 fade-in duration-200">
                     <div className="flex items-center gap-3 bg-surface-raised border border-border rounded-xl px-5 py-3 shadow-float">
-                        <span className="text-sm text-text-highlighted font-medium">
+                        <span className="text-sm text-text-highlighted">
                             {selectedIds.size} selected
                         </span>
                         <div className="w-px h-5 bg-border" />
@@ -493,7 +542,7 @@ export function DashboardPage() {
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[var(--z-index-modal)] backdrop-blur-sm p-4">
                     <div className="bg-surface-raised rounded-lg p-6 w-full max-w-[400px] border border-border">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-text-highlighted">Delete Projects</h2>
+                            <h2 className="heading-2">Delete Projects</h2>
                             <XButton
                                 onClick={() => setShowBulkDeleteModal(false)}
                                 title="Close"
@@ -501,7 +550,7 @@ export function DashboardPage() {
                         </div>
 
                         <p className="text-sm text-text-main mb-6">
-                            Are you sure you want to delete <span className="text-text-highlighted font-medium">{selectedIds.size}</span> project{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
+                            Are you sure you want to delete <span className="text-text-highlighted">{selectedIds.size}</span> project{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
                         </p>
 
                         <div className="flex gap-3 justify-end">
@@ -527,7 +576,7 @@ export function DashboardPage() {
             {/* Subscription Success Modal */}
             <Modal isOpen={showSubscriptionSuccess} onClose={() => setShowSubscriptionSuccess(false)} maxWidth="max-w-[400px]" className="text-center">
                 <div className="text-4xl mb-4">🎉</div>
-                <h2 className="text-lg font-semibold text-text-highlighted mb-2">Welcome to Pro!</h2>
+                <h2 className="heading-2 mb-2">Welcome to Pro!</h2>
                 <p className="text-sm text-text-main mb-6">
                     Your subscription is now active. Enjoy unlimited exports, publishing, and all Pro features.
                 </p>

@@ -426,7 +426,7 @@ export function ControllerApp() {
                 ) : (
                     <>
                         <LogoLink imgClassName="h-8 mb-4 mx-auto" />
-                        <p className="text-2xl font-semibold text-text-main">
+                        <p className="text-2xl font-bold text-text-main">
                             Recording will start as soon as you share a screen
                         </p>
                     </>

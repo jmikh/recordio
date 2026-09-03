@@ -132,11 +132,11 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
         >
             {getStatusIcon()}
             <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text-main leading-snug">{toast.title}</div>
-                {toast.message && <div className="text-[13px] text-text-muted mt-0.5 leading-snug">{toast.message}</div>}
+                <div className="text-sm font-bold text-text-main leading-snug">{toast.title}</div>
+                {toast.message && <div className="text-xs text-text-muted mt-0.5 leading-snug">{toast.message}</div>}
                 {toast.action && (
                     <button
-                        className="mt-1.5 text-[13px] font-semibold text-primary bg-transparent border-none p-0 cursor-pointer hover:underline transition-colors"
+                        className="mt-1.5 text-xs font-bold text-primary bg-transparent border-none p-0 cursor-pointer hover:underline transition-colors"
                         onClick={handleActionClick}
                     >
                         {toast.action.label}

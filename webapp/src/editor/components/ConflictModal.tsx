@@ -63,7 +63,7 @@ export function ConflictModal() {
     return (
         <Modal isOpen onClose={() => {}} maxWidth="max-w-[460px]">
             <div className="mb-2">
-                <h2 className="text-lg font-semibold text-text-highlighted">
+                <h2 className="heading-2">
                     Sync conflict
                 </h2>
             </div>
@@ -81,7 +81,7 @@ export function ConflictModal() {
                 >
                     <TbCloudDown className="icon-lg shrink-0 text-primary" />
                     <div>
-                        <div className="text-sm font-medium">
+                        <div className="text-sm">
                             {loading === 'load' ? 'Loading...' : 'Load cloud version'}
                         </div>
                         <div className="text-xs text-text-muted mt-0.5">
@@ -97,7 +97,7 @@ export function ConflictModal() {
                 >
                     <TbCloudUp className="icon-lg shrink-0 text-text-muted" />
                     <div>
-                        <div className="text-sm font-medium">
+                        <div className="text-sm">
                             {loading === 'overwrite' ? 'Saving...' : 'Overwrite cloud'}
                         </div>
                         <div className="text-xs text-text-muted mt-0.5">

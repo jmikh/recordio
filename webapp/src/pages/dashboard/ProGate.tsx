@@ -42,7 +42,7 @@ export function ProGate({ feature, children, className }: ProGateProps) {
                     <p className="mb-1.5">Upgrade to use {feature}</p>
                     {/* New tab (Step 4): keep the caller's context alive */}
                     <button
-                        className="text-primary font-medium hover:underline"
+                        className="text-primary hover:underline"
                         onClick={() => window.open('/workspace/settings/billing', '_blank')}
                     >
                         Upgrade →

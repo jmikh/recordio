@@ -151,7 +151,7 @@ export function DownloadModal({
             <div className="flex flex-col gap-5">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-text-highlighted font-semibold text-lg">Download video</h2>
+                        <h2 className="heading-2">Download video</h2>
                         <p className="text-sm text-text-muted mt-0.5">
                             {durationLabel} · {resolutionLabel} · MP4
                         </p>
@@ -160,7 +160,7 @@ export function DownloadModal({
                 </div>
 
                 <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-text-main">Resolution</span>
+                    <span className="text-sm text-text-main">Resolution</span>
                     <MultiToggle
                         options={qualityOptions}
                         value={quality}
@@ -170,7 +170,7 @@ export function DownloadModal({
 
                 <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-text-main">Cloud export</span>
+                        <span className="text-sm text-text-main">Cloud export</span>
                         <Toggle
                             value={cloudExport}
                             onChange={setCloudExport}
@@ -240,7 +240,7 @@ function CloudRenderView({
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-text-highlighted font-semibold text-lg">Cloud Rendering</h2>
+                    <h2 className="heading-2">Cloud Rendering</h2>
                     <XButton onClick={onClose} title="Close" />
                 </div>
 
@@ -276,7 +276,7 @@ function CloudRenderView({
 
                     {isCompleted && (
                         <div className="flex items-center gap-3 py-4">
-                            <span className="text-sm text-text-highlighted font-medium">Download complete!</span>
+                            <span className="text-sm text-text-highlighted">Download complete!</span>
                         </div>
                     )}
 
@@ -390,7 +390,7 @@ function LocalRenderView({
     return (
         <Modal isOpen={isOpen} maxWidth="max-w-md">
             <div className="flex flex-col gap-4">
-                <h2 className="text-text-highlighted font-semibold text-lg">Exporting Video</h2>
+                <h2 className="heading-2">Exporting Video</h2>
 
                 <div className="flex flex-col gap-2">
                     {phase === 'preparing' ? (

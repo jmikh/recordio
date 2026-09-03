@@ -49,13 +49,17 @@ export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     'duration_ms',            p.duration_ms,
                     'slug',                   p.slug,
                     'share_policy',           p.share_policy,
-                    'is_shared',              p.slug IS NOT NULL
+                    'is_shared',              p.slug IS NOT NULL,
+                    'is_editor',              EXISTS (
+                        SELECT 1 FROM project_editors pe
+                        WHERE pe.project_id = p.id AND pe.user_id = $2
+                    )
                 ) ORDER BY p.updated_at DESC), '[]'::jsonb) AS projects
                 FROM projects p
                 WHERE p.workspace_id = $1
                   AND p.permanently_deleted = false
                   AND p.upload_status = 'ready'`,
-                [workspaceId],
+                [workspaceId, req.user!.id],
             );
 
             return reply.send({

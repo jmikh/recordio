@@ -3,7 +3,7 @@ import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
 import { captureError } from '../lib/sentry';
 import { CloudStorage, CloudVersionConflictError } from './cloudStorage';
-import type { CloudProjectSummary } from '@shared/api';
+import type { CloudProjectSummary, SharePolicy } from '@shared/api';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
@@ -34,6 +34,10 @@ export interface ProjectListItem {
     durationMs: number | null;
     /** Share slug for public video link (null if not shared) */
     shareSlug: string | null;
+    /** Share visibility (null until first shared) */
+    sharePolicy: SharePolicy | null;
+    /** Whether the project is shared with the caller via project_editors */
+    isEditor: boolean;
 }
 
 // ─── Service ─────────────────────────────────────────────────
@@ -522,6 +526,8 @@ export class CloudProjectService {
             cloudVersion: s.cloud_version,
             durationMs: s.duration_ms,
             shareSlug: s.slug,
+            sharePolicy: s.share_policy ?? null,
+            isEditor: s.is_editor,
         }));
     }
 

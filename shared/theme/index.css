@@ -1,4 +1,4 @@
-@import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@500,700&display=swap');
 
 /* ============================================================
    OKLCH Design System
@@ -7,6 +7,12 @@
 @theme {
    /* Typography */
    --font-sans: 'Satoshi', sans-serif;
+
+   /* Type scale — see .claude/skills/ui-guidelines/SKILL.md → Typography */
+   --text-2xs: 0.6875rem;              /* 11px — dense editor chrome, badges */
+   --text-2xs--line-height: 1rem;
+   --text-xs: 0.8125rem;               /* 13px — bumped from stock 12px */
+   --text-xs--line-height: 1.125rem;
 
    /* ─────────────────────────────────────────────────────────
      Surfaces
@@ -224,44 +230,36 @@ body,
 
    /* Interactive Primary - primary-colored variant */
    .interactive-primary {
-      @apply h-9 px-3 bg-primary border border-border rounded-[var(--radius-interactive)] text-sm text-text-on-primary font-medium hover:border-border-hover hover:bg-primary-highlighted transition-colors cursor-pointer disabled:cursor-default disabled:opacity-70 disabled:hover:bg-primary;
+      @apply h-9 px-3 bg-primary border border-border rounded-[var(--radius-interactive)] text-sm text-text-on-primary hover:border-border-hover hover:bg-primary-highlighted transition-colors cursor-pointer disabled:cursor-default disabled:opacity-70 disabled:hover:bg-primary;
    }
 
    /* Interactive Ghost - borderless, backgroundless variant for subtle toolbar actions */
    .interactive-ghost {
       @apply h-9 px-3 bg-transparent border-none rounded-full text-sm text-text-muted cursor-pointer disabled:text-text-disabled disabled:cursor-default disabled:hover:text-text-disabled;
-      transition: color 0.15s, transform 0.15s, font-weight 0.15s;
+      transition: color 0.15s;
    }
 
-   .interactive-ghost:hover {
-      @apply text-text-highlighted font-medium;
-      transform: scale(1.05);
+   .interactive-ghost:hover:not(:disabled) {
+      @apply text-text-highlighted font-bold;
    }
 
-   .interactive-ghost:disabled:hover {
-      transform: none;
-      font-weight: normal;
-   }
-
-   /* Interactive Icon - circular icon-only button with scale hover */
+   /* Interactive Icon - circular icon-only button with bold color hover */
    .interactive-icon {
       @apply size-9 p-0 bg-transparent border-none rounded-full text-text-muted cursor-pointer flex items-center justify-center;
-      transition: color 0.15s, transform 0.15s;
+      transition: color 0.15s;
    }
 
    .interactive-icon:hover {
       @apply text-text-highlighted;
-      transform: scale(1.15);
    }
 
    .interactive-icon:disabled {
       @apply text-text-disabled cursor-default;
-      transform: none;
    }
 
    /* Interactive Destructive - for dangerous/irreversible actions */
    .interactive-destructive {
-      @apply h-9 px-3 bg-destructive border border-destructive rounded-[var(--radius-interactive)] text-sm text-white font-medium hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default;
+      @apply h-9 px-3 bg-destructive border border-destructive rounded-[var(--radius-interactive)] text-sm text-white hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-default;
       box-shadow: 0 1px 2px oklch(0 0 0 / 8%), inset 0 1px 0 oklch(1 0 0 / 8%);
    }
 
@@ -339,6 +337,26 @@ body,
    /* Subtext - small muted centered helper text for settings panels */
    .subtext {
       @apply text-xs text-text-muted text-left;
+   }
+
+   /* Eyebrow — tiny uppercase group label above a section (sidebar groups, settings list headers) */
+   .text-eyebrow {
+      @apply text-2xs font-bold uppercase tracking-widest text-text-muted;
+   }
+
+   /* Badge text — typography for pills/chips/counters; bg, padding, and radius stay local */
+   .text-badge {
+      @apply text-2xs font-bold leading-none;
+   }
+
+   /* Heading 1 — hero modal/page titles (auth, upgrade) */
+   .heading-1 {
+      @apply text-2xl font-bold text-text-highlighted;
+   }
+
+   /* Heading 2 — page titles, modal titles, settings section headings */
+   .heading-2 {
+      @apply text-lg font-bold text-text-highlighted;
    }
 
    /* Icon Sizes — standardized sizing for all icons */

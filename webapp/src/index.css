@@ -1,3 +1,8 @@
+/* Establish layer priority up front: utilities must beat @layer components,
+   so per-site overrides like `text-eyebrow text-primary` or Button size="sm"
+   (text-xs vs interactive-*'s text-sm) actually apply. */
+@layer theme, base, components, utilities;
+
 @import "tailwindcss" source("../../");
 @import "@shared/theme/index.css";
 

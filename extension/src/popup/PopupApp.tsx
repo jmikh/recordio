@@ -88,7 +88,7 @@ export function PopupApp() {
                     <div className="flex items-start gap-2.5">
                         <MdErrorOutline className="icon-md text-destructive shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-1">
-                            <p className="text-sm font-medium text-text-main">Recording failed to save</p>
+                            <p className="text-sm text-text-main">Recording failed to save</p>
                             <p className="text-xs text-text-muted">{recordingError}</p>
                         </div>
                     </div>

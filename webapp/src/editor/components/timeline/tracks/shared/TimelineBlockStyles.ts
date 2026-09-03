@@ -155,7 +155,7 @@ export function fadeStyle(side: 'left' | 'right'): CSSProperties {
 
 /** Label class for ghost "add" indicators */
 export const ghostLabel =
-    'absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-secondary bg-black/90 px-1.5 py-0.5 rounded pointer-events-none';
+    'absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-2xs text-secondary bg-black/90 px-1.5 py-0.5 rounded pointer-events-none';
 
 /** Base container class for ghost blocks */
 export const ghostContainerBase =

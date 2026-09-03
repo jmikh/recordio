@@ -1,23 +1,33 @@
-import { useState, useEffect } from 'react';
-import { LuArrowLeft, LuUsers, LuSettings2, LuCreditCard, LuLoader } from 'react-icons/lu';
+import { useState, useEffect, useRef } from 'react';
+import { LuLoader } from 'react-icons/lu';
 import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
-import { navigate } from '../../lib/navigate';
 import { captureError } from '../../lib/sentry';
-import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
-import { switchWorkspace } from '../../workspace/switchWorkspace';
-import { GeneralPage } from './GeneralPage';
-import { MembersPage } from './MembersPage';
-import { BillingPage } from './BillingPage';
-import type { Tab, WorkspaceDetails } from './types';
+import { trackWorkspaceSettingsPageLoaded } from '../../analytics';
+import { GeneralSection } from './GeneralSection';
+import { MembersSection } from './MembersSection';
+import { BillingSection } from './BillingSection';
+import type { WorkspaceDetails } from './types';
 
+type SectionId = 'members' | 'billing';
+
+// Legacy tab URLs (/workspace/settings/members|billing) and #hash links target
+// a section of the unified page.
+function readScrollTarget(): SectionId | null {
+    const seg = window.location.hash.replace('#', '') || window.location.pathname.split('/').pop();
+    return seg === 'members' || seg === 'billing' ? seg : null;
+}
+
+/**
+ * All workspace settings on a single page — rendered inside the dashboard
+ * layout next to the main sidebar (no layout of its own).
+ */
 export function WorkspaceSettingsPage() {
     const {
         workspaceId, workspaceName, workspaceRole, setWorkspace,
         workspaceOwnerId, workspaceSeats, hasActivePlan,
-        workspaceList, setWorkspaceList,
     } = useWorkspaceStore();
     const { userId } = useUserStore();
     const { addToast } = useToast();
@@ -25,18 +35,13 @@ export function WorkspaceSettingsPage() {
     // Single plan since the billing revamp: any active subscription includes collaboration
     const hasTeamAccess = hasActivePlan;
 
-    const activeTab = ((): Tab => {
-        const seg = window.location.pathname.split('/').pop();
-        if (seg === 'billing' || seg === 'members') return seg;
-        return 'general';
-    })();
-
-    const goToTab = (tab: Tab) => navigate(`/workspace/settings/${tab}`);
-
     const [details, setDetails] = useState<WorkspaceDetails | null>(null);
     const [loading, setLoading] = useState(true);
+    const scrollTarget = useRef(readScrollTarget());
 
     const isAdmin = workspaceRole === 'admin';
+
+    useEffect(() => { trackWorkspaceSettingsPageLoaded(workspaceId); }, []);
 
     useEffect(() => {
         if (!workspaceId) return;
@@ -55,18 +60,30 @@ export function WorkspaceSettingsPage() {
         })();
     }, [workspaceId]);
 
+    // Honor a deep-linked section once the sections have rendered
     useEffect(() => {
-        if (workspaceList.length > 0) return;
-        invokeFunction('workspace-list', {}).then(({ data, error }) => {
-            if (!error && data) setWorkspaceList(data.workspaces);
-        });
-    }, []);
+        if (loading || !scrollTarget.current) return;
+        const target = scrollTarget.current;
+        scrollTarget.current = null;
+        document.getElementById(`settings-${target}`)?.scrollIntoView({ block: 'start' });
+    }, [loading]);
 
-    const handleSwitchWorkspace = async (newWorkspaceId: string) => {
-        const ws = workspaceList.find(w => w.id === newWorkspaceId);
-        if (!ws) return;
-        await switchWorkspace(ws, userId);
-    };
+    const scrollTo = (section: SectionId) =>
+        document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Anchor navigations while already mounted (e.g. sidebar "Plan and billing")
+    useEffect(() => {
+        const onNavigate = () => {
+            const target = readScrollTarget();
+            if (target) scrollTo(target);
+        };
+        window.addEventListener('navigate', onNavigate);
+        window.addEventListener('popstate', onNavigate);
+        return () => {
+            window.removeEventListener('navigate', onNavigate);
+            window.removeEventListener('popstate', onNavigate);
+        };
+    }, []);
 
     const handleRenamed = (name: string) => {
         if (!workspaceId || !workspaceOwnerId) return;
@@ -95,16 +112,44 @@ export function WorkspaceSettingsPage() {
         );
     };
 
-    const tabs: { id: Tab; label: string; icon: typeof LuSettings2 }[] = [
-        { id: 'general',  label: 'General',         icon: LuSettings2  },
-        { id: 'members',  label: 'Members',          icon: LuUsers      },
-        { id: 'billing',  label: 'Plans & Billing',  icon: LuCreditCard },
-    ];
+    return (
+        <div className="w-full max-w-2xl mx-auto flex flex-col gap-10 pb-16">
+            {/* Page header */}
+            <div>
+                <h1 className="heading-2">Workspace settings</h1>
+                <p className="text-sm text-text-muted mt-1">
+                    Name, members, and plan for {workspaceName ?? 'your workspace'}.
+                </p>
+            </div>
 
-    const renderContent = () => {
-        if (activeTab === 'billing') {
-            return (
-                <BillingPage
+            {loading ? (
+                <div className="flex items-center gap-2 text-text-muted text-sm">
+                    <LuLoader className="icon-sm animate-spin" /> Loading…
+                </div>
+            ) : !details ? (
+                <p className="text-sm text-text-muted">Could not load workspace settings.</p>
+            ) : (
+                <>
+                    <section>
+                        <GeneralSection details={details} isAdmin={isAdmin} onRenamed={handleRenamed} />
+                    </section>
+
+                    <section id="settings-members" className="border-t border-border pt-10">
+                        <MembersSection
+                            details={details}
+                            currentUserId={userId}
+                            hasTeamAccess={hasTeamAccess}
+                            onMemberRemoved={handleMemberRemoved}
+                            onMemberRoleChanged={handleMemberRoleChanged}
+                            onInvitationRescinded={handleInvitationRescinded}
+                            onGoToBilling={() => scrollTo('billing')}
+                        />
+                    </section>
+                </>
+            )}
+
+            <section id="settings-billing" className="border-t border-border pt-10">
+                <BillingSection
                     seatFloor={details
                         ? Math.max(1,
                             details.members.filter(m => m.role !== 'viewer').length +
@@ -112,96 +157,9 @@ export function WorkspaceSettingsPage() {
                           )
                         : 1
                     }
-                    onGoToMembers={() => goToTab('members')}
+                    onGoToMembers={() => scrollTo('members')}
                 />
-            );
-        }
-
-        if (loading) {
-            return (
-                <div className="flex items-center gap-2 text-text-muted text-sm">
-                    <LuLoader className="icon-sm animate-spin" /> Loading…
-                </div>
-            );
-        }
-
-        if (!details) {
-            return <p className="text-sm text-text-muted">Could not load workspace settings.</p>;
-        }
-
-        if (activeTab === 'general') {
-            return <GeneralPage details={details} isAdmin={isAdmin} onRenamed={handleRenamed} />;
-        }
-
-        return (
-            <MembersPage
-                details={details}
-                currentUserId={userId}
-                hasTeamAccess={hasTeamAccess}
-                onMemberRemoved={handleMemberRemoved}
-                onMemberRoleChanged={handleMemberRoleChanged}
-                onInvitationRescinded={handleInvitationRescinded}
-                onGoToBilling={() => goToTab('billing')}
-            />
-        );
-    };
-
-    return (
-        <div className="min-h-screen bg-surface-body text-text-main flex flex-col">
-            <div className="flex flex-1 overflow-hidden">
-                {/* Sidebar nav */}
-                <aside className="w-60 shrink-0 border-r border-border bg-surface flex flex-col">
-                    {/* Workspace */}
-                    <div className="px-4 pt-4 pb-2">
-                        <WorkspaceDropdown
-                            workspaces={workspaceList}
-                            currentWorkspaceId={workspaceId}
-                            currentWorkspaceName={workspaceName}
-                            currentRole={workspaceRole}
-                            onSwitch={handleSwitchWorkspace}
-                            onOpenSettings={() => {}}
-                        />
-                    </div>
-
-                    {/* Back to dashboard */}
-                    <button
-                        type="button"
-                        onClick={() => navigate('/')}
-                        className="mx-4 mb-3 flex items-center gap-2 text-xs text-text-muted hover:text-text-main transition-colors cursor-pointer self-start"
-                    >
-                        <LuArrowLeft className="icon-sm" />
-                        Back to dashboard
-                    </button>
-
-                    <div className="px-2 flex flex-col gap-0.5">
-                    {tabs.map(tab => {
-                        const active = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => goToTab(tab.id)}
-                                className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                                    active
-                                        ? 'bg-primary/10 text-primary font-medium'
-                                        : 'text-text-main hover:bg-state-hover'
-                                }`}
-                            >
-                                <tab.icon className="icon-sm shrink-0" />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                    </div>
-                </aside>
-
-                {/* Content — centered in the available space */}
-                <main className="flex-1 overflow-y-auto flex justify-center">
-                    <div className="w-full p-8 flex justify-center">
-                        {renderContent()}
-                    </div>
-                </main>
-            </div>
+            </section>
         </div>
     );
 }

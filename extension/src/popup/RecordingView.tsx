@@ -79,7 +79,7 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
             {/* Timer row */}
             <div className="flex items-center gap-3 px-3 py-3 rounded-[var(--radius-md)] bg-surface border border-border">
                 <div className={`w-2.5 h-2.5 rounded-full bg-destructive shrink-0 ${recordingState.isPaused ? '' : 'animate-pulse'}`} />
-                <span className="text-2xl font-semibold tabular-nums tracking-wide text-text-highlighted flex-1">
+                <span className="text-2xl font-bold tabular-nums tracking-wide text-text-highlighted flex-1">
                     {formatTime(elapsed)}
                 </span>
                 {/* Mic / camera indicators */}
@@ -108,7 +108,7 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
             {recordingState.isPaused ? (
                 <div className="animate-fade-slide-in flex items-center justify-center gap-2 px-3 py-2 -mt-1 rounded-[var(--radius-md)] bg-destructive/10 border border-destructive/30">
                     <IoPause className="icon-sm text-destructive shrink-0 animate-pulse" />
-                    <span className="text-sm font-medium text-destructive">Recording paused</span>
+                    <span className="text-sm text-destructive">Recording paused</span>
                 </div>
             ) : (
                 <p className="text-xs text-text-muted text-center -mt-1">{sourceLabel}</p>

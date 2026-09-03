@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { LuUndo2, LuRedo2, LuArrowLeft } from 'react-icons/lu';
-import { useWorkspaceStore } from '../../../workspace/useWorkspaceStore';
+import { LuUndo2, LuRedo2 } from 'react-icons/lu';
 
 import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -20,7 +19,7 @@ import { useCloudRender } from '../settings/useCloudRender';
 import { DownloadModal } from '../settings/DownloadModal';
 
 import { TbCloudUpload, TbDownload, TbLink } from 'react-icons/tb';
-import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
+import { Dropdown, Button, Tooltip, LogoLink, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
@@ -60,7 +59,6 @@ export const Header = () => {
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [isProModalOpen, setIsProModalOpen] = useState(false);
     const { isAuthenticated } = useUserStore();
-    const workspaceName = useWorkspaceStore(s => s.workspaceName);
     const entitlements = useEntitlements();
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
 
@@ -206,13 +204,14 @@ export const Header = () => {
             {/* Top Row: Main Controls */}
             <div className="h-header flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Button variant="icon" icon={LuArrowLeft} onClick={handleGoToDashboard} title="Back to Dashboard" />
-                        <div className="flex flex-col leading-tight">
-                            <span className="text-[11px] text-text-muted">Workspace</span>
-                            <span className="text-sm font-semibold text-text-highlighted">{workspaceName ?? 'My Workspace'}</span>
-                        </div>
-                    </div>
+                    <Button
+                        variant="ghost"
+                        onClick={handleGoToDashboard}
+                        aria-label="Back to Dashboard"
+                        title="Back to Dashboard"
+                    >
+                        <LogoLink imgClassName="h-6" />
+                    </Button>
                     <div className="h-4 w-[1px] bg-border mx-2"></div>
 
                     <div className="flex items-center gap-1">
@@ -230,7 +229,7 @@ export const Header = () => {
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
                         />
-                        {true && <span className="text-[10px] text-text-muted ml-1 tabular-nums">
+                        {true && <span className="text-2xs text-text-muted ml-1 tabular-nums">
                             {pastStates.length}/{pastStates.length + futureStates.length}
                         </span>}
                     </div>
@@ -324,7 +323,7 @@ export const Header = () => {
                             <button
                                 onClick={handleShare}
                                 disabled={isSharing || isSyncingMedia}
-                                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm font-medium border-none cursor-pointer transition-colors
+                                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm border-none cursor-pointer transition-colors
                                     bg-primary text-white hover:bg-primary-highlighted
                                     ${(isSharing || isSyncingMedia) ? 'opacity-50 cursor-not-allowed' : ''}
                                 `}
@@ -347,7 +346,7 @@ export const Header = () => {
                         <div className="flex rounded-(--radius-interactive) overflow-hidden">
                             <button
                                 onClick={() => setIsProModalOpen(true)}
-                                className="flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm font-medium border-none cursor-pointer transition-colors bg-primary text-white hover:bg-primary-highlighted"
+                                className="flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm border-none cursor-pointer transition-colors bg-primary text-white hover:bg-primary-highlighted"
                             >
                                 Publish
                             </button>

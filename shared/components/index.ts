@@ -15,6 +15,7 @@ export { MultiToggle, type MultiToggleOption } from './MultiToggle';
 export { ProBadge } from './ProBadge';
 export { ProgressModal } from './ProgressModal';
 export { Scrollbar } from './Scrollbar';
+export { SidebarNav, SidebarNavItem } from './SidebarNav';
 export { Slider } from './Slider';
 export { Toggle } from './Toggle';
 export { XButton } from './XButton';

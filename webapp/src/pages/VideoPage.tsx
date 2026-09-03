@@ -93,7 +93,7 @@ export function VideoPage() {
         return (
             <div className="min-h-screen bg-surface flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">
-                    <h1 className="text-xl font-semibold text-text-main">{error || 'Video not found'}</h1>
+                    <h1 className="heading-2">{error || 'Video not found'}</h1>
                     <p className="text-sm text-text-muted">
                         This video may have been removed or the link may be incorrect.
                     </p>
@@ -134,11 +134,11 @@ export function VideoPage() {
                     <div className="flex-1 min-w-0 border border-border rounded-xl bg-surface p-5">
                         {/* Attribution */}
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-semibold shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold shrink-0">
                                 {data.userName.slice(0, 2).toUpperCase()}
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-text-main">{data.userName}</p>
+                                <p className="text-sm text-text-main">{data.userName}</p>
                             </div>
                         </div>
 
@@ -173,7 +173,7 @@ export function VideoPage() {
                         )}
 
                         {/* Title */}
-                        <h1 className="mt-4 text-lg font-medium text-text-main">{data.name}</h1>
+                        <h1 className="mt-4 text-lg text-text-main">{data.name}</h1>
                     </div>
 
                     {/* Right column — Sidebar */}
@@ -187,9 +187,9 @@ export function VideoPage() {
 
                         {/* Recordio ad card */}
                         <div className="border border-primary/30 rounded-xl p-5 bg-primary/5">
-                            <h3 className="text-sm font-semibold text-text-highlighted mb-1">Record your screen free</h3>
+                            <h3 className="text-sm font-bold text-text-highlighted mb-1">Record your screen free</h3>
                             <p className="text-xs text-text-muted mb-3">
-                                Create beautiful demo videos with <span className="text-primary font-medium">auto zooms</span> from screen recordings in seconds.
+                                Create beautiful demo videos with <span className="text-primary">auto zooms</span> from screen recordings in seconds.
                             </p>
                             <Button
                                 variant="primary"

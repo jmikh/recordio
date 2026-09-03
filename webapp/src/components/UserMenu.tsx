@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuUser, LuLogOut } from 'react-icons/lu';
+import { LuUser, LuLogOut, LuEllipsis } from 'react-icons/lu';
 import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
 import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
@@ -11,9 +11,11 @@ import { navigate } from '../lib/navigate';
 interface UserMenuProps {
     onOpenSupportModal?: () => void;
     openDirection?: 'up' | 'down';
+    /** 'avatar' = compact avatar button (editor header); 'row' = full-width name + email row (sidebar) */
+    variant?: 'avatar' | 'row';
 }
 
-export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMenuProps) {
+export function UserMenu({ onOpenSupportModal, openDirection = 'down', variant = 'avatar' }: UserMenuProps) {
     const { email, name, picture } = useUserStore();
     const { theme, setTheme } = useThemeStore();
     const isDark = theme === 'dark';
@@ -70,7 +72,7 @@ export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMen
                     )}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-text-highlighted truncate">{name || 'Recordio User'}</p>
+                    <p className="text-sm font-bold text-text-highlighted truncate">{name || 'Recordio User'}</p>
                     <p className="text-xs text-text-muted truncate">{email}</p>
                 </div>
             </div>
@@ -112,22 +114,42 @@ export function UserMenu({ onOpenSupportModal, openDirection = 'down' }: UserMen
         </div>
     );
 
+    const avatarImage = picture ? (
+        <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" onError={() => useUserStore.getState().setUser(useUserStore.getState().userId!, email || '', name, null, null)} />
+    ) : (
+        <div className="w-full h-full bg-surface-raised flex items-center justify-center text-text-muted">
+            <LuUser className="icon-sm" />
+        </div>
+    );
+
     return (
         <div className="relative" ref={openDirection === 'down' ? menuRef : undefined}>
-            <button
-                ref={buttonRef}
-                onClick={handleToggle}
-                className="w-8 h-8 rounded-full overflow-hidden border border-border hover:border-text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 relative"
-                title={name || email || 'User Menu'}
-            >
-                {picture ? (
-                    <img src={picture} alt={name || 'User'} className="w-full h-full object-cover" onError={() => useUserStore.getState().setUser(useUserStore.getState().userId!, email || '', name, null, null)} />
-                ) : (
-                    <div className="w-full h-full bg-surface-raised flex items-center justify-center text-text-muted">
-                        <LuUser className="icon-sm" />
+            {variant === 'row' ? (
+                <button
+                    ref={buttonRef}
+                    onClick={handleToggle}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-state-hover transition-colors cursor-pointer text-left"
+                    aria-label="Account menu"
+                >
+                    <div className="w-7 h-7 rounded-full overflow-hidden border border-border shrink-0">
+                        {avatarImage}
                     </div>
-                )}
-            </button>
+                    <div className="min-w-0 flex-1 leading-tight">
+                        <p className="text-sm text-text-highlighted truncate">{name || 'Recordio User'}</p>
+                        <p className="text-xs text-text-muted truncate">{email}</p>
+                    </div>
+                    <LuEllipsis className="icon-md text-text-muted shrink-0" />
+                </button>
+            ) : (
+                <button
+                    ref={buttonRef}
+                    onClick={handleToggle}
+                    className="w-8 h-8 rounded-full overflow-hidden border border-border hover:border-text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 relative"
+                    title={name || email || 'User Menu'}
+                >
+                    {avatarImage}
+                </button>
+            )}
 
             {isOpen && openDirection === 'down' && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-surface-raised border border-border rounded-lg shadow-xl z-[var(--z-index-dropdown)] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">

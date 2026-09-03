@@ -1,3 +1,7 @@
+/* Establish layer priority up front: utilities must beat @layer components
+   (same as webapp/src/index.css). */
+@layer theme, base, components, utilities;
+
 @import "tailwindcss" source("../../");
 @import "@shared/theme/index.css";
 

@@ -3,8 +3,7 @@ import { LuMail, LuLoader, LuX, LuEllipsis } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { invokeFunction } from '../../api/client';
 import { useToast } from '../../components/Toast';
-import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
-import { trackMembersPageLoaded, trackWorkspaceInviteFailed } from '../../analytics';
+import { trackWorkspaceInviteFailed } from '../../analytics';
 import { captureError } from '../../lib/sentry';
 import type { WorkspaceDetails, WorkspaceMember } from './types';
 
@@ -43,9 +42,9 @@ function SeatPanel({ label, sublabel, used, pending, total, note }: {
 
     return (
         <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-3">
-                {label}{' '}
-                <span className="font-normal normal-case tracking-normal">· {sublabel}</span>
+            <p className="flex items-baseline gap-1.5 mb-3">
+                <span className="text-eyebrow">{label}</span>
+                <span className="text-xs text-text-muted">· {sublabel}</span>
             </p>
             <div className="flex items-baseline justify-between mb-2">
                 <div>
@@ -173,16 +172,16 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
             <Avatar name={member.name} email={member.email} />
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-text-highlighted truncate">
+                    <p className="text-sm text-text-highlighted truncate">
                         {member.name ?? member.email}
                     </p>
                     {isCurrentUser && (
-                        <span className="text-[10px] font-semibold text-text-muted bg-state-inactive px-1.5 py-0.5 rounded-sm uppercase tracking-wide shrink-0">
+                        <span className="text-badge text-text-muted bg-state-inactive px-1.5 py-0.5 rounded-sm uppercase tracking-wide shrink-0">
                             You
                         </span>
                     )}
                     {isPlanOwner && (
-                        <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wide shrink-0">
+                        <span className="text-badge text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wide shrink-0">
                             Plan Owner
                         </span>
                     )}
@@ -224,7 +223,7 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationRescinded, onGoToBilling }: {
+export function MembersSection({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationRescinded, onGoToBilling }: {
     details: WorkspaceDetails;
     currentUserId: string | null;
     /** Active subscription — the single plan includes collaboration (billing revamp Step 1) */
@@ -235,7 +234,6 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
     onGoToBilling?: () => void;
 }) {
     const { addToast }                    = useToast();
-    useEffect(() => { trackMembersPageLoaded(useWorkspaceStore.getState().workspaceId); }, []);
     const [inviteEmail, setInviteEmail]   = useState('');
     const [inviteRole, setInviteRole]     = useState<'viewer' | 'creator'>('creator');
     const [inviting, setInviting]         = useState(false);
@@ -262,13 +260,13 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
     // ── No active subscription — collaboration is a Pro feature ──────────────
     if (!hasTeamAccess) {
         return (
-            <div className="w-full max-w-lg">
-                <h2 className="text-base font-semibold text-text-highlighted mb-2">Members</h2>
+            <div className="w-full">
+                <h2 className="heading-2 mb-2">Members</h2>
                 <p className="text-sm text-text-muted">
                     Adding team members is a Pro feature.{' '}
                     <button
                         type="button"
-                        className="text-primary font-medium hover:underline cursor-pointer"
+                        className="text-primary hover:underline cursor-pointer"
                         onClick={onGoToBilling}
                     >
                         Upgrade to Pro →
@@ -364,10 +362,10 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
     // ── Full members UI ───────────────────────────────────────────────────────
 
     return (
-        <div className="w-full max-w-2xl flex flex-col gap-6">
+        <div className="w-full flex flex-col gap-6">
             {/* Header */}
             <div>
-                <h2 className="text-xl font-semibold text-text-highlighted">Members</h2>
+                <h2 className="heading-2">Members</h2>
                 <p className="text-sm text-text-muted mt-0.5">Invite teammates and manage their access.</p>
             </div>
 
@@ -395,7 +393,7 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
             {/* Invite form */}
             {isAdmin && (
                 <div className="border border-border rounded-md p-5">
-                    <h3 className="text-sm font-semibold text-text-highlighted mb-3">Invite a teammate</h3>
+                    <h3 className="text-sm font-bold text-text-highlighted mb-3">Invite a teammate</h3>
                     <form onSubmit={handleInvite} className="flex gap-2">
                         <input
                             type="email"
@@ -437,9 +435,9 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
 
             {/* Active members */}
             <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-3">
-                    Active Members{' '}
-                    <span className="font-normal normal-case tracking-normal">{details.members.length}</span>
+                <p className="flex items-baseline gap-1.5 mb-3">
+                    <span className="text-eyebrow">Active Members</span>
+                    <span className="text-xs text-text-muted">{details.members.length}</span>
                 </p>
                 <div className="flex flex-col divide-y divide-border border border-border rounded-md overflow-hidden">
                     {details.members.map(member => (
@@ -461,9 +459,9 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
             {/* Pending invitations */}
             {details.invitations.length > 0 && (
                 <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-3">
-                        Pending Invitations{' '}
-                        <span className="font-normal normal-case tracking-normal">{details.invitations.length}</span>
+                    <p className="flex items-baseline gap-1.5 mb-3">
+                        <span className="text-eyebrow">Pending Invitations</span>
+                        <span className="text-xs text-text-muted">{details.invitations.length}</span>
                     </p>
                     <div className="flex flex-col gap-2">
                         {details.invitations.map(inv => {
@@ -476,7 +474,7 @@ export function MembersPage({ details, currentUserId, hasTeamAccess, onMemberRem
                                         <LuMail className="icon-sm text-text-muted" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-text-highlighted truncate">{inv.email}</p>
+                                        <p className="text-sm text-text-highlighted truncate">{inv.email}</p>
                                         <p className="text-xs text-text-muted capitalize">
                                             {inv.role} · invited {invitedDate}
                                         </p>

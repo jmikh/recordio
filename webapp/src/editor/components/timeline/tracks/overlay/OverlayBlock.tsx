@@ -97,7 +97,7 @@ export const OverlayBlock: React.FC<OverlayBlockProps> = ({
                         </span>
                         {/* Overlap indicator */}
                         {overlapCount > 0 && width >= MIN_ICON_WIDTH_PX + 16 && (
-                            <span className={`${blockIconClass} text-[8px] font-bold opacity-60`}>
+                            <span className={`${blockIconClass} text-badge opacity-60`}>
                                 +{overlapCount}
                             </span>
                         )}

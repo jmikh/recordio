@@ -129,7 +129,7 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
             {!loading && cap !== null && (
                 <div className="mt-4">
                     <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-text-main">
+                        <span className="text-xs text-text-main">
                             {ownedProjects.length} of {cap} projects used
                         </span>
                     </div>
@@ -145,7 +145,7 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
             )}
 
             <div className="mt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-2">
+                <p className="text-eyebrow mb-2">
                     Delete a project
                 </p>
                 {loading ? (
@@ -170,7 +170,7 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-text-main truncate">{p.name}</p>
-                                    <p className="text-[11px] text-text-muted">
+                                    <p className="text-xs text-text-muted">
                                         {timeAgo(p.createdAt)}
                                         {formatDuration(p.durationMs) ? ` · ${formatDuration(p.durationMs)}` : ''}
                                     </p>
@@ -193,7 +193,7 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
 
             {otherWorkspaces.length > 0 && (
                 <div className="mt-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-2">
+                    <p className="text-eyebrow mb-2">
                         Or save to a different workspace
                     </p>
                     <ul className="flex flex-col gap-1">

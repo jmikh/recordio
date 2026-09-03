@@ -4,7 +4,6 @@ import { EditorPage } from './pages/EditorPage';
 import { ImportPage } from './pages/import/ImportPage';
 import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
-import { WorkspaceSettingsPage } from './pages/settings/WorkspaceSettingsPage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
@@ -54,14 +53,10 @@ export function App() {
             return <AcceptInvitePage />;
         }
 
-        if (path === '/workspace/settings') {
-            // Redirect bare path to the default tab
-            window.history.replaceState({}, '', '/workspace/settings/general');
-            return <WorkspaceSettingsPage />;
-        }
-
-        if (path.startsWith('/workspace/settings/')) {
-            return <WorkspaceSettingsPage />;
+        // Settings renders inside the dashboard layout; legacy tab paths
+        // (/workspace/settings/members|billing) deep-link to a section.
+        if (path.startsWith('/workspace/settings')) {
+            return <DashboardPage showSettings />;
         }
 
         if (path === '/import' || path.startsWith('/import')) {

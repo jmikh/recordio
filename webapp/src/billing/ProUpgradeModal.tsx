@@ -63,10 +63,10 @@ export function ProUpgradeModal({ isOpen, onClose, feature, reason }: ProUpgrade
                 </div>
                 <LogoLink imgClassName="h-8" className="mb-10" />
 
-                <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
+                <p className="text-eyebrow text-primary mb-3">
                     Trial ended
                 </p>
-                <h2 className="text-2xl font-bold text-text-highlighted mb-2">
+                <h2 className="heading-1 mb-2">
                     {feature ? `Upgrade to unlock ${feature}` : 'Upgrade to unlock Pro'}
                 </h2>
                 <p className="text-sm text-text-muted mb-8">
@@ -78,7 +78,7 @@ export function ProUpgradeModal({ isOpen, onClose, feature, reason }: ProUpgrade
                     variant="primary"
                     onClick={handleUpgrade}
                     fullWidth
-                    className="py-3 text-base font-semibold rounded-lg"
+                    className="py-3 text-base font-bold rounded-lg"
                 >
                     Upgrade now
                 </Button>
@@ -87,7 +87,7 @@ export function ProUpgradeModal({ isOpen, onClose, feature, reason }: ProUpgrade
                 </p>
 
                 <div className="w-full border border-border rounded-lg p-4 mt-6 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-3">
+                    <p className="text-eyebrow mb-3">
                         Pro includes
                     </p>
                     <ul className="flex flex-col gap-2">
@@ -117,7 +117,7 @@ export function ProUpgradeModal({ isOpen, onClose, feature, reason }: ProUpgrade
                         href={`mailto:${SUPPORT_EMAIL}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-text-highlighted font-medium hover:underline"
+                        className="text-text-highlighted hover:underline"
                     >
                         Contact support
                     </a>

@@ -884,7 +884,12 @@ chrome.runtime.onMessageExternal.addListener((message, _sender, sendResponse) =>
                 break;
 
             case BRIDGE_MSG.OPEN_CONTROLLER:
-                await openControllerTab();
+                try {
+                    // Requires Chrome 127+; falls back to the controller tab
+                    await (chrome.action as any).openPopup(); // eslint-disable-line @typescript-eslint/no-explicit-any
+                } catch {
+                    await openControllerTab();
+                }
                 sendResponse({ success: true });
                 break;
 

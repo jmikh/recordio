@@ -5,8 +5,8 @@ export type FilterTab = 'all' | 'under_1min';
 export type SortOrder = 'last_created' | 'last_updated' | 'longest' | 'shortest';
 
 export const SORT_OPTIONS = [
-    { value: 'last_created' as SortOrder, label: 'Last created' },
-    { value: 'last_updated' as SortOrder, label: 'Last updated' },
+    { value: 'last_created' as SortOrder, label: 'Last Created' },
+    { value: 'last_updated' as SortOrder, label: 'Last Updated' },
     { value: 'longest' as SortOrder, label: 'Longest' },
     { value: 'shortest' as SortOrder, label: 'Shortest' },
 ];
@@ -71,7 +71,7 @@ export function DashboardHeader({
                             className={`
                                 relative px-3 py-2.5 text-sm transition-colors rounded-t-lg
                                 ${activeFilter === tab.value
-                                    ? 'text-text-highlighted font-medium'
+                                    ? 'text-text-highlighted'
                                     : 'text-text-muted hover:text-text-main'
                                 }
                             `}
@@ -79,7 +79,7 @@ export function DashboardHeader({
                             <span className="flex items-center gap-1.5">
                                 {tab.label}
                                 {tab.count !== undefined && (
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                    <span className={`text-badge px-1.5 py-1 rounded-full ${
                                         activeFilter === tab.value
                                             ? 'bg-primary/20 text-primary'
                                             : 'bg-surface-raised text-text-muted'
@@ -101,7 +101,7 @@ export function DashboardHeader({
                         value={sortOrder}
                         onChange={onSortChange}
                         fullWidth={false}
-                        buttonClassName="h-8 text-xs"
+                        buttonClassName="h-8"
                     />
                 </div>
             </div>

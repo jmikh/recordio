@@ -120,7 +120,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
             style={menuStyle}
         >
             {/* Header */}
-            <div className="text-sm font-medium text-text-highlighted mb-2">Timeline Tracks</div>
+            <div className="text-sm text-text-highlighted mb-2">Timeline Tracks</div>
 
             {/* Column headers */}
 
@@ -186,7 +186,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
 
                 {/* Count + animated chevron */}
                 <div className="flex items-center gap-0.5">
-                    <span className="text-[10px] tabular-nums leading-none">
+                    <span className="text-2xs tabular-nums leading-none">
                         {visibleCount}/{totalCount}
                     </span>
                     <MdKeyboardArrowUp

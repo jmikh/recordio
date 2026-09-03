@@ -36,8 +36,8 @@ export const EasingTooltipContent: React.FC = () => (
                     <path d={EASING_CURVES[style]} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 <div className="flex flex-col">
-                    <span className="text-text-main text-xs font-medium">{EASING_LABELS[style]}</span>
-                    <span className="text-text-muted text-[11px]">{EASING_DESCRIPTIONS[style]}</span>
+                    <span className="text-text-main text-xs">{EASING_LABELS[style]}</span>
+                    <span className="text-text-muted text-xs">{EASING_DESCRIPTIONS[style]}</span>
                 </div>
             </div>
         ))}
