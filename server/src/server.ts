@@ -78,6 +78,7 @@ const app = buildApp(
         publicUrl: config.PUBLIC_URL,
         renderSecret: config.RENDER_SECRET,
         serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
+        adminEmails: config.ADMIN_EMAILS,
         stripePriceIds: {
             monthly: config.STRIPE_PRICE_ID_MONTHLY,
             yearly: config.STRIPE_PRICE_ID_YEARLY,

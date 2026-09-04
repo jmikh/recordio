@@ -55,6 +55,10 @@ export interface DomainLogFields {
     'storage.path_count'?: number;
     'storage.bytes'?: number;
     'email.template'?: 'welcome' | 'workspace-invite' | 'seat-change';
+    /** Target user of a minted impersonation token (/admin-impersonate) */
+    'admin.target_user_id'?: string;
+    /** Request made with an impersonation token — the admin's user id (audit trail) */
+    impersonated_by?: string;
     error_type?: ErrorType;
 }
 

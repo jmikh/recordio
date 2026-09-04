@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sentryFetch } from './sentryFetch';
+import { getImpersonation, stopImpersonation } from '../auth/impersonation';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -21,7 +22,17 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler) {
  * the API client's XHR upload path, which can't go through fetch.
  */
 export function notifyUnauthorized() {
-    if (isHandlingUnauthorized || !unauthorizedHandler) return;
+    if (isHandlingUnauthorized) return;
+    // While impersonating, a 401 means the minted token expired (1h TTL) —
+    // end impersonation (the reload restores the admin's real session)
+    // instead of signing the admin out. Stays latched until the reload.
+    if (getImpersonation()) {
+        isHandlingUnauthorized = true;
+        console.warn('[Supabase] 401 while impersonating — ending impersonation');
+        stopImpersonation();
+        return;
+    }
+    if (!unauthorizedHandler) return;
     isHandlingUnauthorized = true;
     console.warn('[Supabase] 401 received — session invalid, signing out');
     Promise.resolve()

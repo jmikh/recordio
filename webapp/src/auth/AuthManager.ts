@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react';
 import { useUserStore } from './useUserStore';
 import { useWorkspaceStore, type WorkspaceSubscription } from '../workspace/useWorkspaceStore';
 import { supabase, setUnauthorizedHandler } from '../supabase/client';
+import { getImpersonation, stopImpersonation } from './impersonation';
 import { invokeFunction } from '../api/client';
 import { captureError } from '../lib/sentry';
 import { trackSigninFailed } from '../analytics';
@@ -147,9 +148,26 @@ export class AuthManager {
     }
 
     private static async handleSession(session: Session | null) {
+        const impersonation = getImpersonation();
         if (session) {
+            // Sentry keeps the real actor — the admin — even while impersonating
             Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined });
-            await syncUserToStore(session);
+            if (impersonation) {
+                // The UI shows the TARGET's identity; the admin's Supabase
+                // session stays intact underneath. Workspace + subscription
+                // below load as the target too, because invokeFunction
+                // carries the impersonation token.
+                const target = impersonation.target;
+                useUserStore.getState().setUser(
+                    target.id,
+                    target.email ?? '',
+                    target.name || target.email?.split('@')[0] || 'User',
+                    null,
+                    null,
+                );
+            } else {
+                await syncUserToStore(session);
+            }
 
             if (AuthManager.subscriptionFetchedForUserId !== session.user.id) {
                 AuthManager.subscriptionFetchedForUserId = session.user.id;
@@ -162,6 +180,12 @@ export class AuthManager {
                 }
             }
         } else {
+            // Real session gone (signed out elsewhere) — end any
+            // impersonation with it rather than showing a half-dead state
+            if (impersonation) {
+                stopImpersonation();
+                return;
+            }
             Sentry.setUser(null);
             AuthManager.subscriptionFetchedForUserId = null;
             useUserStore.getState().clearUser();

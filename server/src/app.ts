@@ -51,6 +51,8 @@ import { userReviewSetRoutes } from './routes/userReviewSet.js';
 import { workspaceGetDefaultRoutes } from './routes/workspaces/workspaceGetDefault.js';
 import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
 import { trialExtendRoutes } from './routes/billing/trialExtend.js';
+import { adminUserListRoutes } from './routes/admin/adminUserList.js';
+import { adminImpersonateRoutes } from './routes/admin/adminImpersonate.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -85,6 +87,8 @@ export interface AppOptions {
     renderSecret?: string;
     /** Bearer the DB's pg_net email calls carry (SUPABASE_SERVICE_ROLE_KEY) */
     serviceRoleKey?: string;
+    /** Comma-separated ADMIN_EMAILS allowlist for the /admin-* routes (impersonation) */
+    adminEmails?: string;
 }
 
 export type App = ReturnType<typeof buildApp>;
@@ -216,6 +220,13 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
 
     // Billing revamp Step 3 — self-serve trial extension
     app.register(trialExtendRoutes);
+
+    // Admin user impersonation (plans/admin-user-impersonation-oneshot.md)
+    app.register(adminUserListRoutes, { adminEmails: opts.adminEmails });
+    app.register(adminImpersonateRoutes, {
+        adminEmails: opts.adminEmails,
+        supabaseJwtSecret: opts.supabaseJwtSecret,
+    });
 
     app.get('/health', {
         schema: {

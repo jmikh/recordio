@@ -28,6 +28,12 @@ export interface AuthUser {
     id: string;
     email?: string;
     userMetadata: Record<string, unknown>;
+    /**
+     * Admin user id when the token is a minted impersonation token
+     * (/admin-impersonate) — folded into the canonical request log
+     * event as the audit trail.
+     */
+    impersonatedBy?: string;
 }
 
 declare module 'fastify' {
@@ -91,14 +97,25 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
             id: payload.sub,
             email: typeof payload.email === 'string' ? payload.email : undefined,
             userMetadata: (payload.user_metadata as Record<string, unknown>) ?? {},
+            impersonatedBy:
+                typeof payload.impersonated_by === 'string' ? payload.impersonated_by : undefined,
         };
+    }
+
+    function attachUser(req: FastifyRequest, user: AuthUser) {
+        req.userId = user.id;
+        req.user = user;
+        // Every request made while impersonating carries the admin's id
+        // in the canonical log event — the audit trail
+        if (user.impersonatedBy) {
+            req.logCtx.set({ impersonated_by: user.impersonatedBy });
+        }
     }
 
     app.decorate('requireUser', async (req: FastifyRequest, reply: FastifyReply) => {
         const user = await verifyUser(req);
         if (!user) return unauthorized(reply);
-        req.userId = user.id;
-        req.user = user;
+        attachUser(req, user);
     });
 
     // For routes serving both anonymous and signed-in callers
@@ -107,8 +124,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
     app.decorate('optionalUser', async (req: FastifyRequest) => {
         const user = await verifyUser(req);
         if (user) {
-            req.userId = user.id;
-            req.user = user;
+            attachUser(req, user);
         }
     });
 }, { name: 'auth' });

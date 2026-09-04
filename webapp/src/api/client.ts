@@ -1,6 +1,7 @@
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
 import type { ApiRoutes } from '@shared/api';
 import { authAwareFetch, notifyUnauthorized, supabase } from '../supabase/client';
+import { getImpersonation } from '../auth/impersonation';
 
 export type InvokeResult<T> =
     | { data: T; error: null }
@@ -42,7 +43,12 @@ export async function invokeFunction(name: string, body?: unknown): Promise<Invo
     const headers: Record<string, string> = isFormData
         ? {}
         : { 'Content-Type': 'application/json' };
-    if (supabase) {
+    // Impersonation (admin-only) outranks the real session token — the
+    // server then treats every call as the target user
+    const impersonation = getImpersonation();
+    if (impersonation) {
+        headers.Authorization = `Bearer ${impersonation.token}`;
+    } else if (supabase) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) headers.Authorization = `Bearer ${session.access_token}`;
     }
@@ -85,8 +91,8 @@ export async function invokeFunctionUpload<T = unknown>(
         return { data: null, error: new Error('VITE_API_URL is not set') };
     }
 
-    let token: string | undefined;
-    if (supabase) {
+    let token: string | undefined = getImpersonation()?.token;
+    if (!token && supabase) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) token = session.access_token;
     }

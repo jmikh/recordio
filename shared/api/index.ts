@@ -58,6 +58,11 @@ import type {
     WorkspaceSetDefaultResponse,
 } from './workspaces';
 import type {
+    AdminImpersonateRequest,
+    AdminImpersonateResponse,
+    AdminUserListResponse,
+} from './admin';
+import type {
     DefaultWorkspace,
     EmptyRequest,
     SubscriptionGetRequest,
@@ -68,6 +73,7 @@ import type {
     UserReviewSetResponse,
 } from './session';
 
+export * from './admin';
 export * from './assets';
 export * from './entitlements';
 export * from './projects';
@@ -104,4 +110,6 @@ export interface ApiRoutes {
     'workspace-get-default': { request: EmptyRequest; response: DefaultWorkspace };
     'subscription-get': { request: SubscriptionGetRequest; response: SubscriptionGetResponse };
     'trial-extend': { request: TrialExtendRequest; response: TrialExtendResponse };
+    'admin-user-list': { request: EmptyRequest; response: AdminUserListResponse };
+    'admin-impersonate': { request: AdminImpersonateRequest; response: AdminImpersonateResponse };
 }

@@ -13,6 +13,13 @@ const EnvSchema = Type.Object({
     /** Service-role key for Supabase platform APIs (auth admin user lookup, storage) */
     SUPABASE_SERVICE_ROLE_KEY: Type.String({ minLength: 1 }),
     /**
+     * Comma-separated emails allowed to use the /admin-* routes (user
+     * impersonation — plans/admin-user-impersonation-oneshot.md).
+     * Compared case-insensitively against the caller's verified JWT
+     * email. Required — a deploy without it should fail loudly.
+     */
+    ADMIN_EMAILS: Type.String({ minLength: 1 }),
+    /**
      * Stripe secret key + the single per-seat plan's price ids (billing
      * revamp Step 1 — the former STRIPE_PRO_PRICE_ID_* prices renamed;
      * teams prices retired). Required — a deploy without Stripe config

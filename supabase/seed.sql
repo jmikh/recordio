@@ -139,10 +139,10 @@ ON CONFLICT DO NOTHING;
 -- 5. User profiles
 -- ============================================================================
 
-INSERT INTO public.user_profiles (user_id, name, trial_ends_at, default_workspace_id) VALUES
-('11111111-1111-1111-1111-111111111111', 'User One',   NOW() - INTERVAL '30 days', 'eeeeeeee-0000-0000-0000-000000000001'),
-('22222222-2222-2222-2222-222222222222', 'User Two',   NOW() + INTERVAL '7 days',  'eeeeeeee-0000-0000-0000-000000000005'),
-('33333333-3333-3333-3333-333333333333', 'User Three', NULL,                        'eeeeeeee-0000-0000-0000-000000000006')
+INSERT INTO public.user_profiles (user_id, name, default_workspace_id) VALUES
+('11111111-1111-1111-1111-111111111111', 'User One',   'eeeeeeee-0000-0000-0000-000000000001'),
+('22222222-2222-2222-2222-222222222222', 'User Two',   'eeeeeeee-0000-0000-0000-000000000005'),
+('33333333-3333-3333-3333-333333333333', 'User Three', 'eeeeeeee-0000-0000-0000-000000000006')
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ============================================================================

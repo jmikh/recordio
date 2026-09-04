@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Modal, Button } from '@shared/components';
 import { CHROME_EXTENSION_URL } from '@shared/urls';
 import { invokeFunction } from '../api/client';
+import { LocalPreferences } from '../lib/localPreferences';
 import {
     trackReviewModalViewed,
     trackReviewModalReviewClicked,
@@ -11,6 +12,9 @@ import {
 } from '../analytics';
 
 const REVIEW_URL = `${CHROME_EXTENSION_URL}/reviews`;
+
+/** Most times the review ask may ever be shown on one device. */
+const MAX_REVIEW_PROMPTS = 3;
 
 /**
  * Global open state: triggers live on transient surfaces (trial-extend
@@ -35,11 +39,17 @@ export const useLeaveReviewModal = create<{
 }));
 
 /**
- * Opens the review ask unless the user has already (claimed to have)
- * reviewed — checked once per session from the profile, then cached.
- * Fire-and-forget: failures just skip the ask.
+ * Opens the review ask unless it's been capped out. Frequency caps are
+ * device-local (at most MAX_REVIEW_PROMPTS ever, at most once per day);
+ * whether the user has already reviewed is the DB-backed source of truth,
+ * checked once per session and cached. Local caps are checked first so a
+ * capped device skips the profile round-trip entirely. Fire-and-forget:
+ * failures just skip the ask.
  */
 export async function maybeOpenLeaveReviewModal(trigger: ReviewModalTrigger): Promise<void> {
+    if (LocalPreferences.getReviewShownCount() >= MAX_REVIEW_PROMPTS) return;
+    if (LocalPreferences.hasShownReviewToday()) return;
+
     const store = useLeaveReviewModal.getState();
     let reviewed = store.hasReviewed;
     if (reviewed === null) {
@@ -48,6 +58,8 @@ export async function maybeOpenLeaveReviewModal(trigger: ReviewModalTrigger): Pr
         useLeaveReviewModal.getState().setHasReviewed(reviewed);
     }
     if (reviewed) return;
+
+    LocalPreferences.recordReviewShown();
     trackReviewModalViewed(trigger);
     useLeaveReviewModal.getState().open(trigger);
 }

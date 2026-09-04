@@ -5,6 +5,8 @@ import { ImportPage } from './pages/import/ImportPage';
 import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
+import { AdminPage } from './pages/admin/AdminPage';
+import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
 import { AuthModal } from './auth/AuthModal';
@@ -58,6 +60,12 @@ export function App() {
             return <AcceptInvitePage />;
         }
 
+        // Hidden admin page (impersonation) — auth-required; the server
+        // 403s non-admins
+        if (path === '/admin') {
+            return <AdminPage />;
+        }
+
         // Settings renders inside the dashboard layout; legacy tab paths
         // (/workspace/settings/members|billing) deep-link to a section.
         if (path.startsWith('/workspace/settings')) {
@@ -93,6 +101,8 @@ export function App() {
             {getPage()}
             <AuthModal isOpen={showAuthModal} onClose={() => {}} />
             <UploadProgressToast />
+            {/* Loud on every page while impersonating (admin feature) */}
+            <ImpersonationBanner />
             {/* Global host — its triggers live on transient surfaces */}
             <LeaveReviewModal />
         </ToastProvider>
