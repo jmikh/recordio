@@ -24,7 +24,7 @@ import {
 
 const ADMIN_EMAIL = 'admin@example.com';
 
-function post(app: App, url: string, token?: string, payload: unknown = {}) {
+function post(app: App, url: string, token?: string, payload: Record<string, unknown> = {}) {
     return app.inject({
         method: 'POST',
         url,
