@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuRotateCcw, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
+import { TbShare2 } from 'react-icons/tb';
 import { MdOutlineAutoDelete } from 'react-icons/md';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
@@ -39,6 +40,8 @@ interface ProjectCardProps {
     onRestore?: () => void;
     onRename?: (id: string, newName: string) => void;
     onDelete?: (id: string) => void;
+    /** Opens share settings — pass only for projects the viewer owns */
+    onShare?: (id: string) => void;
     showUpdatedAt?: boolean;
 }
 
@@ -70,6 +73,7 @@ export const ProjectCard = ({
     onRestore,
     onRename,
     onDelete,
+    onShare,
     showUpdatedAt = false,
 }: ProjectCardProps) => {
     const isGrid = variant === 'grid';
@@ -144,7 +148,7 @@ export const ProjectCard = ({
         setIsRenaming(false);
     };
 
-    const hasMenu = !isTrashed && (onRename || onDelete);
+    const hasMenu = !isTrashed && (onShare || onRename || onDelete);
 
     return (
         <div
@@ -274,6 +278,16 @@ export const ProjectCard = ({
                     className="fixed z-[9999] bg-surface-raised border border-border rounded-lg shadow-float py-1 px-1 min-w-[160px]"
                     style={{ top: menuPosition.top, left: menuPosition.left }}
                 >
+                    {onShare && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onShare(project.id); closeMenu(); }}
+                            className="w-full text-left px-3 py-2 text-sm text-text-main hover:bg-state-hover rounded-md flex items-center gap-2 cursor-pointer"
+                        >
+                            <TbShare2 className="w-3.5 h-3.5" />
+                            Share
+                        </button>
+                    )}
                     {onRename && (
                         <button
                             type="button"

@@ -22,8 +22,8 @@ import { Dropdown, Button, Tooltip, LogoLink, type DropdownOption } from '@share
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
-import { ShareModal } from './ShareModal';
-import { useProjectMetaStore } from '../../stores/useProjectMetaStore';
+import { ShareModal } from '../../../share/ShareModal';
+import { useProjectMetaStore } from '../../../share/useProjectMetaStore';
 
 const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
     value: preset,
@@ -286,7 +286,11 @@ export const Header = () => {
                 onAuthSuccess={() => { }}
             />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
-            <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
+            <ShareModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                projectName={projectName}
+            />
             <ProUpgradeModal
                 isOpen={isProModalOpen}
                 onClose={() => setIsProModalOpen(false)}

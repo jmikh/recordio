@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { LuTrash2 } from 'react-icons/lu';
-import { CloudProjectService, type ProjectListItem } from '../../storage/cloudProjectService';
+import { CloudProjectService, toShareMeta, type ProjectListItem } from '../../storage/cloudProjectService';
+import { ShareModal } from '../../share/ShareModal';
+import { useProjectMetaStore } from '../../share/useProjectMetaStore';
 import { ProjectCard } from './ProjectCard';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
 import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
@@ -73,6 +75,9 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
     const { addToast } = useToast();
     const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
     const [showRestoreUpgradeModal, setShowRestoreUpgradeModal] = useState(false);
+    const [showShareUpgradeModal, setShowShareUpgradeModal] = useState(false);
+    /** Project whose share settings are open (owner-only card menu action) */
+    const [shareTarget, setShareTarget] = useState<ProjectListItem | null>(null);
 
     // Sort, filter, search state (persisted to localStorage)
     const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
@@ -251,6 +256,34 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
             || item.editorRole === 'edit'
             || (sharedToWorkspace && item.workspaceAccess === 'edit');
         navigate(canEdit ? editorPath(item.shareSlug) : viewPath(item.shareSlug));
+    };
+
+    // Share settings from the card menu (owner-only; free tier gets the
+    // upgrade modal, server enforces regardless). The modal reads from
+    // useProjectMetaStore — hydrate it via project-get first.
+    const handleShareSettings = async (item: ProjectListItem) => {
+        if (!entitlements.canShare) {
+            setShowShareUpgradeModal(true);
+            return;
+        }
+        const { data, error } = await invokeFunction('project-get', { projectId: item.id });
+        if (error || !data) {
+            addToast({ type: 'error', title: 'Failed to load share settings' });
+            return;
+        }
+        useProjectMetaStore.getState().setMeta(toShareMeta(data));
+        setShareTarget(item);
+    };
+
+    const closeShareModal = () => {
+        setShareTarget(null);
+        // Reflect any policy/access change on the card (copy-link vs Private)
+        const m = useProjectMetaStore.getState().meta;
+        if (m) {
+            setAllProjects(prev => prev.map(p => p.id === m.id
+                ? { ...p, sharePolicy: m.sharePolicy, workspaceAccess: m.workspaceAccess }
+                : p));
+        }
     };
 
     // Restore from trash — the button always presses; free tier gets the
@@ -433,6 +466,9 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                                             onSelect={() => toggleSelect(item.id)}
                                             onRename={handleRename}
                                             onDelete={handleDelete}
+                                            onShare={item.ownerId === userId
+                                                ? () => void handleShareSettings(item)
+                                                : undefined}
                                             showUpdatedAt={sortOrder === 'last_updated'}
                                         />
                                     ))}
@@ -529,6 +565,17 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                 onClose={() => setShowRestoreUpgradeModal(false)}
                 feature="restoring deleted videos"
                 reason="restore"
+            />
+            <ProUpgradeModal
+                isOpen={showShareUpgradeModal}
+                onClose={() => setShowShareUpgradeModal(false)}
+                feature="publishing"
+                reason="share"
+            />
+            <ShareModal
+                isOpen={!!shareTarget}
+                onClose={closeShareModal}
+                projectName={shareTarget?.name ?? ''}
             />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
             <AuthModal

@@ -3,7 +3,7 @@ import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
 import { captureError } from '../lib/sentry';
 import { CloudStorage, CloudVersionConflictError } from './cloudStorage';
-import type { AccessRole, CloudProjectSummary, ProjectEditor, SharePolicy } from '@shared/api';
+import type { AccessRole, CloudProject, CloudProjectSummary, ProjectEditor, SharePolicy } from '@shared/api';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
@@ -55,6 +55,24 @@ export interface ProjectShareMeta {
     editors: ProjectEditor[];
     ownerName: string | null;
     ownerEmail: string;
+    /** Version the mux publish targets when the editor isn't tracking a live one */
+    cloudVersion: number;
+}
+
+/** ShareModal's slice of a project-get response (used by editor load + dashboard card menu). */
+export function toShareMeta(cloudProject: CloudProject): ProjectShareMeta {
+    return {
+        id: cloudProject.id,
+        ownerId: cloudProject.owner_id,
+        workspaceId: cloudProject.workspace_id,
+        slug: cloudProject.slug,
+        sharePolicy: cloudProject.share_policy,
+        workspaceAccess: cloudProject.workspace_access,
+        editors: cloudProject.editors,
+        ownerName: cloudProject.owner_name,
+        ownerEmail: cloudProject.owner_email,
+        cloudVersion: cloudProject.cloud_version,
+    };
 }
 
 // ─── Service ─────────────────────────────────────────────────
@@ -462,21 +480,7 @@ export class CloudProjectService {
         const hash = await this.projectDataHash(project);
         this.projectHashes.set(projectId, hash);
 
-        return {
-            project,
-            name: cloudProject.name,
-            meta: {
-                id: cloudProject.id,
-                ownerId: cloudProject.owner_id,
-                workspaceId: cloudProject.workspace_id,
-                slug: cloudProject.slug,
-                sharePolicy: cloudProject.share_policy,
-                workspaceAccess: cloudProject.workspace_access,
-                editors: cloudProject.editors,
-                ownerName: cloudProject.owner_name,
-                ownerEmail: cloudProject.owner_email,
-            },
-        };
+        return { project, name: cloudProject.name, meta: toShareMeta(cloudProject) };
     }
 
     // ─── Save ────────────────────────────────────────────────

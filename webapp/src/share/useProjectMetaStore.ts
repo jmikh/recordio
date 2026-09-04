@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import type { AccessRole, ProjectEditor, SharePolicy } from '@shared/api';
-import type { ProjectShareMeta } from '../../storage/cloudProjectService';
+import type { ProjectShareMeta } from '../storage/cloudProjectService';
 
 /**
- * Share-relevant metadata of the loaded project (share-access model).
- * Populated once by the editor's project load from project-get; the
- * ShareModal reads it and optimistically updates it on share actions.
- * Distinct from useProjectStore: none of this is part of project_data
- * or the undo/redo history.
+ * Share-relevant metadata of the project whose share settings are in
+ * play (share-access model). Populated by the editor's project load OR
+ * by the dashboard's card menu (project-get on demand); the ShareModal
+ * reads it and optimistically updates it on share actions. Distinct
+ * from useProjectStore: none of this is part of project_data or the
+ * undo/redo history.
  */
 interface ProjectMetaState {
     meta: ProjectShareMeta | null;

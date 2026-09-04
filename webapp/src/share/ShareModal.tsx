@@ -2,16 +2,15 @@ import { useEffect, useState } from 'react';
 import { Modal, Button, Dropdown, Tooltip, type DropdownOption } from '@shared/components';
 import { TbLink, TbLock, TbUsers, TbWorld } from 'react-icons/tb';
 import type { AccessRole, SharePolicy, WorkspaceMemberRow } from '@shared/api';
-import { invokeFunction } from '../../../api/client';
-import { useProjectMetaStore } from '../../stores/useProjectMetaStore';
-import { useProjectName } from '../../stores/useProjectStore';
-import { useUserStore } from '../../../auth/useUserStore';
-import { useSyncStatusStore } from '../../../storage/syncStatusStore';
-import { CloudProjectService } from '../../../storage/cloudProjectService';
-import { useToast } from '../../../components/Toast';
-import { captureError } from '../../../lib/sentry';
-import { videoUrl } from '../../../lib/videoUrls';
-import { trackPublishClicked, trackPublishFailed } from '../../../analytics';
+import { invokeFunction } from '../api/client';
+import { useProjectMetaStore } from './useProjectMetaStore';
+import { useUserStore } from '../auth/useUserStore';
+import { useSyncStatusStore } from '../storage/syncStatusStore';
+import { CloudProjectService } from '../storage/cloudProjectService';
+import { useToast } from '../components/Toast';
+import { captureError } from '../lib/sentry';
+import { videoUrl } from '../lib/videoUrls';
+import { trackPublishClicked, trackPublishFailed } from '../analytics';
 
 const POLICY_OPTIONS: DropdownOption<SharePolicy>[] = [
     { value: 'private', label: 'Private (only me)', icon: <TbLock className="icon-sm" /> },
@@ -35,27 +34,28 @@ function Avatar({ name }: { name: string }) {
 interface ShareModalProps {
     isOpen: boolean;
     onClose: () => void;
+    projectName: string;
 }
 
 /**
  * Share settings (share-access model): visibility + workspace access
  * level + individual member grants. Only the owner can change settings —
  * others get a read-only view with Copy link. State lives in
- * useProjectMetaStore (populated at project load), updated optimistically
- * here and reverted on API failure.
+ * useProjectMetaStore (populated by the editor's project load or the
+ * dashboard's card menu), updated optimistically here and reverted on
+ * API failure.
  */
-export function ShareModal({ isOpen, onClose }: ShareModalProps) {
+export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
     const meta = useProjectMetaStore(s => s.meta);
     const setShareSettings = useProjectMetaStore(s => s.setShareSettings);
     const setEditors = useProjectMetaStore(s => s.setEditors);
     const userId = useUserStore(s => s.userId);
-    const projectName = useProjectName();
     const { addToast } = useToast();
     const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
 
     const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
 
-    // Workspace members feed the invite typeahead
+    // Workspace members feed the invite picker
     const workspaceId = meta?.workspaceId;
     useEffect(() => {
         if (!isOpen || !workspaceId) return;
@@ -81,8 +81,9 @@ export function ShareModal({ isOpen, onClose }: ShareModalProps) {
     /** Publish/refresh the shared Mux video for the current edit version (idempotent server-side). */
     const triggerMuxUpdate = () => {
         if (isSyncingMedia || !canEdit) return;
-        const cloudVersion = CloudProjectService.getCloudVersion(meta.id);
-        if (cloudVersion === undefined) return;
+        // In the editor the service tracks the live version; from the
+        // dashboard fall back to the version project-get reported
+        const cloudVersion = CloudProjectService.getCloudVersion(meta.id) ?? meta.cloudVersion;
         void invokeFunction<{ status: string; muxVideoId: string }>('mux-video-create', {
             projectId: meta.id, cloudVersion,
         }).then(({ error }) => {

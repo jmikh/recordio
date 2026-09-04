@@ -29,7 +29,7 @@ import { captureError } from '../lib/sentry';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { navigate } from '../lib/navigate';
 import { editorPath, viewPath } from '../lib/videoUrls';
-import { useProjectMetaStore } from './stores/useProjectMetaStore';
+import { useProjectMetaStore } from '../share/useProjectMetaStore';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 function Editor() {
