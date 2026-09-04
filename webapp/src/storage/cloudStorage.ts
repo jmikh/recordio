@@ -3,7 +3,7 @@ import { supabase } from '../auth/AuthManager';
 import { invokeFunction } from '../api/client';
 
 import type { Project } from '@shared/types';
-import type { CloudProject, CloudProjectSummary } from '@shared/api';
+import type { CloudProject, CloudProjectSummary, ProjectGetRequest } from '@shared/api';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
@@ -74,12 +74,17 @@ export class CloudStorage {
     }
 
     /**
-     * Load full project metadata from cloud.
-     * Also bumps last_accessed_at server-side.
+     * Load full project metadata from cloud, by id or by share slug
+     * (the /video/{slug}/edit editor route). Also bumps
+     * last_accessed_at server-side.
      */
-    static async loadProjectMetadata(projectId: string): Promise<CloudProject | null> {
-        console.log('[CloudStorage] project-get via loadProjectMetadata', projectId);
-        const { data, error } = await invokeFunction('project-get', { projectId });
+    static async loadProjectMetadata(
+        ref: { projectId: string } | { slug: string },
+    ): Promise<CloudProject | null> {
+        console.log('[CloudStorage] project-get via loadProjectMetadata', ref);
+        // Widened to the request type — the union confuses the typed
+        // invokeFunction overload into the untyped fallback
+        const { data, error } = await invokeFunction('project-get', ref as ProjectGetRequest);
 
         if (error) throw error;
         return data;
@@ -134,11 +139,12 @@ export class CloudStorage {
         project: Project,
         name: string,
         workspaceId: string,
-    ): Promise<{ projectId: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
+    ): Promise<{ projectId: string; slug: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
         if (!supabase) throw new Error('Supabase not configured');
 
         const { data, error } = await invokeFunction<{
             projectId: string;
+            slug: string;
             bucket: string;
             uploads: { fileType: string; storagePath: string }[];
             error?: string;

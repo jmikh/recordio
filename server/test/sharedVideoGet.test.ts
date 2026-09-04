@@ -14,7 +14,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
 import { buildApp, type App } from '../src/app.js';
 import { createFakeDeps, type FakeDeps } from './fakes/index.js';
-import { TEST_JWT_SECRET } from './helpers/tokens.js';
+import { TEST_JWT_SECRET, userToken } from './helpers/tokens.js';
 import {
     createTestPool,
     deleteProjects,
@@ -22,14 +22,18 @@ import {
     hasTestDb,
     seedMuxVideo,
     seedProject,
+    seedProjectEditor,
     seedWorkspace,
+    seedWorkspaceMember,
+    SEEDED_USER_2_ID,
     SEEDED_USER_ID,
 } from './helpers/db.js';
 
-async function post(app: App, body: unknown) {
+async function post(app: App, body: unknown, token?: string) {
     return app.inject({
         method: 'POST',
         url: '/shared-video-get',
+        headers: token ? { authorization: `Bearer ${token}` } : {},
         payload: body as Record<string, unknown>,
     });
 }
@@ -106,19 +110,69 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         expect(res.json()).toEqual({ error: 'not_found' });
     });
 
-    it('404 when share_policy is private', async () => {
-        const { app } = testApp();
-        const project = await seed({ sharePolicy: 'private' });
-        const res = await post(app, { slug: project.slug });
-        expect(res.statusCode).toBe(404);
-        expect(res.json()).toEqual({ error: 'not_found' });
+    // ── share-access model: non-public policies need a signed-in viewer ──
+
+    it.each(['private', 'workspace'])(
+        '403 auth_required for an ANONYMOUS viewer when share_policy is %s', async (sharePolicy) => {
+            const { app } = testApp();
+            const project = await seed({ sharePolicy });
+            const res = await post(app, { slug: project.slug });
+            expect(res.statusCode).toBe(403);
+            expect(res.json()).toEqual({ error: 'auth_required' });
+        });
+
+    it('workspace policy: a workspace member can view; a non-member gets 404', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_ID });
+        createdWorkspaces.push(ws.id);
+        const { app, deps } = testApp();
+        const project = await seed({ workspaceId: ws.id, sharePolicy: 'workspace' });
+        nameOwner(deps, project.ownerId, { full_name: 'Owner' });
+
+        // user2 is not (yet) a member of this fresh workspace
+        const outsider = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(outsider.statusCode).toBe(404);
+        expect(outsider.json()).toEqual({ error: 'not_found' });
+
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+        const member = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(member.statusCode).toBe(200);
     });
 
-    it('404 when share_policy is null', async () => {
-        const { app } = testApp();
-        const project = await seed({ sharePolicy: null });
-        const res = await post(app, { slug: project.slug });
-        expect(res.statusCode).toBe(404);
+    it('private policy: owner and individually-granted viewer can view; a plain member gets 404', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_ID });
+        createdWorkspaces.push(ws.id);
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+        const { app, deps } = testApp();
+        const project = await seed({ workspaceId: ws.id, sharePolicy: 'private' });
+        nameOwner(deps, project.ownerId, { full_name: 'Owner' });
+
+        const owner = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(owner.statusCode).toBe(200);
+
+        // Plain workspace membership does NOT see a private video
+        const member = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(member.statusCode).toBe(404);
+
+        // ...until individually granted (view role suffices)
+        await seedProjectEditor(pool, {
+            projectId: project.id, userId: SEEDED_USER_2_ID, role: 'view' });
+        const granted = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(granted.statusCode).toBe(200);
+    });
+
+    it('public policy still serves a signed-in viewer (token is harmless)', async () => {
+        const { app, deps } = testApp();
+        const project = await seed({ name: 'Public one' });
+        nameOwner(deps, project.ownerId, { full_name: 'Owner' });
+        const res = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(res.statusCode).toBe(200);
+        expect((res.json() as { name: string }).name).toBe('Public one');
     });
 
     it('404 when the project is soft-deleted', async () => {

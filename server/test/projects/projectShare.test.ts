@@ -1,6 +1,8 @@
 /**
- * POST /project-share — Part 2 Batch 2. OWNER-only (stricter than the
- * editor routes — pinned); slug generated once, policy always applied.
+ * POST /project-share — Part 2 Batch 2, reshaped by the share-access
+ * model: OWNER-only (stricter than the editor routes — pinned); slugs
+ * are permanent (DB default at insert); the route applies policy +
+ * workspace access and enforces the override rule on individual grants.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
@@ -52,6 +54,13 @@ describe('POST /project-share (auth + validation, no db)', () => {
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(400);
     });
+
+    it('schema 400 pre-query: invalid workspaceAccess', async () => {
+        const { app } = validationApp();
+        const res = await post(app, { projectId: 'p-1', workspaceAccess: 'admin' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(400);
+    });
 });
 
 describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
@@ -62,6 +71,8 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
     let subscribedWs: string;
     /** Trial-less owner: the fakeClock (2026-01-01) predates the SEEDED users' trials */
     let freeOwner: SeededAuthUser;
+    /** Second grantee for the override-rule matrix (user2 is the first) */
+    let grantee: SeededAuthUser;
 
     beforeAll(async () => {
         pool = createTestPool();
@@ -70,6 +81,7 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
         await seedSubscription(pool, { workspaceId: ws.id, status: 'active' });
         subscribedWs = ws.id;
         freeOwner = await seedAuthUser(pool);
+        grantee = await seedAuthUser(pool);
     });
     afterEach(async () => {
         await deleteProjects(pool, createdProjects);
@@ -77,7 +89,7 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
     });
     afterAll(async () => {
         await deleteWorkspaces(pool, createdWorkspaces);
-        await deleteAuthUsers(pool, [freeOwner.id]);
+        await deleteAuthUsers(pool, [freeOwner.id, grantee.id]);
         await pool.end();
     });
 
@@ -95,39 +107,95 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
 
     async function row(id: string) {
         const { rows } = await pool.query(
-            'SELECT slug, share_policy FROM projects WHERE id = $1', [id]);
-        return rows[0] as { slug: string | null; share_policy: string | null };
+            'SELECT slug, share_policy, workspace_access FROM projects WHERE id = $1', [id]);
+        return rows[0] as { slug: string; share_policy: string; workspace_access: string };
     }
 
-    it('first share creates a 12-char slug with isNew true and the default public policy', async () => {
-        const p = await seed({ slug: null, sharePolicy: null });
+    async function editorRoles(projectId: string) {
+        const { rows } = await pool.query(
+            'SELECT user_id, role FROM project_editors WHERE project_id = $1 ORDER BY role',
+            [projectId]);
+        return rows as { user_id: string; role: string }[];
+    }
+
+    it('omitted sharePolicy still means public (pre-modal wire compat) and keeps the slug', async () => {
+        const p = await seed({ sharePolicy: 'private' });
         const { app } = testApp();
 
         const res = await post(app, { projectId: p.id },
             await userToken({ sub: SEEDED_USER_ID }));
 
         expect(res.statusCode).toBe(200);
-        const body = res.json() as { slug: string; isNew: boolean };
-        expect(body.isNew).toBe(true);
-        expect(body.slug).toMatch(/^[0-9a-f]{12}$/);
-        expect(await row(p.id)).toEqual({ slug: body.slug, share_policy: 'public' });
+        expect(res.json()).toEqual({ slug: p.slug, isNew: false });
+        expect(await row(p.id)).toEqual({
+            slug: p.slug, share_policy: 'public', workspace_access: 'view',
+        });
     });
 
-    it('re-share keeps the slug (isNew false) and updates the policy', async () => {
-        const p = await seed({ slug: null, sharePolicy: null });
+    it('applies policy + workspaceAccess together; omitted access keeps the current level', async () => {
+        const p = await seed({ sharePolicy: 'private' });
         const { app } = testApp();
-        const first = (await post(app, { projectId: p.id },
-            await userToken({ sub: SEEDED_USER_ID }))).json() as { slug: string };
+
+        await post(app, { projectId: p.id, sharePolicy: 'workspace', workspaceAccess: 'edit' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(await row(p.id)).toEqual({
+            slug: p.slug, share_policy: 'workspace', workspace_access: 'edit',
+        });
+
+        // access omitted → stays edit
+        await post(app, { projectId: p.id, sharePolicy: 'public' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(await row(p.id)).toEqual({
+            slug: p.slug, share_policy: 'public', workspace_access: 'edit',
+        });
+    });
+
+    // Override rule: a policy granting the workspace view erases
+    // individual view grants; workspace edit erases ALL grants;
+    // private erases nothing.
+    it('workspace-view share deletes view grants and keeps edit grants', async () => {
+        const p = await seed({ sharePolicy: 'private' });
+        await seedProjectEditor(pool, { projectId: p.id, userId: SEEDED_USER_2_ID, role: 'view' });
+        await seedProjectEditor(pool, { projectId: p.id, userId: grantee.id, role: 'edit' });
+        const { app } = testApp();
 
         const res = await post(app, { projectId: p.id, sharePolicy: 'workspace' },
             await userToken({ sub: SEEDED_USER_ID }));
 
-        expect(res.json()).toEqual({ slug: first.slug, isNew: false });
-        expect(await row(p.id)).toEqual({ slug: first.slug, share_policy: 'workspace' });
+        expect(res.statusCode).toBe(200);
+        expect(await editorRoles(p.id)).toEqual([{ user_id: grantee.id, role: 'edit' }]);
+    });
+
+    it('workspace-edit share deletes ALL individual grants', async () => {
+        const p = await seed({ sharePolicy: 'private' });
+        await seedProjectEditor(pool, { projectId: p.id, userId: SEEDED_USER_2_ID, role: 'view' });
+        await seedProjectEditor(pool, { projectId: p.id, userId: grantee.id, role: 'edit' });
+        const { app } = testApp();
+
+        const res = await post(app,
+            { projectId: p.id, sharePolicy: 'public', workspaceAccess: 'edit' },
+            await userToken({ sub: SEEDED_USER_ID }));
+
+        expect(res.statusCode).toBe(200);
+        expect(await editorRoles(p.id)).toEqual([]);
+    });
+
+    it('setting private keeps all individual grants', async () => {
+        const p = await seed({ sharePolicy: 'public' });
+        await seedProjectEditor(pool, { projectId: p.id, userId: SEEDED_USER_2_ID, role: 'view' });
+        await seedProjectEditor(pool, { projectId: p.id, userId: grantee.id, role: 'edit' });
+        const { app } = testApp();
+
+        const res = await post(app, { projectId: p.id, sharePolicy: 'private' },
+            await userToken({ sub: SEEDED_USER_ID }));
+
+        expect(res.statusCode).toBe(200);
+        expect(await editorRoles(p.id)).toHaveLength(2);
+        expect((await row(p.id)).share_policy).toBe('private');
     });
 
     it('403 with the exact body for an EDITOR (owner-only, stricter than editor routes)', async () => {
-        const p = await seed({ slug: null });
+        const p = await seed({ sharePolicy: 'private' });
         await seedProjectEditor(pool, { projectId: p.id, userId: SEEDED_USER_2_ID });
         const { app } = testApp();
 
@@ -136,7 +204,7 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
 
         expect(res.statusCode).toBe(403);
         expect(res.json()).toEqual({ error: 'Only the project owner can share a project' });
-        expect((await row(p.id)).slug).toBeNull();
+        expect((await row(p.id)).share_policy).toBe('private');
     });
 
     it.each([
@@ -160,7 +228,7 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
     it('403 subscription_required for the owner in a free workspace', async () => {
         const ws = await seedWorkspace(pool, { ownerId: freeOwner.id });
         createdWorkspaces.push(ws.id);
-        const p = await seed({ workspaceId: ws.id, slug: null });
+        const p = await seed({ workspaceId: ws.id, sharePolicy: 'private' });
         const { app } = testApp();
 
         const res = await post(app, { projectId: p.id },
@@ -168,6 +236,19 @@ describe.runIf(hasTestDb())('POST /project-share (e2e, real Postgres)', () => {
 
         expect(res.statusCode).toBe(403);
         expect(res.json()).toEqual({ error: 'subscription_required' });
-        expect((await row(p.id)).slug).toBeNull();
+        expect((await row(p.id)).share_policy).toBe('private');
+    });
+
+    it('sharePolicy private is allowed WITHOUT a subscription (un-share must always work)', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: freeOwner.id });
+        createdWorkspaces.push(ws.id);
+        const p = await seed({ workspaceId: ws.id, sharePolicy: 'public' });
+        const { app } = testApp();
+
+        const res = await post(app, { projectId: p.id, sharePolicy: 'private' },
+            await userToken({ sub: SEEDED_USER_ID }));
+
+        expect(res.statusCode).toBe(200);
+        expect((await row(p.id)).share_policy).toBe('private');
     });
 });

@@ -2,8 +2,13 @@
  * POST /shared-video-get — ports the edge function of the same name
  * (Wave A #2).
  *
- * PUBLIC — no auth. Resolves a share slug to video page data; read-only.
- * Stricter per-route rate limit instead (the global limit is a backstop).
+ * OPTIONAL auth (share-access model): resolves a share slug to video
+ * page data; read-only. 'public' serves anyone; other policies need a
+ * signed-in viewer with access (owner, individual grant, or workspace
+ * member for 'workspace') — anonymous callers get 403 auth_required so
+ * the page can prompt sign-in; signed-in without access gets the same
+ * 404 as a missing slug. Stricter per-route rate limit (the global
+ * limit is a backstop).
  *
  * Mux video lookup priority (verbatim from the edge function):
  *   1. Latest completed (highest cloud_version) with a playback id → completed
@@ -18,9 +23,11 @@
  *
  * Request:  { slug }
  * Response: { name, userName, status?, muxPlaybackId? }
+ *           | 403 { error: 'auth_required' } | 404 { error: 'not_found' }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
+import { canViewProject } from '../services/projectAccess.js';
 
 /** VideoPage polls every 5s (12/min); 60/min per IP leaves headroom without inviting scraping. */
 const RATE_LIMIT_PER_MINUTE = 60;
@@ -29,7 +36,7 @@ interface ProjectRow {
     id: string;
     name: string;
     owner_id: string;
-    share_policy: string | null;
+    share_policy: string;
 }
 
 interface MuxVideoRow {
@@ -41,6 +48,7 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
         '/shared-video-get',
         {
+            preHandler: app.optionalUser,
             config: {
                 rateLimit: { max: RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' },
             },
@@ -61,6 +69,7 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                         ),
                         muxPlaybackId: Type.Optional(Type.String()),
                     }),
+                    403: Type.Object({ error: Type.String() }),
                     404: Type.Object({ error: Type.String() }),
                 },
             },
@@ -78,8 +87,18 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
             );
             const project = projectRows[0] as ProjectRow | undefined;
 
-            if (!project || project.share_policy !== 'public') {
+            if (!project) {
                 return reply.code(404).send({ error: 'not_found' });
+            }
+            if (project.share_policy !== 'public') {
+                // Anonymous viewers may simply need to sign in (workspace
+                // or individually-shared videos) — tell the page so
+                if (!req.user) {
+                    return reply.code(403).send({ error: 'auth_required' });
+                }
+                if (!await canViewProject(app.deps.db, project.id, req.user.id)) {
+                    return reply.code(404).send({ error: 'not_found' });
+                }
             }
             req.logCtx.set({ 'project.id': project.id });
 

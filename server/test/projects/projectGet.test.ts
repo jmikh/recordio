@@ -43,10 +43,11 @@ describe('POST /project-get (auth + validation, no db)', () => {
         expect(res.statusCode).toBe(401);
     });
 
-    it('schema 400 pre-query: missing projectId', async () => {
+    it('400 pre-query: neither projectId nor slug provided', async () => {
         const { app } = validationApp();
         const res = await post(app, {}, await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(400);
+        expect(res.json()).toEqual({ error: 'projectId or slug required' });
     });
 });
 
@@ -91,7 +92,7 @@ describe.runIf(hasTestDb())('POST /project-get (e2e, real Postgres)', () => {
     }
 
     it('returns the full project shape for the owner and bumps last_accessed_at', async () => {
-        const project = await seed({ projectData: { tracks: [1, 2] }, slug: null });
+        const project = await seed({ projectData: { tracks: [1, 2] }, sharePolicy: 'private' });
         await seedProjectEditor(pool, { projectId: project.id, userId: SEEDED_USER_2_ID });
 
         const before = await pool.query(
@@ -111,8 +112,11 @@ describe.runIf(hasTestDb())('POST /project-get (e2e, real Postgres)', () => {
             project_data: { tracks: [1, 2] },
             cloud_version: 1,
             upload_status: 'pending',
-            slug: null,
-            is_shared: false,
+            slug: project.slug,
+            share_policy: 'private',
+            workspace_access: 'view',
+            is_shared: false, // derived from share_policy now, not the slug
+            owner_email: 'user1@gmail.com',
         });
         // The editors list joins auth.users (email) + user_profiles (name)
         const editors = body.editors as Array<Record<string, unknown>>;
@@ -120,6 +124,7 @@ describe.runIf(hasTestDb())('POST /project-get (e2e, real Postgres)', () => {
         expect(editors[0]).toMatchObject({
             user_id: SEEDED_USER_2_ID,
             email: 'user2@gmail.com',
+            role: 'edit',
         });
 
         const after = await pool.query(
@@ -140,6 +145,61 @@ describe.runIf(hasTestDb())('POST /project-get (e2e, real Postgres)', () => {
         const res = await post(app, { projectId: project.id },
             await userToken({ sub: SEEDED_USER_2_ID }));
         expect(res.statusCode).toBe(200);
+    });
+
+    it('loads by slug (share-access model); unknown slug is the same 403 as no access', async () => {
+        const project = await seed();
+        const { app } = testApp();
+
+        const res = await post(app, { slug: project.slug },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+        expect((res.json() as { id: string }).id).toBe(project.id);
+
+        const unknown = await post(app, { slug: 'no-such-slug' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(unknown.statusCode).toBe(403);
+        expect(unknown.json()).toEqual({ error: 'Not an editor of this project' });
+    });
+
+    // Share-access model: workspace_access 'edit' on a shared policy
+    // grants every workspace member edit access; a view-role individual
+    // grant does NOT.
+    it('workspace-edit share grants members editor access; a view grant does not', async () => {
+        const ws = await seedWorkspace(pool, {});
+        createdWorkspaces.push(ws.id);
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+
+        const wsEdit = await seed({
+            workspaceId: ws.id, sharePolicy: 'workspace', workspaceAccess: 'edit' });
+        const viewOnly = await seed({ workspaceId: ws.id, sharePolicy: 'private' });
+        await seedProjectEditor(pool, {
+            projectId: viewOnly.id, userId: SEEDED_USER_2_ID, role: 'view' });
+
+        const { app } = testApp();
+        const viaWorkspace = await post(app, { projectId: wsEdit.id },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(viaWorkspace.statusCode).toBe(200);
+
+        const viaViewGrant = await post(app, { projectId: viewOnly.id },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(viaViewGrant.statusCode).toBe(403);
+    });
+
+    // Seat-billing guard: viewer-role members hold free view-only seats,
+    // so workspace-edit sharing must not hand them edit rights
+    it('workspace-edit does NOT grant editor access to viewer-role members', async () => {
+        const ws = await seedWorkspace(pool, {});
+        createdWorkspaces.push(ws.id);
+        await seedWorkspaceMember(pool, {
+            workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'viewer' });
+        const project = await seed({
+            workspaceId: ws.id, sharePolicy: 'workspace', workspaceAccess: 'edit' });
+
+        const { app } = testApp();
+        const res = await post(app, { projectId: project.id },
+            await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(res.statusCode).toBe(403);
     });
 
     it.each([

@@ -24,6 +24,7 @@ import { trackProjectOpened, trackDashboardPageLoaded, trackProjectDeleteFailed,
 import { captureError } from '../../lib/sentry';
 
 import { navigate } from '../../lib/navigate';
+import { editorPath, viewPath } from '../../lib/videoUrls';
 
 /** `showSettings` renders the workspace settings page in the content area (same sidebar). */
 export function DashboardPage({ showSettings = false }: { showSettings?: boolean }) {
@@ -239,7 +240,17 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
 
     const handleOpen = (item: ProjectListItem) => {
         trackProjectOpened();
-        navigate(`/editor?projectId=${item.id}`);
+        if (!item.shareSlug) {
+            // Defensive: pre-migration row without a slug
+            navigate(`/editor?projectId=${item.id}`);
+            return;
+        }
+        // Permission-aware: only viewers with edit access land in the editor
+        const sharedToWorkspace = item.sharePolicy === 'workspace' || item.sharePolicy === 'public';
+        const canEdit = item.ownerId === userId
+            || item.editorRole === 'edit'
+            || (sharedToWorkspace && item.workspaceAccess === 'edit');
+        navigate(canEdit ? editorPath(item.shareSlug) : viewPath(item.shareSlug));
     };
 
     // Restore from trash — the button always presses; free tier gets the
@@ -413,6 +424,8 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                                                 updatedAt: item.updatedAt,
                                                 durationMs: item.durationMs,
                                                 shareSlug: item.shareSlug,
+                                                sharePolicy: item.sharePolicy,
+                                                sharedWithMe: !!item.editorRole && item.ownerId !== userId,
                                             }}
                                             onOpen={() => handleOpen(item)}
                                             selectMode={selectMode}

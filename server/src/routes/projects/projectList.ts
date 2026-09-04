@@ -49,9 +49,14 @@ export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     'duration_ms',            p.duration_ms,
                     'slug',                   p.slug,
                     'share_policy',           p.share_policy,
-                    'is_shared',              p.slug IS NOT NULL,
+                    'workspace_access',       p.workspace_access,
+                    'is_shared',              p.share_policy IN ('public', 'workspace'),
                     'is_editor',              EXISTS (
                         SELECT 1 FROM project_editors pe
+                        WHERE pe.project_id = p.id AND pe.user_id = $2
+                    ),
+                    'editor_role',            (
+                        SELECT pe.role FROM project_editors pe
                         WHERE pe.project_id = p.id AND pe.user_id = $2
                     )
                 ) ORDER BY p.updated_at DESC), '[]'::jsonb) AS projects

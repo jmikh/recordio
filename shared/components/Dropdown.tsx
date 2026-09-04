@@ -32,6 +32,8 @@ interface DropdownProps<T> {
     hideSuffixInTrigger?: boolean;
     /** Accessible name for the trigger when there's no visible `label` (compact mode) */
     ariaLabel?: string;
+    /** Disables the trigger — read-only states keep the same layout */
+    disabled?: boolean;
 }
 
 export function Dropdown<T>({
@@ -46,6 +48,7 @@ export function Dropdown<T>({
     suffix,
     hideSuffixInTrigger = false,
     ariaLabel,
+    disabled = false,
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -148,6 +151,7 @@ export function Dropdown<T>({
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
+                disabled={disabled}
                 aria-label={ariaLabel}
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}

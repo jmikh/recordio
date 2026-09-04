@@ -20,6 +20,10 @@ import type {
     CloudProject,
     ProjectConfirmUploadResponse,
     ProjectDeleteResponse,
+    ProjectEditorRemoveRequest,
+    ProjectEditorSetRequest,
+    ProjectEditorsResponse,
+    ProjectGetRequest,
     ProjectIdRequest,
     ProjectListRequest,
     ProjectListResponse,
@@ -74,12 +78,14 @@ export * from './session';
 export interface ApiRoutes {
     'asset-list': { request: AssetListRequest; response: AssetListResponse };
     'asset-delete': { request: AssetDeleteRequest; response: AssetDeleteResponse };
-    'project-get': { request: ProjectIdRequest; response: CloudProject | null };
+    'project-get': { request: ProjectGetRequest; response: CloudProject | null };
     'project-list': { request: ProjectListRequest; response: ProjectListResponse };
     'project-update': { request: ProjectUpdateRequest; response: ProjectUpdateResponse };
     'project-update-name': { request: ProjectNameUpdateRequest; response: ProjectNameUpdateResponse };
     'project-rename': { request: ProjectNameUpdateRequest; response: ProjectNameUpdateResponse };
     'project-share': { request: ProjectShareRequest; response: ProjectShareResponse };
+    'project-editor-set': { request: ProjectEditorSetRequest; response: ProjectEditorsResponse };
+    'project-editor-remove': { request: ProjectEditorRemoveRequest; response: ProjectEditorsResponse };
     'project-delete': { request: ProjectIdRequest; response: ProjectDeleteResponse };
     'project-restore': { request: ProjectIdRequest; response: ProjectRestoreResponse };
     'project-confirm-upload': { request: ProjectIdRequest; response: ProjectConfirmUploadResponse };

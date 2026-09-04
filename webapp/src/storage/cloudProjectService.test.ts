@@ -233,12 +233,14 @@ describe('CloudProjectService.listProjects', () => {
             created_at: '2024-01-01',
             last_accessed_at: '2024-01-01',
             deleted_at: null,
-            is_shared: false,
+            is_shared: true,
             cloud_version: 1,
             duration_ms: 5000,
-            slug: null,
+            slug: 'abc123def456',
             share_policy: 'public',
+            workspace_access: 'view',
             is_editor: true,
+            editor_role: 'edit',
         }]);
 
         const items = await CloudProjectService.listProjects('workspace-1');

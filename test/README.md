@@ -5,9 +5,9 @@
 | Category | Files | Infrastructure needed |
 |---|---|---|
 | **Unit tests** | `shared/**/*.test.ts`, `webapp/src/**/*.test.ts` | None |
-| **Supabase RPC tests** | `test/integration/supabase-rpc.test.ts` | Supabase |
-| **Edge function tests** | `test/integration/edge-functions.test.ts` | Supabase + Functions + MinIO + Mock render worker |
 | **Render worker tests** | `test/integration/render-worker.test.ts` | Supabase + Functions + MinIO + Playwright + ffmpeg |
+
+(The Supabase RPC and edge-function integration suites were deleted 2026-09-04 — they targeted the decommissioned edge functions / graveyarded RPCs and could no longer pass. Their coverage lives in `server/test/`.)
 
 ## Prerequisites
 
@@ -58,26 +58,6 @@ This must stay running in a separate terminal. The `--env-file` flag loads S3 cr
 
 ## Running integration tests
 
-### Supabase RPC tests
-
-**Requires:** Supabase
-
-```bash
-npx vitest run test/integration/supabase-rpc.test.ts
-```
-
-Tests database RPC functions (project CRUD, render jobs, etc.) using real Supabase clients authenticated as test users.
-
-### Edge function tests
-
-**Requires:** Supabase + edge functions + MinIO
-
-```bash
-npx vitest run test/integration/edge-functions.test.ts
-```
-
-Tests edge functions (`storage-download-urls`, `render-job-create`, etc.) via HTTP. The mock render worker is started/stopped automatically by the test (no manual setup needed).
-
 ### Render worker tests
 
 **Requires:** Supabase + edge functions + MinIO + ffmpeg + Playwright
@@ -105,7 +85,7 @@ If you want to trigger a real render from the webapp (click Export), start the r
 PORT=8090 npx tsx --env-file=render-worker/.env.local render-worker/src/server.ts
 ```
 
-This uses the same port as the mock render worker used by tests. They won't conflict — the mock only lives for the few seconds a test runs. Just don't run edge function tests while the real worker is up.
+This uses the same port the edge functions were configured to call.
 
 **Requires:** MinIO running + Supabase with functions served (same as integration tests).
 
@@ -118,7 +98,6 @@ This uses the same port as the mock render worker used by tests. They won't conf
 | Edge functions | 54321 (via gateway) | `supabase functions serve --env-file supabase/.env.local` |
 | MinIO S3 API | 9000 | `docker compose up -d minio` |
 | MinIO Console | 9001 | Started with MinIO |
-| Mock render worker | 8090 | Auto-started by edge function tests |
 | Real render worker (local dev) | 8090 | `PORT=8090 npx tsx render-worker/src/server.ts` |
 | Render worker (test instance) | 8095 | Auto-started by render worker tests |
 | Media file server (test) | 9998 | Auto-started by render worker tests |
@@ -129,8 +108,6 @@ This uses the same port as the mock render worker used by tests. They won't conf
 - [test/helpers/s3Client.ts](helpers/s3Client.ts) — S3 client for MinIO (upload, presigned URLs, existence checks)
 - [test/helpers/testMedia.ts](helpers/testMedia.ts) — Generates minimal test media via ffmpeg (cached in tmpdir)
 - [test/helpers/setupMinio.ts](helpers/setupMinio.ts) — Creates the `project-media` bucket in MinIO
-- [test/helpers/mockRenderWorker.ts](helpers/mockRenderWorker.ts) — Mock render worker for edge function tests
-- [test/helpers/mockMuxApi.ts](helpers/mockMuxApi.ts) — Mock Mux Video API for edge function tests
 - [test/helpers/createProject.ts](helpers/createProject.ts) — Test project factory
 
 ## Docker networking

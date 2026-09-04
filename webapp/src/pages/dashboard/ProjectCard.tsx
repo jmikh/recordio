@@ -5,11 +5,8 @@ import { MdOutlineAutoDelete } from 'react-icons/md';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
 import { timeAgo } from './timeAgo';
-import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
-
-const VIDEO_BASE_URL = import.meta.env.PROD
-    ? `${EDITOR_ORIGIN_PROD}/video`
-    : 'http://localhost:3001/video';
+import { videoUrl } from '../../lib/videoUrls';
+import type { SharePolicy } from '@shared/api';
 
 /** Minimal project info needed for the card — works with both Project and ProjectListItem */
 export interface ProjectCardData {
@@ -19,8 +16,12 @@ export interface ProjectCardData {
     createdAt: Date | string;
     /** Duration in milliseconds (from output windows) */
     durationMs?: number | null;
-    /** Share slug for public video link (null = not shared) */
+    /** Permanent share slug (share-access model: every project has one) */
     shareSlug?: string | null;
+    /** Visibility — the copy-link button only shows for workspace/public */
+    sharePolicy?: SharePolicy | null;
+    /** Granted to the viewer individually (not via workspace) — shows a tag */
+    sharedWithMe?: boolean;
     /** ISO date when the project was soft-deleted (null = active) */
     deletedAt?: string | null;
     /** Last updated timestamp */
@@ -75,7 +76,10 @@ export const ProjectCard = ({
     const isTrashed = !!project.deletedAt;
 
     const purgedays = project.deletedAt ? daysUntil(new Date(new Date(project.deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()) : null;
-    const shareUrl = project.shareSlug ? `${VIDEO_BASE_URL}/${project.shareSlug}` : null;
+    // Every project has a slug now — the link is only meaningfully
+    // shareable when the policy grants someone access to it
+    const isSharedOut = project.sharePolicy === 'public' || project.sharePolicy === 'workspace';
+    const shareUrl = isSharedOut && project.shareSlug ? videoUrl(project.shareSlug) : null;
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -235,7 +239,7 @@ export const ProjectCard = ({
                                 {shareUrl ? (
                                     <CopyLinkButton url={shareUrl} title="Copy published link" />
                                 ) : (
-                                    <span className="text-2xs text-text-muted">Draft</span>
+                                    <span className="text-2xs text-text-muted">Private</span>
                                 )}
                                 {isActive && <span className="chosen-dot"></span>}
                             </>
@@ -249,6 +253,11 @@ export const ProjectCard = ({
                             : `Created ${timeAgo(project.createdAt)}`
                         }
                     </span>
+                    {project.sharedWithMe && (
+                        <span className="text-badge text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            Shared with you
+                        </span>
+                    )}
                     {isTrashed && purgedays !== null && (
                         <span className="flex items-center gap-1 text-xs text-destructive/70 ml-auto">
                             <MdOutlineAutoDelete className="w-3.5 h-3.5" />

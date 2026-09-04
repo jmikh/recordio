@@ -7,11 +7,12 @@
  * already consumes (snake_case; project_data is arbitrary), so NO
  * response schema — serialization must not strip anything.
  *
- * Request:  { projectId }
- * Response: the project object (200) | 403 { error }
+ * Request:  { projectId } | { slug } (share-access model: the editor
+ *           route /video/{slug}/edit loads by slug)
+ * Response: the project object (200) | 400 { error } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { ProjectIdRequestSchema } from '@shared/api/projects';
+import { ProjectGetRequestSchema } from '@shared/api/projects';
 import { canEditProject } from '../../services/projectAccess.js';
 
 export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -20,11 +21,25 @@ export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
         {
             preHandler: app.requireUser,
             schema: {
-                body: ProjectIdRequestSchema,
+                body: ProjectGetRequestSchema,
             },
         },
         async (req, reply) => {
-            const { projectId } = req.body;
+            let projectId = req.body.projectId;
+            if (!projectId) {
+                if (!req.body.slug) {
+                    return reply.code(400).send({ error: 'projectId or slug required' });
+                }
+                const { rows } = await app.deps.db.query(
+                    'SELECT id FROM projects WHERE slug = $1 AND deleted_at IS NULL',
+                    [req.body.slug],
+                );
+                projectId = (rows[0] as { id: string } | undefined)?.id;
+                if (!projectId) {
+                    // Unknown slug is indistinguishable from no access
+                    return reply.code(403).send({ error: 'Not an editor of this project' });
+                }
+            }
             req.logCtx.set({ 'project.id': projectId });
 
             if (!await canEditProject(app.deps.db, projectId, req.user!.id)) {
@@ -53,12 +68,20 @@ export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     'thumbnail_storage_path', p.thumbnail_storage_path,
                     'slug',                   p.slug,
                     'share_policy',           p.share_policy,
-                    'is_shared',              p.slug IS NOT NULL,
+                    'workspace_access',       p.workspace_access,
+                    'is_shared',              p.share_policy IN ('public', 'workspace'),
+                    'owner_email',            (
+                        SELECT u.email FROM auth.users u WHERE u.id = p.owner_id
+                    ),
+                    'owner_name',             (
+                        SELECT up.name FROM user_profiles up WHERE up.user_id = p.owner_id
+                    ),
                     'editors',                (
                         SELECT COALESCE(jsonb_agg(jsonb_build_object(
                             'user_id', pe.user_id,
                             'email',   u.email,
-                            'name',    up.name
+                            'name',    up.name,
+                            'role',    pe.role
                         )), '[]'::jsonb)
                         FROM project_editors pe
                         JOIN auth.users u ON u.id = pe.user_id

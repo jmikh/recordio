@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LogoLink } from '@shared/components/LogoLink';
 import { Button } from '@shared/components';
 import { ThemeToggle } from '../theme/ThemeToggle';
-import { TbCopy } from 'react-icons/tb';
+import { TbCopy, TbLock } from 'react-icons/tb';
 import { CHROME_EXTENSION_URL, MARKETING_ORIGIN } from '@shared/types/bridge';
 import { invokeFunction } from '../api/client';
+import { AuthModal } from '../auth/AuthModal';
+import { useUserStore } from '../auth/useUserStore';
 import { navigate } from '../lib/navigate';
 
 interface VideoPageData {
@@ -21,8 +24,13 @@ export function VideoPage() {
     const [data, setData] = useState<VideoPageData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    // 403 auth_required: a workspace/individually-shared video and the
+    // viewer isn't signed in (or the token expired)
+    const [authRequired, setAuthRequired] = useState(false);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const isAuthenticated = useUserStore(s => s.isAuthenticated);
 
     const slug = window.location.pathname.split('/video/')[1]?.split('/')[0]?.split('?')[0];
 
@@ -34,7 +42,11 @@ export function VideoPage() {
         );
 
         if (fetchError || !result || result.error) {
-            setError('Video not found or has been removed');
+            if (fetchError instanceof FunctionsHttpError && fetchError.context.status === 403) {
+                setAuthRequired(true);
+            } else {
+                setError('Video not found or has been removed');
+            }
             setLoading(false);
             stopPolling();
             return;
@@ -57,6 +69,8 @@ export function VideoPage() {
         }
     };
 
+    // Signing in re-runs the fetch: the video may be visible to the
+    // now-authenticated viewer (workspace / individual share).
     useEffect(() => {
         if (!slug) {
             setError('Invalid link');
@@ -64,13 +78,16 @@ export function VideoPage() {
             return;
         }
 
+        setAuthRequired(false);
+        setError(null);
+        setLoading(true);
         fetchVideo();
 
         // Start polling — will self-stop on terminal state
         pollRef.current = setInterval(fetchVideo, POLL_INTERVAL_MS);
 
         return () => stopPolling();
-    }, [slug]);
+    }, [slug, isAuthenticated]);
 
     const copyLink = () => {
         navigator.clipboard.writeText(window.location.href);
@@ -85,6 +102,24 @@ export function VideoPage() {
                     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     <span className="text-sm">Loading video...</span>
                 </div>
+            </div>
+        );
+    }
+
+    if (authRequired) {
+        return (
+            <div className="min-h-screen bg-surface flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">
+                    <TbLock size={32} className="text-text-muted" />
+                    <h1 className="heading-2">Sign in to view this video</h1>
+                    <p className="text-sm text-text-muted">
+                        This video is only available to people it has been shared with.
+                    </p>
+                    <Button variant="primary" onClick={() => setIsAuthModalOpen(true)}>
+                        Sign in
+                    </Button>
+                </div>
+                <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
             </div>
         );
     }

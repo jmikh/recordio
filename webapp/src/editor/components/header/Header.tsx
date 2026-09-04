@@ -10,21 +10,20 @@ import { navigate } from '../../../lib/navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { useUserStore } from '../../../auth/useUserStore';
 
-import { trackDownloadClicked, trackPublishClicked, trackPublishFailed } from '../../../analytics';
-import { captureError } from '../../../lib/sentry';
+import { trackDownloadClicked } from '../../../analytics';
 import { useEntitlements } from '../../../billing/useEntitlements';
 import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';
 import { DownloadModal } from '../settings/DownloadModal';
 
-import { TbCloudUpload, TbDownload, TbLink } from 'react-icons/tb';
+import { TbCloudUpload, TbDownload, TbShare2 } from 'react-icons/tb';
 import { Dropdown, Button, Tooltip, LogoLink, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
-import { invokeFunction } from '../../../api/client';
-import { EDITOR_ORIGIN_PROD } from '@shared/types/bridge';
+import { ShareModal } from './ShareModal';
+import { useProjectMetaStore } from '../../stores/useProjectMetaStore';
 
 const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
     value: preset,
@@ -49,10 +48,6 @@ function SyncIndicator() {
         </Tooltip>
     );
 }
-
-const VIDEO_BASE_URL = import.meta.env.PROD
-    ? `${EDITOR_ORIGIN_PROD}/video`
-    : 'http://localhost:3001/video';
 
 export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -91,65 +86,9 @@ export const Header = () => {
     const downloadBusy = cloudRender.isActive || isSyncingMedia;
     const progressPct = Math.round(cloudRender.progress * 100);
 
-    // Share/publish state
-    const [shareSlug, setShareSlug] = useState<string | null>(null);
-    const [isSharing, setIsSharing] = useState(false);
-
-    useEffect(() => {
-        if (!isAuthenticated || !project?.id) return;
-        invokeFunction('project-get', { projectId: project.id })
-            .then(({ data }) => {
-                if (data?.slug) setShareSlug(data.slug);
-            });
-    }, [isAuthenticated, project?.id]);
-
-    const copyShareLink = async (slug: string) => {
-        const url = `${VIDEO_BASE_URL}/${slug}`;
-        try {
-            await navigator.clipboard.writeText(url);
-            addToast({ type: 'success', title: 'Link copied to clipboard' });
-        } catch {
-            addToast({ type: 'error', title: 'Failed to copy link' });
-        }
-    };
-
-    const handleShare = async () => {
-        if (!project?.id || isSharing) return;
-        trackPublishClicked(project.id);
-        setIsSharing(true);
-        try {
-            let slug = shareSlug;
-            if (!slug) {
-                const { data, error } = await invokeFunction('project-share', { projectId: project.id });
-                if (error || !data) throw error;
-                slug = data.slug;
-                setShareSlug(slug);
-            }
-            await copyShareLink(slug);
-            const cloudVersion = CloudProjectService.getCloudVersion(project.id);
-            if (cloudVersion !== undefined) {
-                // Fire-and-forget: sharing succeeds regardless; failures are
-                // only reported (invokeFunction resolves with { error }, so
-                // the old .catch never saw HTTP errors — this does)
-                void invokeFunction<{ status: string; muxVideoId: string }>('mux-video-create', {
-                    projectId: project.id, cloudVersion,
-                }).then(({ error }) => {
-                    if (error) captureError(error, { flow: 'publish', phase: 'mux_create', projectId: project.id });
-                });
-            }
-        } catch (e: any) {
-            captureError(e, { flow: 'publish', projectId: project.id });
-            trackPublishFailed({
-                project_id: project.id,
-                error: e?.message || 'Unknown error',
-                error_name: e?.name,
-                is_offline: !navigator.onLine,
-            });
-            addToast({ type: 'error', title: 'Share failed', message: e?.message || 'Unknown error' });
-        } finally {
-            setIsSharing(false);
-        }
-    };
+    // Share modal (share-access model) — settings + copy link live there
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const shareReady = useProjectMetaStore(s => s.meta !== null);
     const updateProjectName = useProjectStore(s => s.updateProjectName);
     const [localName, setLocalName] = useState(projectName);
     const localNameRef = useRef(localName);
@@ -318,46 +257,14 @@ export const Header = () => {
                         </div>
                     </Tooltip>
 
-                    {entitlements.canShare ? (
-                        <div className="flex rounded-[var(--radius-interactive)] overflow-hidden">
-                            <button
-                                onClick={handleShare}
-                                disabled={isSharing || isSyncingMedia}
-                                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm border-none cursor-pointer transition-colors
-                                    bg-primary text-white hover:bg-primary-highlighted
-                                    ${(isSharing || isSyncingMedia) ? 'opacity-50 cursor-not-allowed' : ''}
-                                `}
-                            >
-                                {isSharing ? 'Publishing...' : shareSlug ? 'Republish' : 'Publish'}
-                            </button>
-                            <button
-                                onClick={() => shareSlug && copyShareLink(shareSlug)}
-                                disabled={!shareSlug}
-                                className={`flex items-center justify-center px-2 py-1.5 border-none cursor-pointer transition-colors border-l border-white/20
-                                    ${shareSlug
-                                        ? 'bg-primary/80 text-white hover:bg-primary'
-                                        : 'bg-primary/40 text-white/50 cursor-not-allowed'}
-                                `}
-                            >
-                                <TbLink className="icon-sm" />
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex rounded-(--radius-interactive) overflow-hidden">
-                            <button
-                                onClick={() => setIsProModalOpen(true)}
-                                className="flex items-center justify-center gap-1.5 py-1.5 px-3 text-sm border-none cursor-pointer transition-colors bg-primary text-white hover:bg-primary-highlighted"
-                            >
-                                Publish
-                            </button>
-                            <button
-                                onClick={() => setIsProModalOpen(true)}
-                                className="flex items-center justify-center px-2 py-1.5 border-none cursor-pointer transition-colors border-l border-white/20 bg-primary/80 text-white hover:bg-primary"
-                            >
-                                <TbLink className="icon-sm" />
-                            </button>
-                        </div>
-                    )}
+                    <Button
+                        variant="primary"
+                        icon={TbShare2}
+                        disabled={entitlements.canShare && !shareReady}
+                        onClick={() => (entitlements.canShare ? setIsShareModalOpen(true) : setIsProModalOpen(true))}
+                    >
+                        Share
+                    </Button>
 
                     {isAuthenticated ? (
                         <div className="ml-1">
@@ -379,6 +286,7 @@ export const Header = () => {
                 onAuthSuccess={() => { }}
             />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+            <ShareModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} />
             <ProUpgradeModal
                 isOpen={isProModalOpen}
                 onClose={() => setIsProModalOpen(false)}

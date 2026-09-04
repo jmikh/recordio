@@ -125,8 +125,10 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
             workspace_id: ws.id,
             cloud_version: 1,
             deleted_at: null,
-            is_shared: true, // seedProject defaults a slug
+            is_shared: true, // seedProject defaults share_policy 'public'
+            workspace_access: 'view',
             is_editor: false, // no project_editors row for the caller
+            editor_role: null,
         });
 
         expect(lines.find((l) => l.msg === 'request')).toMatchObject({
@@ -135,14 +137,18 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
         });
     });
 
-    it('flags is_editor on projects shared with the caller via project_editors', async () => {
+    it('flags is_editor + editor_role on projects shared with the caller via project_editors', async () => {
         const ws = await seedOwnWorkspace();
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
         const theirs = await seedProject(pool, {
             workspaceId: ws.id, ownerId: SEEDED_USER_2_ID, uploadStatus: 'ready' });
+        const viewOnly = await seedProject(pool, {
+            workspaceId: ws.id, ownerId: SEEDED_USER_2_ID, uploadStatus: 'ready' });
         const mine = await seedProject(pool, {
             workspaceId: ws.id, uploadStatus: 'ready' });
         await seedProjectEditor(pool, { projectId: theirs.id, userId: SEEDED_USER_ID });
+        await seedProjectEditor(pool, {
+            projectId: viewOnly.id, userId: SEEDED_USER_ID, role: 'view' });
 
         const { app } = testApp();
         const res = await post(app, { workspaceId: ws.id },
@@ -151,8 +157,9 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
 
         const { projects } = res.json() as { projects: Array<Record<string, unknown>> };
         const byId = new Map(projects.map((p) => [p.id, p]));
-        expect(byId.get(theirs.id)?.is_editor).toBe(true);
-        expect(byId.get(mine.id)?.is_editor).toBe(false);
+        expect(byId.get(theirs.id)).toMatchObject({ is_editor: true, editor_role: 'edit' });
+        expect(byId.get(viewOnly.id)).toMatchObject({ is_editor: true, editor_role: 'view' });
+        expect(byId.get(mine.id)).toMatchObject({ is_editor: false, editor_role: null });
     });
 
     it('returns { projects: [] } for an empty workspace', async () => {

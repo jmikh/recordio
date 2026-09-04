@@ -36,7 +36,7 @@ export function createTestPool(): pg.Pool {
 
 export interface SeededProject {
     id: string;
-    slug: string | null;
+    slug: string;
     name: string;
     ownerId: string;
 }
@@ -44,9 +44,12 @@ export interface SeededProject {
 export interface SeedProjectOptions {
     ownerId?: string;
     name?: string;
-    /** Pass null for a never-shared project (mux-video-create gates on slug) */
-    slug?: string | null;
-    sharePolicy?: string | null;
+    /** Slugs are NOT NULL since the share-access migration; defaults unique */
+    slug?: string;
+    /** 'private' | 'workspace' | 'public' — NOT NULL, defaults 'public' here */
+    sharePolicy?: string;
+    /** Level workspace members get when the policy is workspace/public */
+    workspaceAccess?: 'view' | 'edit';
     deletedAt?: string | null;
     projectData?: unknown;
     /** Defaults to the owner's seeded personal workspace */
@@ -62,7 +65,7 @@ export interface SeedProjectOptions {
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
     const id = randomUUID();
     const ownerId = opts.ownerId ?? SEEDED_USER_ID;
-    const slug = opts.slug === undefined ? `test-${randomUUID()}` : opts.slug;
+    const slug = opts.slug ?? `test-${randomUUID()}`;
     const name = opts.name ?? 'Test project';
 
     let workspaceId = opts.workspaceId;
@@ -77,9 +80,9 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
 
     await db.query(
         `INSERT INTO projects
-            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, deleted_at, expires_at, upload_status, permanently_deleted, cloud_version, updated_at)
-         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, COALESCE($10, 'pending'), $11, $12, COALESCE($13::timestamptz, now()))`,
-        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy === undefined ? 'public' : opts.sharePolicy, opts.deletedAt ?? null, opts.expiresAt ?? null, opts.uploadStatus ?? null, opts.permanentlyDeleted ?? false, opts.cloudVersion ?? 1, opts.updatedAt ?? null],
+            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, workspace_access, deleted_at, expires_at, upload_status, permanently_deleted, cloud_version, updated_at)
+         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, COALESCE($11, 'pending'), $12, $13, COALESCE($14::timestamptz, now()))`,
+        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy ?? 'public', opts.workspaceAccess ?? 'view', opts.deletedAt ?? null, opts.expiresAt ?? null, opts.uploadStatus ?? null, opts.permanentlyDeleted ?? false, opts.cloudVersion ?? 1, opts.updatedAt ?? null],
     );
     return { id, slug, name, ownerId };
 }
@@ -138,11 +141,11 @@ export async function setUserProfileName(
 
 export async function seedProjectEditor(
     db: Db,
-    opts: { projectId: string; userId: string },
+    opts: { projectId: string; userId: string; role?: 'view' | 'edit' },
 ): Promise<void> {
     await db.query(
-        'INSERT INTO project_editors (project_id, user_id) VALUES ($1, $2)',
-        [opts.projectId, opts.userId],
+        'INSERT INTO project_editors (project_id, user_id, role) VALUES ($1, $2, $3)',
+        [opts.projectId, opts.userId, opts.role ?? 'edit'],
     );
 }
 

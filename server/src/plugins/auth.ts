@@ -34,9 +34,11 @@ declare module 'fastify' {
     interface FastifyInstance {
         /** preHandler: 401 unless a valid Supabase user JWT is presented */
         requireUser: preHandlerAsyncHookHandler;
+        /** preHandler: sets req.user when a valid JWT is presented; never 401s */
+        optionalUser: preHandlerAsyncHookHandler;
     }
     interface FastifyRequest {
-        /** Set by requireUser */
+        /** Set by requireUser / optionalUser */
         user?: AuthUser;
     }
 }
@@ -61,9 +63,10 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
         ? createRemoteJWKSet(new URL('/auth/v1/.well-known/jwks.json', opts.supabaseUrl))
         : undefined;
 
-    app.decorate('requireUser', async (req: FastifyRequest, reply: FastifyReply) => {
+    /** Verifies the request's bearer token; null on any failure. */
+    async function verifyUser(req: FastifyRequest): Promise<AuthUser | null> {
         const header = req.headers.authorization;
-        if (!header?.startsWith('Bearer ')) return unauthorized(reply);
+        if (!header?.startsWith('Bearer ')) return null;
         const token = header.slice('Bearer '.length);
 
         let payload: Record<string, unknown>;
@@ -77,19 +80,36 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
                 payload = (await jwtVerify(token, jwks, { algorithms: ['ES256', 'RS256'] })).payload;
             }
         } catch {
-            return unauthorized(reply);
+            return null;
         }
         // Reject non-user tokens signed with the same secret (anon/service role)
         if (typeof payload.sub !== 'string' || payload.role !== 'authenticated') {
-            return unauthorized(reply);
+            return null;
         }
 
-        req.userId = payload.sub;
-        req.user = {
+        return {
             id: payload.sub,
             email: typeof payload.email === 'string' ? payload.email : undefined,
             userMetadata: (payload.user_metadata as Record<string, unknown>) ?? {},
         };
+    }
+
+    app.decorate('requireUser', async (req: FastifyRequest, reply: FastifyReply) => {
+        const user = await verifyUser(req);
+        if (!user) return unauthorized(reply);
+        req.userId = user.id;
+        req.user = user;
+    });
+
+    // For routes serving both anonymous and signed-in callers
+    // (shared-video-get): a bad/missing token is simply an anonymous
+    // request, never a 401.
+    app.decorate('optionalUser', async (req: FastifyRequest) => {
+        const user = await verifyUser(req);
+        if (user) {
+            req.userId = user.id;
+            req.user = user;
+        }
     });
 }, { name: 'auth' });
 

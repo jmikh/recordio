@@ -1,18 +1,26 @@
 /**
- * POST /project-share — creates/updates a project's share slug + policy
- * (Part 2 Batch 2). Ports project_share inline: OWNER-only (editors
- * cannot share — stricter than the editor routes, pinned); generates a
- * 12-hex-char slug on first share, keeps the existing one after; always
- * applies the policy. The old TABLE(slug, is_new) wrapper was an RPC
- * artifact — the response is a plain object (the client used .single()).
+ * POST /project-share — updates a project's share policy + workspace
+ * access level. OWNER-only (editors cannot share — stricter than the
+ * editor routes, pinned). Slugs are permanent since the share-access
+ * migration (DB default at insert), so this route no longer creates
+ * them; the generation fallback stays for pre-migration rows only.
  *
- * Share links are trial/Pro (billing revamp Step 1): the workspace's
- * entitlements must have canShare, else 403 subscription_required.
+ * Share links are trial/Pro: the workspace's entitlements must have
+ * canShare — EXCEPT for sharePolicy 'private', which is always allowed
+ * (an expired-trial owner must be able to un-share a public video).
  *
- * The SQL fn's 'Invalid share_policy' RAISE is replaced by the schema
- * enum; PT404/PT403 become plain 404/403 with the same messages.
+ * Omitted sharePolicy means 'public' (wire compat with the pre-modal
+ * Publish button); omitted workspaceAccess keeps the current level.
  *
- * Request:  { projectId, sharePolicy? = 'public' }
+ * Override rule (confirmed design): a policy granting the workspace
+ * view (workspace/public + access=view) deletes individual 'view'
+ * grants; workspace access 'edit' deletes ALL individual grants — the
+ * broad grant subsumes them. Setting private deletes nothing. The
+ * UPDATE and the conditional DELETE run as one atomic CTE statement
+ * (the pooled db has no transaction surface — see
+ * workspaceInviteAccept.ts).
+ *
+ * Request:  { projectId, sharePolicy? = 'public', workspaceAccess? }
  * Response: { slug, isNew } | 404 { error } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
@@ -36,7 +44,7 @@ export const projectShareRoutes: FastifyPluginAsyncTypebox = async (app) => {
             },
         },
         async (req, reply) => {
-            const { projectId } = req.body;
+            const { projectId, workspaceAccess } = req.body;
             const sharePolicy = req.body.sharePolicy ?? 'public';
             const db = app.deps.db;
             req.logCtx.set({ 'project.id': projectId });
@@ -58,27 +66,48 @@ export const projectShareRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 return reply.code(403).send({ error: 'Only the project owner can share a project' });
             }
 
-            const entitlements = await getWorkspaceEntitlements(
-                db,
-                app.deps.clock,
-                project.workspaceId,
-            );
-            if (!entitlements.canShare) {
-                return reply.code(403).send({ error: 'subscription_required' });
+            if (sharePolicy !== 'private') {
+                const entitlements = await getWorkspaceEntitlements(
+                    db,
+                    app.deps.clock,
+                    project.workspaceId,
+                );
+                if (!entitlements.canShare) {
+                    return reply.code(403).send({ error: 'subscription_required' });
+                }
             }
 
             const isNew = project.slug === null;
             const slug = project.slug
                 ?? randomUUID().replaceAll('-', '').slice(0, 12);
 
-            await db.query(
-                `UPDATE projects
-                 SET slug = $2, share_policy = $3, updated_at = NOW()
-                 WHERE id = $1`,
-                [projectId, slug, sharePolicy],
+            // Update + override-rule delete in one atomic statement: a
+            // policy granting the workspace view erases individual view
+            // grants; workspace access 'edit' erases all grants.
+            const { rows: removed } = await db.query(
+                `WITH updated AS (
+                    UPDATE projects
+                    SET slug = $2,
+                        share_policy = $3,
+                        workspace_access = COALESCE($4, workspace_access),
+                        updated_at = NOW()
+                    WHERE id = $1
+                    RETURNING id, share_policy, workspace_access
+                )
+                DELETE FROM project_editors pe
+                USING updated u
+                WHERE pe.project_id = u.id
+                  AND u.share_policy IN ('workspace', 'public')
+                  AND (u.workspace_access = 'edit' OR pe.role = 'view')
+                RETURNING pe.user_id`,
+                [projectId, slug, sharePolicy, workspaceAccess ?? null],
             );
 
-            req.logCtx.set({ 'project.slug': slug });
+            req.logCtx.set({
+                'project.slug': slug,
+                'share.policy': sharePolicy,
+                'share.removed_editors': removed.length,
+            });
             return { slug, isNew };
         },
     );

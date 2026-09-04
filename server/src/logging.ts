@@ -40,6 +40,9 @@ export type ErrorType =
 export interface DomainLogFields {
     'project.id'?: string;
     'project.slug'?: string;
+    'share.policy'?: string;
+    /** Individual grants removed by the share override rule */
+    'share.removed_editors'?: number;
     'workspace.id'?: string;
     'render.job_id'?: string;
     'mux.asset_id'?: string;

@@ -17,9 +17,14 @@ import { LeaveReviewModal } from './components/LeaveReviewModal';
 // before any component tries to make Supabase queries.
 AuthManager.init();
 
-// Routes that don't require authentication
+/** /video/{slug}/edit — the editor form of a video URL (auth required) */
+const VIDEO_EDIT_PATH = /^\/video\/[^/]+\/edit\/?$/;
+
+// Routes that don't require authentication. /video/{slug}(/view) is the
+// public viewer; its /edit form is the editor and needs auth.
 function isPublicRoute(path: string) {
-    return path.startsWith('/video/') || path === '/uninstall' || path === '/accept-invite';
+    if (path.startsWith('/video/')) return !VIDEO_EDIT_PATH.test(path);
+    return path === '/uninstall' || path === '/accept-invite';
 }
 
 export function App() {
@@ -63,7 +68,13 @@ export function App() {
             return <ImportPage />;
         }
 
+        // Legacy editor URL (/editor?projectId=…) — the editor redirects
+        // to /video/{slug}/edit after loading
         if (path === '/editor' || path.startsWith('/editor')) {
+            return <EditorPage />;
+        }
+
+        if (VIDEO_EDIT_PATH.test(path)) {
             return <EditorPage />;
         }
 

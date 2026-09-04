@@ -23,6 +23,17 @@ export const SharePolicySchema = Type.Union([
 export type SharePolicy = Static<typeof SharePolicySchema>;
 
 /**
+ * Access level — used both for projects.workspace_access (what workspace
+ * members get when share_policy is 'workspace'/'public') and for
+ * project_editors.role (per-user grants).
+ */
+export const AccessRoleSchema = Type.Union([
+    Type.Literal('view'),
+    Type.Literal('edit'),
+]);
+export type AccessRole = Static<typeof AccessRoleSchema>;
+
+/**
  * Shared request body of project-get / project-delete / project-restore /
  * project-confirm-upload (identical inline objects before this file).
  */
@@ -33,10 +44,21 @@ export type ProjectIdRequest = Static<typeof ProjectIdRequestSchema>;
 
 // ── POST /project-get ────────────────────────────────────────────
 
+/**
+ * project-get resolves by id OR by slug (the /video/{slug}/edit editor
+ * route); exactly one is required — the route 400s on neither.
+ */
+export const ProjectGetRequestSchema = Type.Object({
+    projectId: Type.Optional(Type.String({ minLength: 1 })),
+    slug: Type.Optional(Type.String({ minLength: 1 })),
+});
+export type ProjectGetRequest = Static<typeof ProjectGetRequestSchema>;
+
 export interface ProjectEditor {
     user_id: string;
     email: string;
     name: string | null;
+    role: AccessRole;
 }
 
 /** Full project row as project-get sends it (response: CloudProject | null). */
@@ -53,9 +75,12 @@ export interface CloudProject {
     updated_at: string;
     created_at: string;
     thumbnail_storage_path: string | null;
-    slug: string | null;
+    slug: string;
     share_policy: SharePolicy;
+    workspace_access: AccessRole;
     is_shared: boolean;
+    owner_name: string | null;
+    owner_email: string;
     editors: ProjectEditor[];
 }
 
@@ -80,11 +105,14 @@ export interface CloudProjectSummary {
     deleted_at: string | null;
     cloud_version: number;
     duration_ms: number | null;
-    slug: string | null;
+    slug: string;
     share_policy: SharePolicy;
+    workspace_access: AccessRole;
     is_shared: boolean;
     /** Whether the calling user has a project_editors row (project shared with them) */
     is_editor: boolean;
+    /** The calling user's project_editors role, null when none */
+    editor_role: AccessRole | null;
 }
 
 export interface ProjectListResponse {
@@ -128,7 +156,10 @@ export type ProjectNameUpdateResponse = Static<typeof ProjectNameUpdateResponseS
 
 export const ProjectShareRequestSchema = Type.Object({
     projectId: Type.String({ minLength: 1 }),
+    // Omitted sharePolicy still means 'public' (wire compat with the
+    // pre-modal Publish button); omitted workspaceAccess keeps current.
     sharePolicy: Type.Optional(SharePolicySchema),
+    workspaceAccess: Type.Optional(AccessRoleSchema),
 });
 export type ProjectShareRequest = Static<typeof ProjectShareRequestSchema>;
 
@@ -137,6 +168,32 @@ export const ProjectShareResponseSchema = Type.Object({
     isNew: Type.Boolean(),
 });
 export type ProjectShareResponse = Static<typeof ProjectShareResponseSchema>;
+
+// ── POST /project-editor-set / /project-editor-remove ────────────
+
+export const ProjectEditorSetRequestSchema = Type.Object({
+    projectId: Type.String({ minLength: 1 }),
+    userId: Type.String({ minLength: 1 }),
+    role: AccessRoleSchema,
+});
+export type ProjectEditorSetRequest = Static<typeof ProjectEditorSetRequestSchema>;
+
+export const ProjectEditorRemoveRequestSchema = Type.Object({
+    projectId: Type.String({ minLength: 1 }),
+    userId: Type.String({ minLength: 1 }),
+});
+export type ProjectEditorRemoveRequest = Static<typeof ProjectEditorRemoveRequestSchema>;
+
+/** Both grant routes return the refreshed editors list (project-get shape). */
+export const ProjectEditorsResponseSchema = Type.Object({
+    editors: Type.Array(Type.Object({
+        user_id: Type.String(),
+        email: Type.String(),
+        name: Type.Union([Type.String(), Type.Null()]),
+        role: AccessRoleSchema,
+    })),
+});
+export type ProjectEditorsResponse = Static<typeof ProjectEditorsResponseSchema>;
 
 // ── POST /project-delete / -restore / -confirm-upload ────────────
 

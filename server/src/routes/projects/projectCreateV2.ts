@@ -27,8 +27,9 @@
  * pinned by the round-trip test).
  *
  * Request:  { project, name?, workspaceId }
- * Response: { projectId, bucket, uploads: [{ fileType, storagePath }] }
+ * Response: { projectId, slug, bucket, uploads: [{ fileType, storagePath }] }
  *           | 403 { error, cap? }
+ * (slug comes from the DB column default — share-access model)
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
@@ -69,6 +70,7 @@ export const projectCreateV2Routes: FastifyPluginAsyncTypebox = async (app) => {
                 response: {
                     200: Type.Object({
                         projectId: Type.String(),
+                        slug: Type.String(),
                         bucket: Type.Literal(BUCKET),
                         uploads: Type.Array(
                             Type.Object({
@@ -140,7 +142,7 @@ export const projectCreateV2Routes: FastifyPluginAsyncTypebox = async (app) => {
                 ? Math.round(project.timeline.durationMs)
                 : null;
 
-            await app.deps.db.query(
+            const { rows: created } = await app.deps.db.query(
                 `INSERT INTO projects
                     (id, workspace_id, created_by, owner_id, name, project_data,
                      upload_status, duration_ms)
@@ -152,7 +154,8 @@ export const projectCreateV2Routes: FastifyPluginAsyncTypebox = async (app) => {
                      name = EXCLUDED.name,
                      project_data = EXCLUDED.project_data,
                      upload_status = EXCLUDED.upload_status,
-                     duration_ms = EXCLUDED.duration_ms`,
+                     duration_ms = EXCLUDED.duration_ms
+                 RETURNING slug`,
                 [
                     projectId,
                     workspaceId,
@@ -163,7 +166,12 @@ export const projectCreateV2Routes: FastifyPluginAsyncTypebox = async (app) => {
                 ],
             );
 
-            return { projectId, bucket: BUCKET, uploads };
+            return {
+                projectId,
+                slug: (created[0] as { slug: string }).slug,
+                bucket: BUCKET,
+                uploads,
+            };
         },
     );
 };

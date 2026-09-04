@@ -26,8 +26,9 @@ test('import page streams the recording from the extension and opens the editor'
 
     await page.goto(`/import?id=${recordingId}&ext=e2e-mock-extension`);
 
-    // Handoff completed → project created → SPA redirect into the editor.
-    await expect(page).toHaveURL(new RegExp(`/editor\\?projectId=${recordingId}`), { timeout: 20_000 });
+    // Handoff completed → project created → SPA redirect into the editor
+    // (share-access model: the editor lives at /video/{slug}/edit).
+    await expect(page).toHaveURL(/\/video\/[^/]+\/edit/, { timeout: 20_000 });
     await expect(page.locator('#project-name-input')).toHaveValue(name, { timeout: 20_000 });
     await expect(page.locator('canvas').first()).toBeVisible();
 

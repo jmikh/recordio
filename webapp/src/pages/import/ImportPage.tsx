@@ -10,6 +10,7 @@ import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
 import { AuthModal } from '../../auth/AuthModal';
 import { navigate } from '../../lib/navigate';
+import { editorPath } from '../../lib/videoUrls';
 import { invokeFunction } from '../../api/client';
 import { CapRecoveryPanel } from './CapRecoveryPanel';
 
@@ -189,7 +190,7 @@ export function ImportPage() {
             // 1. Create project on server, get storage paths, cache blobs locally.
             //    Blobs are cached BEFORE the upload starts, so editor playback works
             //    immediately and a refresh mid-upload can resume from cache.
-            const { project, name, bucket, uploads } = await CloudProjectService.importRecordingLocalV2(
+            const { project, name, slug, bucket, uploads } = await CloudProjectService.importRecordingLocalV2(
                 state.recording,
                 state.screenVideo,
                 workspaceId,
@@ -214,7 +215,7 @@ export function ImportPage() {
             setStatus('success');
             confirmHandoff(project.id);
             trackProjectCreatedSuccess(project);
-            navigate(`/editor?projectId=${project.id}`);
+            navigate(editorPath(slug));
         } catch (error: any) {
             // The at-cap refusal is expected product behavior, not a failure —
             // no Sentry, dedicated recovery UI (revamp Step 4)

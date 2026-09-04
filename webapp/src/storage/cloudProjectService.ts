@@ -3,7 +3,7 @@ import type { RawRecording } from '@shared/types';
 import * as Sentry from '@sentry/react';
 import { captureError } from '../lib/sentry';
 import { CloudStorage, CloudVersionConflictError } from './cloudStorage';
-import type { CloudProjectSummary, SharePolicy } from '@shared/api';
+import type { AccessRole, CloudProjectSummary, ProjectEditor, SharePolicy } from '@shared/api';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
@@ -32,12 +32,29 @@ export interface ProjectListItem {
     cloudVersion: number | null;
     /** Duration in milliseconds (from output windows) */
     durationMs: number | null;
-    /** Share slug for public video link (null if not shared) */
+    /** Permanent share slug (share-access model: every project has one) */
     shareSlug: string | null;
-    /** Share visibility (null until first shared) */
+    /** Share visibility ('private' = draft) */
     sharePolicy: SharePolicy | null;
+    /** What workspace members get when the policy is workspace/public */
+    workspaceAccess: AccessRole | null;
     /** Whether the project is shared with the caller via project_editors */
     isEditor: boolean;
+    /** The caller's individual grant role (null = none) */
+    editorRole: AccessRole | null;
+}
+
+/** Share-relevant metadata returned alongside a loaded project. */
+export interface ProjectShareMeta {
+    id: string;
+    ownerId: string;
+    workspaceId: string | null;
+    slug: string;
+    sharePolicy: SharePolicy;
+    workspaceAccess: AccessRole;
+    editors: ProjectEditor[];
+    ownerName: string | null;
+    ownerEmail: string;
 }
 
 // ─── Service ─────────────────────────────────────────────────
@@ -101,7 +118,7 @@ export class CloudProjectService {
         workspaceId: string,
         cameraBlob?: Blob,
         micBlob?: Blob,
-    ): Promise<{ project: Project; name: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
+    ): Promise<{ project: Project; name: string; slug: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
         const projectId = recording.id;
 
         const screenSource = { ...recording.screenSource, storagePath: '' };
@@ -120,7 +137,7 @@ export class CloudProjectService {
         let name = recording.name || 'New Project';
         if (name.length > 40) name = name.substring(0, 37) + '...';
 
-        const { bucket, uploads } = await CloudStorage.createProjectV2(project, name, workspaceId);
+        const { slug, bucket, uploads } = await CloudStorage.createProjectV2(project, name, workspaceId);
 
         const pathMap = new Map(uploads.map(u => [u.fileType, u.storagePath]));
         if (pathMap.has('screen')) project.screenSource.storagePath = pathMap.get('screen')!;
@@ -142,7 +159,7 @@ export class CloudProjectService {
         const hash = await this.projectDataHash(project);
         this.projectHashes.set(projectId, hash);
 
-        return { project, name, bucket, uploads };
+        return { project, name, slug, bucket, uploads };
     }
 
     /**
@@ -236,7 +253,7 @@ export class CloudProjectService {
             data: { projectId },
         });
 
-        const cloud = await CloudStorage.loadProjectMetadata(projectId);
+        const cloud = await CloudStorage.loadProjectMetadata({ projectId });
         if (!cloud || cloud.upload_status !== 'pending') return false;
 
         const project = cloud.project_data as Project;
@@ -376,16 +393,17 @@ export class CloudProjectService {
      * deterministic path pattern. Blob URLs go to useMediaUrlStore.
      */
     static async loadProject(
-        projectId: string,
+        ref: { projectId: string } | { slug: string },
         onStatus?: (status: string) => void,
-    ): Promise<{ project: Project; name: string } | null> {
+    ): Promise<{ project: Project; name: string; meta: ProjectShareMeta } | null> {
         onStatus?.('Loading project...');
-        console.log('[CloudProjectService.loadProject] Loading project:', projectId);
-        const cloudProject = await CloudStorage.loadProjectMetadata(projectId);
+        console.log('[CloudProjectService.loadProject] Loading project:', ref);
+        const cloudProject = await CloudStorage.loadProjectMetadata(ref);
         if (!cloudProject) {
             console.error('[CloudProjectService.loadProject] loadProjectMetadata returned null — project_get returned NULL. Possible auth.uid() mismatch.');
             return null;
         }
+        const projectId = cloudProject.id;
         console.log('[CloudProjectService.loadProject] Got metadata:', { upload_status: cloudProject.upload_status, cloud_version: cloudProject.cloud_version, created_by: cloudProject.created_by });
 
         // Projects may be in 'pending' state while a background upload is in
@@ -444,7 +462,21 @@ export class CloudProjectService {
         const hash = await this.projectDataHash(project);
         this.projectHashes.set(projectId, hash);
 
-        return { project, name: cloudProject.name };
+        return {
+            project,
+            name: cloudProject.name,
+            meta: {
+                id: cloudProject.id,
+                ownerId: cloudProject.owner_id,
+                workspaceId: cloudProject.workspace_id,
+                slug: cloudProject.slug,
+                sharePolicy: cloudProject.share_policy,
+                workspaceAccess: cloudProject.workspace_access,
+                editors: cloudProject.editors,
+                ownerName: cloudProject.owner_name,
+                ownerEmail: cloudProject.owner_email,
+            },
+        };
     }
 
     // ─── Save ────────────────────────────────────────────────
@@ -527,7 +559,9 @@ export class CloudProjectService {
             durationMs: s.duration_ms,
             shareSlug: s.slug,
             sharePolicy: s.share_policy ?? null,
+            workspaceAccess: s.workspace_access ?? null,
             isEditor: s.is_editor,
+            editorRole: s.editor_role ?? null,
         }));
     }
 
@@ -589,7 +623,7 @@ export class CloudProjectService {
      * Discard local edits and reload the cloud version.
      */
     static async resolveConflictReload(projectId: string): Promise<{ project: Project; name: string } | null> {
-        const result = await this.loadProject(projectId);
+        const result = await this.loadProject({ projectId });
         useSyncStatusStore.getState().clearConflict();
         return result;
     }

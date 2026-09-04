@@ -106,11 +106,6 @@ export const muxVideoCreateRoutes: FastifyPluginAsyncTypebox<MuxVideoCreateRoute
                 return reply.code(403).send({ error: 'subscription_required' });
             }
 
-            if (!access.slug) {
-                return reply
-                    .code(400)
-                    .send({ error: 'Project not shared. Create a share link first.' });
-            }
             const ownerId = access.owner_id;
 
             // Inline port of mux_video_get_or_create (SQL fn graveyarded

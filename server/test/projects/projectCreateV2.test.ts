@@ -163,6 +163,8 @@ describe.runIf(hasTestDb())('POST /project-create-v2 (e2e, real Postgres)', () =
         const prefix = `${SEEDED_USER_ID}/${project.id}`;
         expect(res.json()).toEqual({
             projectId: project.id,
+            // 12-hex slug from the DB column default (share-access model)
+            slug: expect.stringMatching(/^[0-9a-f]{12}$/) as unknown as string,
             bucket: 'project-media',
             uploads: [
                 { fileType: 'screen', storagePath: `${prefix}/screen.webm` },
@@ -179,6 +181,8 @@ describe.runIf(hasTestDb())('POST /project-create-v2 (e2e, real Postgres)', () =
             name: 'My import',
             upload_status: 'pending',
             duration_ms: 12346, // Math.round(12345.6)
+            slug: (res.json() as { slug: string }).slug,
+            share_policy: 'private',
         });
         // Stored project_data carries the stamped paths
         const data = row!.project_data as {

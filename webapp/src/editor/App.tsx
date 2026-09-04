@@ -28,6 +28,9 @@ import { trackEditorPageLoaded, trackProjectLoadFailed } from '../analytics';
 import { captureError } from '../lib/sentry';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { navigate } from '../lib/navigate';
+import { editorPath, viewPath } from '../lib/videoUrls';
+import { useProjectMetaStore } from './stores/useProjectMetaStore';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
@@ -74,14 +77,17 @@ function Editor() {
     }, []);
 
 
-    // Load Project ID from URL
+    // Load project from the URL — /video/{slug}/edit, or the legacy
+    // /editor?projectId= form (redirected to the slug URL after load)
     useEffect(() => {
         let cancelled = false;
-        const params = new URLSearchParams(window.location.search);
-        const projectId = params.get('projectId');
+        const editMatch = window.location.pathname.match(/^\/video\/([^/]+)\/edit\/?$/);
+        const slug = editMatch?.[1] ?? null;
+        const legacyProjectId = new URLSearchParams(window.location.search).get('projectId');
+        const projectRef = slug ?? legacyProjectId;
 
         async function init() {
-            if (!projectId) {
+            if (!projectRef) {
                 navigate('/', { replace: true });
                 return;
             }
@@ -99,7 +105,10 @@ function Editor() {
             try {
                 useMediaUrlStore.getState().revokeAll();
 
-                const result = await CloudProjectService.loadProject(projectId, setLoadingStatus);
+                const result = await CloudProjectService.loadProject(
+                    slug ? { slug } : { projectId: legacyProjectId! },
+                    setLoadingStatus,
+                );
 
                 if (cancelled) return;
 
@@ -109,8 +118,13 @@ function Editor() {
                 }
 
                 loadProject(result.project, result.name);
+                useProjectMetaStore.getState().setMeta(result.meta);
+                // Canonical URL: legacy links land on the slug form
+                if (!slug) {
+                    navigate(editorPath(result.meta.slug), { replace: true });
+                }
                 setIsLoading(false);
-                trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId, projectId);
+                trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId, result.meta.id);
 
                 // Load asset library in background (non-blocking)
                 useAssetLibraryStore.getState().load().catch(err =>
@@ -120,13 +134,19 @@ function Editor() {
 
             } catch (err: any) {
                 if (cancelled) return;
+                // A view-only viewer opening /edit: project-get 403s —
+                // send them to the view page instead of an error
+                if (slug && err instanceof FunctionsHttpError && err.context?.status === 403) {
+                    navigate(viewPath(slug), { replace: true });
+                    return;
+                }
                 captureError(err, {
                     flow: 'project_load',
                     phase: loadingStatus,
-                    projectId,
+                    projectId: projectRef,
                 });
                 trackProjectLoadFailed({
-                    project_id: projectId,
+                    project_id: projectRef,
                     error: err?.message || 'Unknown error',
                     error_name: err?.name,
                     is_offline: !navigator.onLine,

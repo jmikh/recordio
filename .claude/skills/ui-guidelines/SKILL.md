@@ -9,6 +9,7 @@ description: UI design system reference for this codebase — covers design toke
 
 - **Never use hardcoded Tailwind palette colors** (`red-400`, `gray-700`, `blue-500`, etc.) — always use semantic tokens
 - **Never use raw `<button>` elements** — always use `<Button>` from `@shared/components`
+- **Never hand-roll select/dropdown/picker menus** — always use `<Dropdown>` from `@shared/components`; it supports `disabled` (whole control) and per-option `disabled`, so read-only or partially-restricted states don't justify a custom control either
 - **Check `shared/components/` before building anything custom** — most common UI needs are already covered
 - **No `style={{}}` for layout/theming** — Tailwind classes only; inline styles are acceptable only for dynamically computed values (positions, widths from state, user color pickers)
 - **Use shadow utilities** (`shadow-sm`, `shadow-float`) — not inline `boxShadow`; these are the only two shadow tokens
@@ -44,7 +45,7 @@ All in `shared/components/` (barrel-exported from `@shared/components`). Read th
 | `XButton` | Small circular remove/close button |
 | `Toggle` | Boolean on/off switch, with optional label |
 | `MultiToggle` | Pill-style multi-option selector |
-| `Dropdown` | Select input with portal-rendered menu |
+| `Dropdown` | Any select/picker with portal-rendered menu — has `disabled` + per-option `disabled`; never hand-roll one |
 | `CollapsibleCard` | Animated expand/collapse section |
 | `LogoLink` | Branding/logo link |
 | `Tooltip` / `InfoTooltip` | Portal-rendered tooltips |

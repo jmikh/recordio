@@ -216,17 +216,9 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
         expect(deps.renderWorker.submissions).toHaveLength(0);
     });
 
-    it('400 with the exact edge-fn body when the project has no share slug; no RPC side effects', async () => {
-        const { app, deps } = testApp();
-        const project = await seed({ slug: null });
-
-        const res = await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
-        expect(res.statusCode).toBe(400);
-        expect(res.json()).toEqual({ error: 'Project not shared. Create a share link first.' });
-        expect(await muxRows(project.id)).toHaveLength(0);
-        expect(await jobRows(project.id)).toHaveLength(0);
-        expect(deps.renderWorker.submissions).toHaveLength(0);
-    });
+    // (The "no share slug → 400" case died with the share-access
+    // migration: slugs are NOT NULL with a DB default, so the route's
+    // slug gate is unreachable — flagged for cleanup.)
 
     // Billing revamp Step 1: share plumbing is trial/Pro — a FREE
     // workspace (no subscription, owner without a trial) is denied
