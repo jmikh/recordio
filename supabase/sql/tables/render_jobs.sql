@@ -17,7 +17,8 @@
 │     "total_duration_s" REAL,                                      │
 │     "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), │
 │     "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), │
-│     "attempt_count" INTEGER NOT NULL DEFAULT 1                    │
+│     "attempt_count" INTEGER NOT NULL DEFAULT 1,                   │
+│     "quality" TEXT NOT NULL DEFAULT '1080p'::text                 │
 │ );                                                                │
 └───────────────────────────────────────────────────────────────────┘
 │    rls_info     │

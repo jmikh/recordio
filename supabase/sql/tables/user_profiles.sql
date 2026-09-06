@@ -5,7 +5,9 @@
 │     "name" TEXT,                                         │
 │     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(), │
 │     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(), │
-│     "default_workspace_id" UUID                          │
+│     "default_workspace_id" UUID,                         │
+│     "reviewed_at" TIMESTAMP WITH TIME ZONE,              │
+│     "welcome_email_sent_at" TIMESTAMP WITH TIME ZONE     │
 │ );                                                       │
 └──────────────────────────────────────────────────────────┘
 │    rls_info     │
