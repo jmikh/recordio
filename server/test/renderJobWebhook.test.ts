@@ -234,6 +234,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
             projectId: project.id,
             cloudVersion: 2,
             renderStoragePath: renderPath,
+            quality: '2K', // only the Mux quality feeds Mux
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -270,6 +271,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
             projectId: project.id,
             cloudVersion: 1,
             renderStoragePath: `u/${project.id}/renders/v1.mp4`,
+            quality: '2K', // only the Mux quality feeds Mux
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -289,7 +291,11 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
     it('failed: job failed with the error AND the pending mux_video cascades (RPC behavior)', async () => {
         const { app } = testApp();
         const project = await seed();
-        const jobId = await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1 });
+        const jobId = await seedRenderJob(pool, {
+            projectId: project.id,
+            cloudVersion: 1,
+            quality: '2K', // only the Mux quality cascades to the mux_video
+        });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
             cloudVersion: 1,
@@ -312,7 +318,11 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
     it('failed without an error message: mux cascade uses the RPC default', async () => {
         const { app } = testApp();
         const project = await seed();
-        const jobId = await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1 });
+        const jobId = await seedRenderJob(pool, {
+            projectId: project.id,
+            cloudVersion: 1,
+            quality: '2K', // only the Mux quality cascades to the mux_video
+        });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
             cloudVersion: 1,
@@ -323,6 +333,54 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
 
         const { rows } = await pool.query('SELECT * FROM mux_videos WHERE id = $1', [muxVideoId]);
         expect(rows[0]).toMatchObject({ status: 'failed', error: 'Render failed' });
+    });
+
+    it('completed at a NON-Mux quality: pending mux_video is left alone, no mux/S3 calls', async () => {
+        // A 1080p download export for a version that also has a shared
+        // (2K) mux_video must not hijack it — Mux streams the 2K render.
+        const { app, deps } = testApp();
+        const project = await seed();
+        const jobId = await seedRenderJob(pool, {
+            projectId: project.id,
+            cloudVersion: 3,
+            renderStoragePath: `u/${project.id}/renders/v3.mp4`,
+            quality: '1080p',
+        });
+        const muxVideoId = await seedMuxVideo(pool, {
+            projectId: project.id,
+            cloudVersion: 3,
+            status: 'pending',
+        });
+
+        const res = await post(app, { jobId, status: 'completed' }, TEST_RENDER_SECRET);
+        expect(res.statusCode).toBe(200);
+
+        expect((await jobRow(jobId)).status).toBe('completed');
+        expect(deps.mux.createdAssets).toHaveLength(0);
+        expect(deps.s3.presignedDownloads).toHaveLength(0);
+        const { rows } = await pool.query('SELECT * FROM mux_videos WHERE id = $1', [muxVideoId]);
+        expect(rows[0]).toMatchObject({ status: 'pending', mux_asset_id: null });
+    });
+
+    it('failed at a NON-Mux quality: pending mux_video does NOT cascade', async () => {
+        const { app } = testApp();
+        const project = await seed();
+        const jobId = await seedRenderJob(pool, {
+            projectId: project.id,
+            cloudVersion: 3,
+            quality: '1080p',
+        });
+        const muxVideoId = await seedMuxVideo(pool, {
+            projectId: project.id,
+            cloudVersion: 3,
+            status: 'pending',
+        });
+
+        await post(app, { jobId, status: 'failed', error: 'ffmpeg exploded' }, TEST_RENDER_SECRET);
+
+        expect((await jobRow(jobId)).status).toBe('failed');
+        const { rows } = await pool.query('SELECT * FROM mux_videos WHERE id = $1', [muxVideoId]);
+        expect(rows[0]).toMatchObject({ status: 'pending', error: null });
     });
 
     it('contributes render.job_id/project.id and emits render_job.completed', async () => {

@@ -305,12 +305,15 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
     it('new mux_video + render already completed: uploads to Mux from the presigned render URL', async () => {
         const { app, deps } = testApp();
         const project = await seed();
-        const renderPath = `${SEEDED_USER_ID}/${project.id}/renders/v1.mp4`;
+        // Mux ingests the 2K render (mux-video-create requests it), so the
+        // cache hit is the completed 2K job — a 1080p one would not match.
+        const renderPath = `${SEEDED_USER_ID}/${project.id}/renders/v1_2K.mp4`;
         await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 1,
             status: 'completed',
             renderStoragePath: renderPath,
+            quality: '2K',
         });
 
         const res = await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
@@ -397,6 +400,7 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
             projectId: project.id,
             cloudVersion: 1,
             status: 'completed',
+            quality: '2K', // cache hit for the Mux-quality render
         });
 
         const res = await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
@@ -420,8 +424,9 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
         expect((await muxRows(project.id))[0].user_id).toBe(SEEDED_USER_2_ID);
         const jobs = await jobRows(project.id);
         expect(jobs[0].user_id).toBe(SEEDED_USER_2_ID);
+        // 2K path suffix — mux-video-create renders at MUX_RENDER_QUALITY
         expect(jobs[0].render_storage_path).toBe(
-            `${SEEDED_USER_2_ID}/${project.id}/renders/v1.mp4`,
+            `${SEEDED_USER_2_ID}/${project.id}/renders/v1_2K.mp4`,
         );
         expect(deps.renderWorker.submissions).toHaveLength(1);
     });
@@ -446,6 +451,7 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
             projectId: project.id,
             cloudVersion: 1,
             status: 'completed',
+            quality: '2K', // cache hit for the Mux-quality render → mux upload
         });
 
         const res = await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());

@@ -42,7 +42,7 @@ import { Type } from '@sinclair/typebox';
 import { getWorkspaceEntitlements } from '../services/entitlements.js';
 import { getProjectIfEditor } from '../services/projectAccess.js';
 import { getOrCreateRenderJob, type RenderJobResolution } from '../services/renderJobs.js';
-import { markMuxVideoFailed, uploadToMux } from '../services/muxUpload.js';
+import { markMuxVideoFailed, uploadToMux, MUX_RENDER_QUALITY } from '../services/muxUpload.js';
 
 interface MuxVideoResolution {
     mux_video_id: string;
@@ -156,6 +156,10 @@ export const muxVideoCreateRoutes: FastifyPluginAsyncTypebox<MuxVideoCreateRoute
                     projectId,
                     userId: ownerId,
                     cloudVersion,
+                    // Mux streams a single quality (1440p) regardless of what
+                    // the user picks for downloads — cached per (project,
+                    // version, quality), so this is its own render job.
+                    quality: MUX_RENDER_QUALITY,
                     statusCallbackUrl,
                     log: req.log,
                 });

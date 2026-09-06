@@ -33,7 +33,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { logEvent } from '../logging.js';
-import { uploadToMux } from '../services/muxUpload.js';
+import { uploadToMux, MUX_RENDER_QUALITY } from '../services/muxUpload.js';
 
 interface JobRow {
     status: string;
@@ -42,6 +42,7 @@ interface JobRow {
     project_id: string;
     cloud_version: number;
     render_storage_path: string | null;
+    quality: string;
 }
 
 export interface RenderJobWebhookRoutesOptions {
@@ -105,7 +106,7 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
             req.logCtx.set({ 'render.job_id': jobId });
 
             const { rows } = await app.deps.db.query(
-                `SELECT status, created_at, start_duration_s, project_id, cloud_version, render_storage_path
+                `SELECT status, created_at, start_duration_s, project_id, cloud_version, render_storage_path, quality
                  FROM render_jobs WHERE id = $1`,
                 [jobId],
             );
@@ -160,6 +161,12 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                         'render worker reported job failure',
                     );
                 }
+                // $4 gates the cascade to the Mux quality only: a pending
+                // mux_video tracks its own MUX_RENDER_QUALITY render, so a
+                // failed render at another quality (e.g. a 1080p download
+                // export for the same version) must not fail it. The job's
+                // own status update is unconditional (data-modifying CTEs
+                // always run to completion regardless of the outer WHERE).
                 await app.deps.db.query(
                     `WITH job AS (
                         UPDATE render_jobs
@@ -173,10 +180,11 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                         updated_at = NOW()
                     FROM job
                     WHERE $2 IN ('failed', 'canceled')
+                      AND $4::boolean
                       AND mv.project_id = job.project_id
                       AND mv.cloud_version = job.cloud_version
                       AND mv.status = 'pending'`,
-                    [jobId, status, errorMsg || null],
+                    [jobId, status, errorMsg || null, job.quality === MUX_RENDER_QUALITY],
                 );
 
                 if (status === 'completed') {
@@ -186,8 +194,12 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                     });
 
                     // Render done → upload to Mux if a pending mux_video
-                    // awaits this version
-                    if (job.render_storage_path) {
+                    // awaits this version. Only the Mux quality (1440p)
+                    // feeds Mux: a completed render at another quality (e.g.
+                    // a 1080p download export for the same version) must not
+                    // hijack the pending mux_video — mux-video-create always
+                    // enqueues its own MUX_RENDER_QUALITY render.
+                    if (job.quality === MUX_RENDER_QUALITY && job.render_storage_path) {
                         const { rows: muxRows } = await app.deps.db.query(
                             `SELECT id FROM mux_videos
                              WHERE project_id = $1 AND cloud_version = $2 AND status = 'pending'

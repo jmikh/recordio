@@ -14,10 +14,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LuLoader } from 'react-icons/lu';
-import { Button, LogoLink } from '@shared/components';
+import { Button, LogoLink, Modal } from '@shared/components';
 import type { AdminUserSummary } from '@shared/api';
 import { invokeFunction } from '../../api/client';
 import { startImpersonation } from '../../auth/impersonation';
+import { navigate } from '../../lib/navigate';
 import { fuzzyMatch, type FuzzyMatch } from './fuzzy';
 
 type Status = 'loading' | 'ready' | 'forbidden' | 'error';
@@ -118,6 +119,28 @@ export function AdminPage() {
         }
     };
 
+    // Non-admins get a plain 404 — never reveal that /admin exists. The
+    // server 403s admin-user-list; we surface it as "page not found".
+    if (status === 'forbidden') {
+        return (
+            <div className="min-h-screen bg-surface-body">
+                <Modal isOpen ariaLabel="Page not found" maxWidth="max-w-[440px]">
+                    <h2 className="heading-1 mb-1">404</h2>
+                    <p className="text-sm text-text-main mb-6">
+                        This page doesn&apos;t exist.
+                    </p>
+                    <Button
+                        variant="primary"
+                        onClick={() => navigate('/')}
+                        className="w-full"
+                    >
+                        Go to home page
+                    </Button>
+                </Modal>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-surface-body flex flex-col items-center px-4 py-10">
             <div className="mb-8">
@@ -136,10 +159,6 @@ export function AdminPage() {
                         <LuLoader className="icon-md animate-spin" />
                         Loading users...
                     </div>
-                )}
-
-                {status === 'forbidden' && (
-                    <p className="text-sm text-destructive" role="alert">Not authorized.</p>
                 )}
 
                 {status === 'error' && (

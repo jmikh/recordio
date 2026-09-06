@@ -1,10 +1,22 @@
 import mixpanel from 'mixpanel-browser';
+import { getImpersonation } from '../auth/impersonation';
 
 // ============================================================================
 // Mixpanel Initialization
 // ============================================================================
 
 const IS_PRODUCTION = import.meta.env.MODE === 'production';
+
+/**
+ * While an admin is impersonating a target user, Mixpanel must stay completely
+ * inert — no events and no identity changes. Otherwise the admin's actions
+ * would be attributed to the target's profile (and identifyUser would re-point
+ * the admin's own distinct_id at the target). Suppressing everything leaves
+ * Mixpanel exactly as it was before impersonation started.
+ */
+function isImpersonating(): boolean {
+    return getImpersonation() !== null;
+}
 
 let mixpanelReady = false;
 
@@ -49,6 +61,7 @@ async function detectBrowser(): Promise<string> {
  * Merges any anonymous events into the identified profile.
  */
 export function identifyUser(email: string) {
+    if (isImpersonating()) return;
     mixpanel.identify(email);
 }
 
@@ -59,6 +72,7 @@ export function identifyUser(email: string) {
  * only be called on actual login, not session restore.
  */
 export function setUserProfileOnce(email: string) {
+    if (isImpersonating()) return;
     mixpanel.people.set_once({ $email: email, signup_date: new Date().toISOString() });
 }
 
@@ -70,6 +84,7 @@ export function setUserProfileOnce(email: string) {
  * Called from useUserStore.clearUser on sign-out.
  */
 export function resetUser() {
+    if (isImpersonating()) return;
     mixpanel.reset();
 }
 
@@ -82,6 +97,7 @@ export function resetUser() {
  * to the Supabase ID, and calling identify(extId) would overwrite it.
  */
 export function identifyExtensionUser(extensionDistinctId: string) {
+    if (isImpersonating()) return;
     mixpanel.identify(extensionDistinctId);
 }
 
@@ -90,6 +106,7 @@ export function identifyExtensionUser(extensionDistinctId: string) {
 // ============================================================================
 
 function trackEvent(eventName: string, params: Record<string, any> = {}) {
+    if (isImpersonating()) return;
     if (!IS_PRODUCTION) {
         console.log(`[Analytics] ${eventName}`, params);
         return;
