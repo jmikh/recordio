@@ -10,7 +10,9 @@ import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
 import { AuthModal } from './auth/AuthModal';
+import { AuthUnreachableModal } from './auth/AuthUnreachableModal';
 import { useUserStore } from './auth/useUserStore';
+import { useAuthStatusStore } from './auth/useAuthStatusStore';
 import { UploadProgressToast } from './storage/UploadProgressToast';
 import { useUploadBeforeUnloadWarning } from './storage/useUploadBeforeUnloadWarning';
 import { LeaveReviewModal } from './components/LeaveReviewModal';
@@ -22,17 +24,27 @@ AuthManager.init();
 /** /video/{slug}/edit — the editor form of a video URL (auth required) */
 const VIDEO_EDIT_PATH = /^\/video\/[^/]+\/edit\/?$/;
 
-// Routes that don't require authentication. /video/{slug}(/view) is the
-// public viewer; its /edit form is the editor and needs auth.
-function isPublicRoute(path: string) {
-    if (path.startsWith('/video/')) return !VIDEO_EDIT_PATH.test(path);
-    return path === '/uninstall' || path === '/accept-invite';
+/**
+ * Routes App gates itself: signed out they render nothing but the page
+ * background with the sign-in modal on top — the dashboard never mounts
+ * and never fetches. Everything else is either public (/video/{slug},
+ * /uninstall, /accept-invite) or prompts for auth on its own at the right
+ * moment: the editor blocks on its own sign-in screen once the project
+ * load needs a session, and /import has to keep running while signed out
+ * so it can receive the extension's blobs before asking to sign in.
+ */
+function isGatedRoute(path: string) {
+    if (path.startsWith('/video/')) return false;
+    if (path.startsWith('/editor')) return false;
+    if (path.startsWith('/import')) return false;
+    return path !== '/uninstall' && path !== '/accept-invite';
 }
 
 export function App() {
     const [path, setPath] = useState(window.location.pathname);
     const [authReady, setAuthReady] = useState(false);
     const isAuthenticated = useUserStore(s => s.isAuthenticated);
+    const authServerUnreachable = useAuthStatusStore(s => s.authServerUnreachable);
 
     useUploadBeforeUnloadWarning();
 
@@ -94,12 +106,43 @@ export function App() {
         return <DashboardPage />;
     };
 
-    const showAuthModal = authReady && !isAuthenticated && !isPublicRoute(path);
+    const isGated = isGatedRoute(path);
+
+    // A stored session we can't renew because the auth server is unreachable.
+    // auth-js keeps that session and emits nothing, so authReady never resolves
+    // while the persisted store still says we're signed in — the app would
+    // otherwise render as authenticated against a dead session (a blank
+    // dashboard, since it holds for workspaceReady) for the ~50s the refresh
+    // retries take to give up. Signing in again wouldn't help, so this gets its
+    // own modal rather than the sign-in one, and it holds once authReady
+    // resolves too so the two don't flip back and forth.
+    const usableSession = authReady && isAuthenticated;
+    if (isGated && !usableSession && authServerUnreachable) {
+        return (
+            <ToastProvider>
+                <div className="w-full h-screen bg-surface-body" />
+                <AuthUnreachableModal />
+            </ToastProvider>
+        );
+    }
+
+    // Signed out on a gated route: bare background + a sign-in modal with no
+    // way out. The modal waits for authReady so a returning session doesn't
+    // flash it; the blank page doesn't, so the dashboard never shows through.
+    const blocked = !isAuthenticated && isGated;
+
+    if (blocked) {
+        return (
+            <ToastProvider>
+                <div className="w-full h-screen bg-surface-body" />
+                <AuthModal isOpen={authReady} onClose={() => {}} />
+            </ToastProvider>
+        );
+    }
 
     return (
         <ToastProvider>
             {getPage()}
-            <AuthModal isOpen={showAuthModal} onClose={() => {}} />
             <UploadProgressToast />
             {/* Loud on every page while impersonating (admin feature) */}
             <ImpersonationBanner />

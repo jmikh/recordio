@@ -7,9 +7,13 @@ import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
 import { DEVICE_FRAMES } from '@shared/utils/deviceFrames';
-import { Scrollbar, SidebarNav, SidebarNavItem } from '@shared/components';
+import { Button, LogoLink, Scrollbar, SidebarNav, SidebarNavItem } from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { useUserStore } from '../../../auth/useUserStore';
+import { CloudProjectService } from '../../../storage/cloudProjectService';
+import { useSyncStatusStore } from '../../../storage/syncStatusStore';
+import { navigate } from '../../../lib/navigate';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
 import { SpotlightInspector } from './SpotlightInspector';
@@ -126,40 +130,69 @@ export const SettingsPanel = () => {
     const overlaySegments = useProjectStore(s => s.project.timeline.overlaySegments);
     const selectedOverlaySegment = selectedOverlaySegmentId ? (overlaySegments || []).find(b => b.id === selectedOverlaySegmentId) : null;
 
+    // Save before leaving, mirroring the old header logo behavior
+    const handleGoToDashboard = async () => {
+        const { userId } = useUserStore.getState();
+        if (userId) {
+            const { project: proj, userEvents } = useProjectStore.getState();
+            const fullProject = { ...proj, userEvents };
+            await CloudProjectService.saveProject(fullProject, userId);
+
+            if (useSyncStatusStore.getState().conflict) {
+                useSyncStatusStore.getState().setPendingNavigation('/');
+                return;
+            }
+        }
+        navigate('/');
+    };
+
     return (
-        <div id="settings-panel" className="flex flex-col h-full border-r border-border bg-surface">
-            <div className="flex flex-1 min-h-0">
-            {/* Sidebar Navigation */}
-            <SidebarNav id="settings-nav" className="w-44 py-6 border-r border-border">
-                {navItems.map((item) => {
-                    const isDisabled = item.disabled;
-                    const showActive = activeTab === item.id && !hasSelection;
+        <div id="settings-panel" className="flex h-full">
+            {/* Logo + navigation — one bordered side panel column */}
+            <div className="w-44 flex flex-col bg-surface border-r border-border">
+                {/* Logo — same placement as the dashboard sidebar */}
+                <div className="px-3 pt-3">
+                    <Button
+                        variant="ghost"
+                        onClick={handleGoToDashboard}
+                        aria-label="Back to Dashboard"
+                        title="Back to Dashboard"
+                        className="w-fit"
+                    >
+                        <LogoLink imgClassName="h-6" />
+                    </Button>
+                </div>
+                <SidebarNav id="settings-nav" className="flex-1 min-h-0 py-6">
+                    {navItems.map((item) => {
+                        const isDisabled = item.disabled;
+                        const showActive = activeTab === item.id && !hasSelection;
 
-                    return (
-                        <SidebarNavItem
-                            key={item.id}
-                            label={item.label}
-                            icon={item.icon}
-                            active={showActive}
-                            disabled={isDisabled}
-                            onClick={() => !isDisabled && handleTabChange(item.id)}
-                            onMouseEnter={(e) => {
-                                if (isDisabled && item.disabledTooltip) {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    setTooltipPosition({
-                                        left: rect.right + 8,
-                                        top: rect.top + rect.height / 2
-                                    });
-                                    setHoveredDisabledTab(item.id);
-                                }
-                            }}
-                            onMouseLeave={() => setHoveredDisabledTab(null)}
-                        />
-                    );
-                })}
-            </SidebarNav>
+                        return (
+                            <SidebarNavItem
+                                key={item.id}
+                                label={item.label}
+                                icon={item.icon}
+                                active={showActive}
+                                disabled={isDisabled}
+                                onClick={() => !isDisabled && handleTabChange(item.id)}
+                                onMouseEnter={(e) => {
+                                    if (isDisabled && item.disabledTooltip) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setTooltipPosition({
+                                            left: rect.right + 8,
+                                            top: rect.top + rect.height / 2
+                                        });
+                                        setHoveredDisabledTab(item.id);
+                                    }
+                                }}
+                                onMouseLeave={() => setHoveredDisabledTab(null)}
+                            />
+                        );
+                    })}
+                </SidebarNav>
+            </div>
 
-            {/* Content Area */}
+            {/* Content Area — transparent, runs the full height */}
             <div id="settings-content" className="w-80 flex flex-row relative h-full bg-surface-body">
                 <div
                     ref={setScrollContainer}
@@ -190,7 +223,6 @@ export const SettingsPanel = () => {
                     orientation="vertical"
                     dependency={activeTab}
                 />
-            </div>
             </div>
 
             {/* Preload Device Frames */}

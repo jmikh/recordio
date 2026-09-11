@@ -55,7 +55,7 @@ export function DashboardHeader({
                         value={searchQuery}
                         onChange={e => onSearchChange(e.target.value)}
                         placeholder="Search recordings, transcripts..."
-                        className="w-full h-9 pl-9 pr-3 text-sm bg-surface-raised border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+                        className="w-full h-9 pl-9 pr-3 text-sm bg-surface border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
                     />
                 </div>
             </div>
@@ -82,7 +82,7 @@ export function DashboardHeader({
                                     <span className={`text-badge px-1.5 py-1 rounded-full ${
                                         activeFilter === tab.value
                                             ? 'bg-primary/20 text-primary'
-                                            : 'bg-surface-raised text-text-muted'
+                                            : 'bg-state-inactive text-text-muted'
                                     }`}>
                                         {tab.count}
                                     </span>

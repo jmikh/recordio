@@ -28,7 +28,7 @@ export const DebugBar = () => {
     };
 
     return (
-        <div className="h-8 flex items-center px-4 gap-2 border-t border-border bg-background">
+        <div className="h-8 flex items-center px-4 gap-2 border-t border-border bg-surface">
             <span className="text-eyebrow mr-2">Debug</span>
             <button
                 className="px-2 py-0.5 bg-blue-900/50 hover:bg-blue-800 text-blue-200 text-2xs rounded cursor-pointer border border-blue-800"

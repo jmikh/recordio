@@ -6,19 +6,17 @@ import { LuUndo2, LuRedo2 } from 'react-icons/lu';
 import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
 import { ProUpgradeModal } from '../../../billing/ProUpgradeModal';
-import { navigate } from '../../../lib/navigate';
 import { UserMenu } from '../../../components/UserMenu';
 import { useUserStore } from '../../../auth/useUserStore';
 
 import { trackDownloadClicked } from '../../../analytics';
 import { useEntitlements } from '../../../billing/useEntitlements';
-import { CloudProjectService } from '../../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';
 import { DownloadModal } from '../settings/DownloadModal';
 
 import { TbCloudUpload, TbDownload, TbShare2 } from 'react-icons/tb';
-import { Dropdown, Button, Tooltip, LogoLink, type DropdownOption } from '@shared/components';
+import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
@@ -121,38 +119,11 @@ export const Header = () => {
     const pastStates = useProjectHistory(state => state.pastStates);
     const futureStates = useProjectHistory(state => state.futureStates);
 
-    const handleGoToDashboard = async () => {
-        const { userId } = useUserStore.getState();
-        if (userId) {
-            const { project: proj, userEvents } = useProjectStore.getState();
-            const fullProject = { ...proj, userEvents };
-            await CloudProjectService.saveProject(fullProject, userId);
-
-            if (useSyncStatusStore.getState().conflict) {
-                useSyncStatusStore.getState().setPendingNavigation('/');
-                return;
-            }
-        }
-        navigate('/');
-    };
-
-
-
     return (
-        <div id="editor-header" className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
+        <div id="editor-header" className="bg-surface border border-border rounded-xl mt-1 mr-1 flex flex-col shrink-0 z-[var(--z-index-navbar)] select-none">
             {/* Top Row: Main Controls */}
             <div className="h-header flex items-center px-4 justify-between relative w-full">
                 <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        onClick={handleGoToDashboard}
-                        aria-label="Back to Dashboard"
-                        title="Back to Dashboard"
-                    >
-                        <LogoLink imgClassName="h-6" />
-                    </Button>
-                    <div className="h-4 w-[1px] bg-border mx-2"></div>
-
                     <div className="flex items-center gap-1">
                         <Button
                             variant="icon"

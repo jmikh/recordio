@@ -43,7 +43,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
 }) => {
     return (
         <div
-            className="flex items-center justify-between pl-3 pr-1 bg-surface-raised rounded-sm overflow-hidden mx-1"
+            className="flex items-center justify-between pl-3 pr-1 bg-surface rounded-sm overflow-hidden mx-1"
             style={{ height, minHeight: height, transition: 'height 150ms ease' }}
         >
             {!isCollapsed && (

@@ -2,7 +2,8 @@ import { type Session } from '@supabase/supabase-js';
 import * as Sentry from '@sentry/react';
 import { useUserStore } from './useUserStore';
 import { useWorkspaceStore, type WorkspaceSubscription } from '../workspace/useWorkspaceStore';
-import { supabase, setUnauthorizedHandler } from '../supabase/client';
+import { supabase, setUnauthorizedHandler, setRefreshOutcomeHandler } from '../supabase/client';
+import { useAuthStatusStore } from './useAuthStatusStore';
 import { getImpersonation, stopImpersonation } from './impersonation';
 import { invokeFunction } from '../api/client';
 import { captureError } from '../lib/sentry';
@@ -122,6 +123,13 @@ export class AuthManager {
 
         setUnauthorizedHandler(() => AuthManager.signOut());
 
+        // auth-js stays silent when a refresh fails because the server is
+        // unreachable, so the transport reports it instead. Without this the
+        // app renders as authenticated against a session it can't renew.
+        setRefreshOutcomeHandler(outcome => {
+            useAuthStatusStore.getState().setAuthServerUnreachable(outcome === 'unreachable');
+        });
+
         let firstEvent = true;
         supabase.auth.onAuthStateChange((event, session) => {
             console.log(`[Auth] onAuthStateChange: ${event}, session: ${session ? session.user.id : 'null'}`);
@@ -221,6 +229,17 @@ export class AuthManager {
         Object.keys(localStorage)
             .filter(k => k.startsWith('sb-'))
             .forEach(k => localStorage.removeItem(k));
+
+        // Clear our own stores rather than waiting for SIGNED_OUT: auth-js only
+        // emits that when it actually removed the session, and a logout whose
+        // network call fails returns early without removing anything. The local
+        // session is gone either way (we just wiped it), so the UI must follow —
+        // otherwise isAuthenticated stays true against a session that no longer
+        // exists and the app renders signed-in with every request failing.
+        AuthManager.subscriptionFetchedForUserId = null;
+        Sentry.setUser(null);
+        useUserStore.getState().clearUser();
+        useWorkspaceStore.getState().clearWorkspace();
     }
 
     /**

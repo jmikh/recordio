@@ -257,10 +257,10 @@ export function Timeline() {
     }, [totalOutputDuration, pixelsPerSec]); // deps that affect width
 
     return (
-        <div className="flex flex-col h-full bg-surface select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
+        <div className="flex flex-col h-full bg-surface-body select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div id="timeline-body" className="flex bg-surface overflow-hidden relative" style={{ height: timelineTotalHeight + SCROLLBAR_GUTTER }} onMouseLeave={() => setHoveredTrack(null)}>
+            <div id="timeline-body" className="flex bg-surface-body overflow-hidden relative" style={{ height: timelineTotalHeight + SCROLLBAR_GUTTER }} onMouseLeave={() => setHoveredTrack(null)}>
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div
@@ -268,7 +268,7 @@ export function Timeline() {
                     style={{ width: HEADER_WIDTH }}
                 >
                     {/* Track Visibility Dropdown — matches ruler height exactly */}
-                    <div style={{ height: RULER_HEIGHT }} className="border-b border-border shrink-0 flex items-center">
+                    <div style={{ height: RULER_HEIGHT }} className="bg-surface border-b border-border shrink-0 flex items-center">
                         <TimelineSettings height={RULER_HEIGHT} />
                     </div>
 

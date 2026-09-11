@@ -152,9 +152,9 @@
       ============================================================ */
 
    /* Surfaces - Subtle primary-tinted off-white */
-   --surface-body: oklch(100% 0.000 var(--hue-secondary));
-   --surface-default: oklch(99% 0.002 var(--hue-secondary));
-   --surface-raised: oklch(98% 0.002 var(--hue-secondary));
+   --surface-body: oklch(96.5% 0.012 var(--hue-primary));
+   --surface-default: oklch(99% 0.003 var(--hue-primary));
+   --surface-raised: oklch(100% 0 0);
 
    /* Interactive State Overlays - Black transparency */
    --state-inactive: oklch(0 0 0 / 3%);
@@ -182,9 +182,9 @@
    ============================================================ */
 .dark {
    /* Surfaces - Subtle primary-tinted deep grays */
-   --surface-body: oklch(0.10 0.02 var(--hue-primary));
-   --surface-default: oklch(0.18 0.02 var(--hue-primary));
-   --surface-raised: oklch(0.25 0.02 var(--hue-primary));
+   --surface-body: oklch(0.10 0.035 var(--hue-primary));
+   --surface-default: oklch(0.18 0.016 var(--hue-primary));
+   --surface-raised: oklch(0.26 0.012 var(--hue-primary));
 
    /* Interactive State Overlays - Original values */
    --state-disabled: oklch(1 0 0 / 1%);

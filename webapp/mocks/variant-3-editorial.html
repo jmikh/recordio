@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Mock — Editorial</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: oklch(0.55 0.22 290);
+    --primary-hi: oklch(0.60 0.24 290);
+    --primary-soft: oklch(0.95 0.035 290);
+    --secondary: oklch(0.85 0.16 95);
+    --tertiary: oklch(0.65 0.18 155);
+    --body: oklch(0.99 0.004 85);
+    --text-hi: oklch(0.20 0.015 290);
+    --text-main: oklch(0.34 0.015 290);
+    --text-muted: oklch(0.54 0.015 290);
+    --border: oklch(0.91 0.008 290);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Satoshi', -apple-system, sans-serif;
+    font-weight: 500;
+    background: var(--body); color: var(--text-main);
+    display: flex; min-height: 100vh;
+  }
+
+  /* ---------- Slim sidebar ---------- */
+  .sidebar {
+    width: 240px; flex-shrink: 0;
+    border-right: 1.5px solid var(--text-hi);
+    display: flex; flex-direction: column;
+    padding: 24px 18px; gap: 20px;
+    background: var(--body);
+  }
+  .logo { display: flex; align-items: center; gap: 9px; font-weight: 900; font-size: 18px; letter-spacing: 0.02em; color: var(--text-hi); }
+  .logo-mark { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); display: grid; place-items: center; }
+  .logo-mark::after { content: ''; width: 10px; height: 10px; border-radius: 50%; border: 2.5px solid #fff; }
+
+  .workspace {
+    border: 1.5px solid var(--text-hi); border-radius: 12px; padding: 12px;
+    cursor: pointer; background: #fff;
+    box-shadow: 3px 3px 0 var(--text-hi);
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .workspace:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--text-hi); }
+  .workspace-row { display: flex; justify-content: space-between; align-items: center; }
+  .workspace-name { font-size: 14px; font-weight: 700; color: var(--text-hi); }
+  .workspace-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--text-muted); }
+  .badge-trial { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; background: var(--secondary); color: var(--text-hi); border: 1.5px solid var(--text-hi); padding: 2px 6px; border-radius: 4px; }
+  .invite { margin-top: 9px; padding-top: 9px; border-top: 1.5px dashed var(--border); font-size: 13px; font-weight: 700; color: var(--primary); cursor: pointer; }
+
+  .btn-record {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--primary); color: #fff;
+    font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 0.01em;
+    border: 1.5px solid var(--text-hi); border-radius: 12px; padding: 13px;
+    box-shadow: 3px 3px 0 var(--text-hi);
+    cursor: pointer; transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .btn-record:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--text-hi); background: var(--primary-hi); }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--secondary); border: 1.5px solid var(--text-hi); }
+
+  .nav-eyebrow { font-size: 10px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); padding: 10px 10px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 9px; font-size: 14px;
+    color: var(--text-main); cursor: pointer; transition: background 0.1s;
+  }
+  .nav-item:hover { background: var(--primary-soft); }
+  .nav-item.active { background: var(--text-hi); color: #fff; font-weight: 700; }
+  .nav-item.active .nav-count { background: var(--secondary); color: var(--text-hi); }
+  .nav-ico { width: 18px; text-align: center; font-size: 14px; }
+  .nav-count { margin-left: auto; font-size: 11px; font-weight: 900; background: var(--body); border: 1.5px solid currentColor; border-radius: 20px; padding: 1px 7px; }
+  .nav-item:not(.active) .nav-count { border-color: var(--border); color: var(--text-muted); }
+
+  .sidebar-footer { margin-top: auto; display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--tertiary); border: 1.5px solid var(--text-hi); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 900; }
+  .user-name { font-size: 13px; font-weight: 700; color: var(--text-hi); }
+  .user-email { font-size: 11px; color: var(--text-muted); }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; padding: 34px 48px 80px; }
+  .topbar { display: flex; gap: 14px; margin-bottom: 40px; }
+  .search {
+    flex: 0 1 400px; display: flex; align-items: center; gap: 10px;
+    border: 1.5px solid var(--text-hi); border-radius: 30px; padding: 11px 18px;
+    background: #fff; font-size: 14px; color: var(--text-muted);
+  }
+  .sort { margin-left: auto; display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); border-radius: 30px; padding: 10px 16px; font-size: 13px; font-weight: 700; color: var(--text-main); cursor: pointer; background: #fff; }
+  .sort:hover { border-color: var(--text-hi); }
+
+  .hero { margin-bottom: 34px; }
+  .hero h1 {
+    font-size: 46px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05;
+    color: var(--text-hi);
+  }
+  .hero h1 .accent { position: relative; white-space: nowrap; }
+  .hero h1 .accent::after {
+    content: ''; position: absolute; left: -2px; right: -6px; bottom: 4px; height: 14px;
+    background: var(--secondary); z-index: -1; transform: rotate(-1deg);
+  }
+  .hero h1 .count { color: var(--primary); }
+  .hero p { margin-top: 10px; font-size: 15px; color: var(--text-muted); }
+
+  .tabs { display: flex; gap: 10px; margin-bottom: 30px; }
+  .tab {
+    font-size: 14px; font-weight: 700; padding: 9px 18px;
+    border: 1.5px solid var(--border); border-radius: 30px;
+    color: var(--text-muted); cursor: pointer; background: #fff;
+    transition: all 0.12s;
+  }
+  .tab:hover { border-color: var(--text-hi); color: var(--text-hi); }
+  .tab.active { background: var(--text-hi); border-color: var(--text-hi); color: #fff; box-shadow: 3px 3px 0 var(--primary); }
+  .tab b { color: var(--secondary); margin-left: 4px; }
+  .tab:not(.active) b { color: var(--primary); }
+
+  /* ---------- Cards ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 30px 26px; }
+  .card { cursor: pointer; }
+  .thumb {
+    position: relative; aspect-ratio: 16/9.4; border-radius: 16px; overflow: hidden;
+    border: 1.5px solid var(--text-hi);
+    box-shadow: 5px 5px 0 var(--border);
+    transition: transform 0.15s, box-shadow 0.15s;
+    padding: 14px 14px 0;
+  }
+  .card:hover .thumb { transform: translate(-2px,-2px); box-shadow: 8px 8px 0 var(--primary-soft), 8px 8px 0 1.5px var(--primary); }
+  .t1 { background: linear-gradient(135deg, oklch(0.87 0.09 290), oklch(0.78 0.13 305)); }
+  .t2 { background: linear-gradient(135deg, oklch(0.89 0.08 155), oklch(0.80 0.10 190)); }
+  .t3 { background: linear-gradient(135deg, oklch(0.91 0.09 95), oklch(0.83 0.11 65)); }
+  .t4 { background: linear-gradient(135deg, oklch(0.86 0.07 260), oklch(0.78 0.10 290)); }
+  .t5 { background: linear-gradient(135deg, oklch(0.89 0.07 340), oklch(0.80 0.11 310)); }
+  .window { background: #fff; border-radius: 8px 8px 0 0; height: 100%; overflow: hidden; border: 1.5px solid var(--text-hi); border-bottom: none; }
+  .window-bar { height: 16px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; gap: 4px; padding: 0 9px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; border: 1px solid var(--text-hi); }
+  .sk { padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .sk-row { display: flex; gap: 6px; }
+  .sk-bar { height: 7px; border-radius: 4px; background: oklch(0.92 0.008 290); }
+  .sk-bar.hl { background: var(--primary-soft); }
+  .sk-block { border-radius: 5px; background: oklch(0.95 0.006 290); border: 1px solid var(--border); }
+  .cam {
+    position: absolute; bottom: 10px; left: 13px;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--text-hi); border: 2px solid #fff; outline: 1.5px solid var(--text-hi);
+    display: grid; place-items: center; color: var(--secondary); font-size: 13px; font-weight: 900;
+  }
+  .dur {
+    position: absolute; bottom: 11px; right: 13px;
+    background: #fff; border: 1.5px solid var(--text-hi);
+    color: var(--text-hi); font-size: 11px; font-weight: 900;
+    padding: 3px 9px; border-radius: 20px;
+  }
+  .card-body { padding: 13px 4px 0; }
+  .card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--text-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card:hover .card-title { color: var(--primary); }
+  .pill { font-size: 10px; font-weight: 900; letter-spacing: 0.06em; padding: 3px 9px; border-radius: 20px; border: 1.5px solid; flex-shrink: 0; }
+  .pill-private { border-color: var(--border); color: var(--text-muted); background: #fff; }
+  .pill-link { border-color: var(--tertiary); color: oklch(0.45 0.13 155); background: oklch(0.95 0.03 155); }
+  .card-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark"></div>RECORDIO</div>
+
+  <div class="workspace">
+    <div class="workspace-row"><span class="workspace-name">My Workspace</span><span style="font-size:11px">▾</span></div>
+    <div class="workspace-meta"><span class="badge-trial">TRIAL</span> 1 member</div>
+    <div class="invite">+ Invite teammates</div>
+  </div>
+
+  <button class="btn-record"><span class="rec-dot"></span>New Recording</button>
+
+  <nav>
+    <div class="nav-eyebrow">Library</div>
+    <div class="nav-item active"><span class="nav-ico">▦</span>Your Videos<span class="nav-count">5</span></div>
+    <div class="nav-item"><span class="nav-ico">◫</span>Workspace<span class="nav-count">2</span></div>
+    <div class="nav-item"><span class="nav-ico">↗</span>Published<span class="nav-count">2</span></div>
+    <div class="nav-item"><span class="nav-ico">◌</span>Trash<span class="nav-count">20</span></div>
+  </nav>
+
+  <nav>
+    <div class="nav-eyebrow">Manage</div>
+    <div class="nav-item"><span class="nav-ico">⚙</span>Workspace Settings</div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="avatar">J</div>
+    <div>
+      <div class="user-name">John Mikhail</div>
+      <div class="user-email">johnfwilliam@gmail.com</div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="search">⌕&nbsp; Search recordings, transcripts…</div>
+    <div class="sort">Last Created ▾</div>
+  </div>
+
+  <div class="hero">
+    <h1>Your <span class="accent">videos</span>,<br>all <span class="count">5</span> of them.</h1>
+    <p>Record, trim, and share in seconds. Your latest work lives here.</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">All<b>5</b></div>
+    <div class="tab">Under 1 min<b>4</b></div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="thumb t1">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:38%"></div><div class="sk-bar" style="width:20%"></div></div>
+            <div class="sk-row"><div class="sk-block" style="width:30%;height:44px"></div><div class="sk-block" style="width:66%;height:44px"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:80%"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">13s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-private">PRIVATE</span></div>
+        <div class="card-meta">Created 1 week ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t2">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:26%"></div></div>
+            <div class="sk-row"><div class="sk-block" style="width:100%;height:38px"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:65%"></div><div class="sk-bar" style="width:25%"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">5s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-link">LINK</span></div>
+        <div class="card-meta">Created 1 week ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t3">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-block" style="width:22%;height:70px"></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <div class="sk-bar hl" style="width:60%"></div>
+                <div class="sk-bar" style="width:90%"></div>
+                <div class="sk-bar" style="width:75%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">10s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-private">PRIVATE</span></div>
+        <div class="card-meta">Created 1 month ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t4">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:32%"></div><div class="sk-bar" style="width:32%"></div></div>
+            <div class="sk-row"><div class="sk-block" style="width:48%;height:52px;background:oklch(0.3 0.02 290);border:none"></div><div class="sk-block" style="width:48%;height:52px"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">1m 5s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-private">PRIVATE</span></div>
+        <div class="card-meta">Created 3 months ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t5">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:45%"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:95%"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:95%"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:60%"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">1s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">user_profiles | Table Editor</span><span class="pill pill-link">LINK</span></div>
+        <div class="card-meta">Created 4 months ago</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+</body>
+</html>

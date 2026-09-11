@@ -18,7 +18,7 @@ supabase functions serve --env-file supabase/.env.local
 
 # 3. Fastify server — runs at http://localhost:8080 (the webapp routes
 #    migrated API calls here via VITE_API_URL in .env.development.local)
-(cd server && npm run dev)
+npm run dev:server
 
 # 4. Webapp — runs at http://localhost:3001
 npm run dev:webapp

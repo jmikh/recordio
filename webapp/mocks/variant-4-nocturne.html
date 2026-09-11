@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Mock — Nocturne</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: oklch(0.55 0.22 290);
+    --primary-hi: oklch(0.65 0.24 290);
+    --primary-glow: oklch(0.70 0.20 290);
+    --secondary: oklch(0.80 0.16 58);
+    --tertiary: oklch(0.72 0.16 155);
+    --body: oklch(0.115 0.028 290);
+    --glass: oklch(0.20 0.035 290 / 0.55);
+    --glass-hi: oklch(0.26 0.04 290 / 0.65);
+    --stroke: oklch(1 0 0 / 0.09);
+    --stroke-hi: oklch(1 0 0 / 0.16);
+    --text-hi: oklch(0.95 0.01 290);
+    --text-main: oklch(0.80 0.02 290);
+    --text-muted: oklch(0.60 0.03 290);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Satoshi', -apple-system, sans-serif;
+    font-weight: 500;
+    background: var(--body); color: var(--text-main);
+    display: flex; min-height: 100vh;
+    position: relative; overflow-x: hidden;
+  }
+  /* ambient glows */
+  body::before, body::after {
+    content: ''; position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+  }
+  body::before {
+    width: 700px; height: 700px; top: -280px; right: -180px;
+    background: radial-gradient(circle, oklch(0.45 0.20 290 / 0.28), transparent 65%);
+  }
+  body::after {
+    width: 560px; height: 560px; bottom: -260px; left: 180px;
+    background: radial-gradient(circle, oklch(0.5 0.14 200 / 0.14), transparent 65%);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 260px; flex-shrink: 0; z-index: 1;
+    border-right: 1px solid var(--stroke);
+    background: oklch(0.14 0.03 290 / 0.6);
+    backdrop-filter: blur(20px);
+    display: flex; flex-direction: column;
+    padding: 22px 14px; gap: 18px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 0 10px; font-weight: 700; font-size: 17px; letter-spacing: 0.05em; color: var(--text-hi); }
+  .logo-mark {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--primary-hi), var(--primary));
+    display: grid; place-items: center;
+    box-shadow: 0 0 22px oklch(0.55 0.22 290 / 0.75);
+  }
+  .logo-mark::after { content: ''; width: 11px; height: 11px; border-radius: 50%; border: 2.5px solid #fff; }
+
+  .workspace {
+    background: var(--glass); border: 1px solid var(--stroke);
+    border-radius: 14px; padding: 13px; cursor: pointer;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .workspace:hover { border-color: var(--stroke-hi); background: var(--glass-hi); }
+  .workspace-row { display: flex; justify-content: space-between; align-items: center; }
+  .workspace-name { font-size: 14px; font-weight: 700; color: var(--text-hi); }
+  .chev { font-size: 11px; color: var(--text-muted); }
+  .workspace-meta { display: flex; align-items: center; gap: 8px; margin-top: 7px; font-size: 12px; color: var(--text-muted); }
+  .badge-trial {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--secondary); border: 1px solid oklch(0.8 0.16 58 / 0.45);
+    background: oklch(0.8 0.16 58 / 0.12);
+    padding: 2.5px 7px; border-radius: 20px;
+    text-shadow: 0 0 12px oklch(0.8 0.16 58 / 0.6);
+  }
+  .invite { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--stroke); font-size: 13px; color: var(--primary-glow); cursor: pointer; }
+  .invite:hover { color: oklch(0.8 0.16 290); }
+
+  .btn-record {
+    position: relative;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    background: linear-gradient(135deg, var(--primary-hi), var(--primary) 55%, oklch(0.48 0.2 315));
+    color: #fff; font-family: inherit; font-size: 14px; font-weight: 700;
+    border: none; border-radius: 14px; padding: 14px; cursor: pointer;
+    box-shadow: 0 0 0 1px oklch(0.7 0.2 290 / 0.35), 0 8px 30px oklch(0.5 0.22 290 / 0.55);
+    transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .btn-record:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px oklch(0.75 0.2 290 / 0.5), 0 10px 40px oklch(0.55 0.22 290 / 0.75); }
+  .rec-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.4); } 60% { box-shadow: 0 0 0 7px rgb(255 255 255 / 0); } }
+
+  .nav-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); padding: 10px 12px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px; border-radius: 11px;
+    font-size: 14px; color: var(--text-main); cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.13s;
+  }
+  .nav-item:hover { background: oklch(1 0 0 / 0.04); color: var(--text-hi); }
+  .nav-item.active {
+    background: linear-gradient(135deg, oklch(0.55 0.22 290 / 0.22), oklch(0.55 0.22 290 / 0.08));
+    border-color: oklch(0.6 0.2 290 / 0.35);
+    color: var(--text-hi); font-weight: 700;
+  }
+  .nav-ico { width: 18px; text-align: center; font-size: 15px; color: var(--text-muted); }
+  .nav-item.active .nav-ico { color: var(--primary-glow); text-shadow: 0 0 14px var(--primary-glow); }
+  .nav-count { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-muted); background: oklch(1 0 0 / 0.06); border-radius: 10px; padding: 2px 8px; }
+  .nav-item.active .nav-count { background: oklch(0.55 0.22 290 / 0.4); color: #fff; }
+
+  .sidebar-footer {
+    margin-top: auto; display: flex; align-items: center; gap: 10px;
+    background: var(--glass); border: 1px solid var(--stroke);
+    border-radius: 14px; padding: 10px 12px;
+  }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-hi), var(--tertiary));
+    color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700;
+    box-shadow: 0 0 14px oklch(0.55 0.2 290 / 0.5);
+  }
+  .user-name { font-size: 13px; font-weight: 700; color: var(--text-hi); }
+  .user-email { font-size: 11px; color: var(--text-muted); }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; padding: 30px 42px 70px; z-index: 1; }
+  .topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 34px; }
+  .search {
+    flex: 0 1 400px; display: flex; align-items: center; gap: 10px;
+    background: var(--glass); border: 1px solid var(--stroke);
+    backdrop-filter: blur(12px);
+    border-radius: 12px; padding: 11px 16px;
+    font-size: 14px; color: var(--text-muted);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search:hover { border-color: oklch(0.6 0.2 290 / 0.5); box-shadow: 0 0 0 3px oklch(0.55 0.22 290 / 0.15); }
+  .sort {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    background: var(--glass); border: 1px solid var(--stroke);
+    border-radius: 11px; padding: 10px 15px;
+    font-size: 13px; color: var(--text-main); cursor: pointer;
+  }
+
+  .hero { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 26px; }
+  .hero h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-hi); }
+  .hero h1 .grad {
+    background: linear-gradient(100deg, var(--primary-glow), oklch(0.75 0.14 200));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { margin-top: 5px; font-size: 14px; color: var(--text-muted); }
+
+  .tabs {
+    display: inline-flex; gap: 4px; margin-bottom: 26px;
+    background: var(--glass); border: 1px solid var(--stroke);
+    backdrop-filter: blur(12px); border-radius: 12px; padding: 4px;
+  }
+  .tab { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 8px 16px; border-radius: 9px; color: var(--text-muted); cursor: pointer; }
+  .tab.active {
+    background: linear-gradient(135deg, oklch(0.55 0.22 290 / 0.4), oklch(0.55 0.22 290 / 0.2));
+    color: var(--text-hi); font-weight: 700;
+    box-shadow: inset 0 0 0 1px oklch(0.65 0.2 290 / 0.4);
+  }
+  .tab-count { font-size: 11px; font-weight: 700; border-radius: 9px; padding: 1px 7px; background: oklch(1 0 0 / 0.08); color: var(--text-muted); }
+  .tab.active .tab-count { background: oklch(0.65 0.22 290 / 0.5); color: #fff; }
+
+  /* ---------- Cards ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(285px, 1fr)); gap: 24px; }
+  .card {
+    background: var(--glass); border: 1px solid var(--stroke);
+    backdrop-filter: blur(14px);
+    border-radius: 18px; overflow: hidden; cursor: pointer;
+    transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: oklch(0.6 0.2 290 / 0.55);
+    box-shadow: 0 18px 45px oklch(0.05 0.02 290 / 0.6), 0 0 30px oklch(0.55 0.22 290 / 0.22);
+  }
+  .thumb { position: relative; aspect-ratio: 16/9.3; padding: 13px 13px 0; overflow: hidden; }
+  .t1 { background: linear-gradient(135deg, oklch(0.40 0.14 290 / 0.7), oklch(0.28 0.09 320 / 0.7)); }
+  .t2 { background: linear-gradient(135deg, oklch(0.40 0.11 210 / 0.7), oklch(0.28 0.08 260 / 0.7)); }
+  .t3 { background: linear-gradient(135deg, oklch(0.42 0.10 160 / 0.7), oklch(0.28 0.08 210 / 0.7)); }
+  .t4 { background: linear-gradient(135deg, oklch(0.40 0.11 330 / 0.7), oklch(0.27 0.08 290 / 0.7)); }
+  .t5 { background: linear-gradient(135deg, oklch(0.42 0.09 70 / 0.7), oklch(0.28 0.07 30 / 0.7)); }
+  .window {
+    background: oklch(0.17 0.025 290); border: 1px solid var(--stroke);
+    border-bottom: none;
+    border-radius: 9px 9px 0 0; height: 100%; overflow: hidden;
+    box-shadow: 0 10px 35px rgb(0 0 0 / 0.5);
+    transition: transform 0.18s;
+  }
+  .card:hover .window { transform: scale(1.02); }
+  .window-bar { height: 16px; background: oklch(0.22 0.03 290); display: flex; align-items: center; gap: 4px; padding: 0 9px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: oklch(1 0 0 / 0.2); }
+  .sk { padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .sk-row { display: flex; gap: 6px; }
+  .sk-bar { height: 7px; border-radius: 4px; background: oklch(1 0 0 / 0.09); }
+  .sk-bar.hl { background: oklch(0.6 0.18 290 / 0.65); box-shadow: 0 0 10px oklch(0.55 0.22 290 / 0.4); }
+  .sk-block { border-radius: 5px; background: oklch(1 0 0 / 0.06); }
+  .cam {
+    position: absolute; bottom: 10px; left: 12px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, oklch(0.5 0.15 290), oklch(0.3 0.08 290));
+    border: 2px solid oklch(0.8 0.1 290 / 0.7);
+    box-shadow: 0 0 16px oklch(0.55 0.2 290 / 0.55);
+    display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700;
+  }
+  .dur {
+    position: absolute; bottom: 10px; right: 12px;
+    background: oklch(0.1 0.02 290 / 0.75); backdrop-filter: blur(6px);
+    border: 1px solid var(--stroke-hi);
+    color: var(--text-hi); font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 20px;
+  }
+  .card-body { padding: 13px 16px 15px; }
+  .card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card-title { font-size: 14px; font-weight: 700; color: var(--text-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; padding: 3px 9px; border-radius: 20px; border: 1px solid; flex-shrink: 0; }
+  .pill-private { border-color: var(--stroke-hi); color: var(--text-muted); }
+  .pill-link { border-color: oklch(0.72 0.16 155 / 0.5); color: var(--tertiary); background: oklch(0.72 0.16 155 / 0.1); text-shadow: 0 0 10px oklch(0.72 0.16 155 / 0.5); }
+  .card-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark"></div>RECORDIO</div>
+
+  <div class="workspace">
+    <div class="workspace-row"><span class="workspace-name">My Workspace</span><span class="chev">▾</span></div>
+    <div class="workspace-meta"><span class="badge-trial">TRIAL</span> 1 member</div>
+    <div class="invite">+ Invite teammates</div>
+  </div>
+
+  <button class="btn-record"><span class="rec-dot"></span>New Recording</button>
+
+  <nav>
+    <div class="nav-eyebrow">Library</div>
+    <div class="nav-item active"><span class="nav-ico">▦</span>Your Videos<span class="nav-count">5</span></div>
+    <div class="nav-item"><span class="nav-ico">◫</span>Workspace<span class="nav-count">2</span></div>
+    <div class="nav-item"><span class="nav-ico">↗</span>Published<span class="nav-count">2</span></div>
+    <div class="nav-item"><span class="nav-ico">◌</span>Trash<span class="nav-count">20</span></div>
+  </nav>
+
+  <nav>
+    <div class="nav-eyebrow">Manage</div>
+    <div class="nav-item"><span class="nav-ico">⚙</span>Workspace Settings</div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="avatar">J</div>
+    <div>
+      <div class="user-name">John Mikhail</div>
+      <div class="user-email">johnfwilliam@gmail.com</div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="search">⌕&nbsp; Search recordings, transcripts…</div>
+    <div class="sort">Last Created <span class="chev">▾</span></div>
+  </div>
+
+  <div class="hero">
+    <div>
+      <h1>Your <span class="grad">library</span></h1>
+      <p>5 recordings · 1m 34s total · 2 published</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">All <span class="tab-count">5</span></div>
+    <div class="tab">Under 1 min <span class="tab-count">4</span></div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="thumb t1">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:38%"></div><div class="sk-bar" style="width:20%"></div></div>
+            <div class="sk-row"><div class="sk-block" style="width:30%;height:44px"></div><div class="sk-block" style="width:66%;height:44px"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:80%"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">13s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-private">PRIVATE</span></div>
+        <div class="card-meta">Created 1 week ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t2">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:26%"></div></div>
+            <div class="sk-row"><div class="sk-block" style="width:100%;height:38px"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:65%"></div><div class="sk-bar" style="width:25%"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">5s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-link">LINK</span></div>
+        <div class="card-meta">Created 1 week ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t3">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-block" style="width:22%;height:70px"></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <div class="sk-bar hl" style="width:60%"></div>
+                <div class="sk-bar" style="width:90%"></div>
+                <div class="sk-bar" style="width:75%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">10s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-private">PRIVATE</span></div>
+        <div class="card-meta">Created 1 month ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t4">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:32%"></div><div class="sk-bar" style="width:32%"></div></div>
+            <div class="sk-row"><div class="sk-block" style="width:48%;height:52px;background:oklch(1 0 0 / 0.12)"></div><div class="sk-block" style="width:48%;height:52px"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">1m 5s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">Tab Recording</span><span class="pill pill-private">PRIVATE</span></div>
+        <div class="card-meta">Created 3 months ago</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb t5">
+        <div class="window">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="sk">
+            <div class="sk-row"><div class="sk-bar hl" style="width:45%"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:95%"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:95%"></div></div>
+            <div class="sk-row"><div class="sk-bar" style="width:60%"></div></div>
+          </div>
+        </div>
+        <div class="cam">J</div><div class="dur">1s</div>
+      </div>
+      <div class="card-body">
+        <div class="card-title-row"><span class="card-title">user_profiles | Table Editor</span><span class="pill pill-link">LINK</span></div>
+        <div class="card-meta">Created 4 months ago</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+</body>
+</html>

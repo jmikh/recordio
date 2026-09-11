@@ -155,13 +155,13 @@ export const ProjectCard = ({
             id="project-card"
             onClick={handleClick}
             className={`
-                group relative flex bg-surface-raised flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
+                group relative flex bg-surface flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
                 ${isGrid ? 'p-4 aspect-4/3 gap-3' : 'p-3'}
                 ${selectMode && selected
                     ? 'border-primary ring-2 ring-primary/30'
                     : isActive
                         ? 'border-border-primary scale-[1.02]'
-                        : 'border-border hover:border-border-hover hover:scale-[1.01] hover:shadow-lg'
+                        : 'border-border hover:border-border-hover hover:scale-[1.01] hover:shadow-float'
                 }
             `}
         >
@@ -175,7 +175,7 @@ export const ProjectCard = ({
                     ref={menuButtonRef}
                     type="button"
                     onClick={openMenu}
-                    className="absolute top-2 right-2 z-10 hidden group-hover:flex items-center justify-center w-7 h-7 rounded-md bg-surface-body/80 backdrop-blur-sm text-text-muted hover:text-text-main hover:bg-surface-body transition-colors cursor-pointer"
+                    className="absolute top-2 right-2 z-10 hidden group-hover:flex items-center justify-center w-7 h-7 rounded-md bg-surface-raised/90 backdrop-blur-sm text-text-muted hover:text-text-main hover:bg-surface-raised transition-colors cursor-pointer"
                 >
                     <LuEllipsis className="w-4 h-4" />
                 </button>
@@ -183,7 +183,7 @@ export const ProjectCard = ({
 
             {/* Thumbnail */}
             <div className={`
-                bg-background rounded-lg overflow-hidden shrink-0 border border-border relative shadow-inner
+                bg-surface-body rounded-lg overflow-hidden shrink-0 border border-border relative shadow-inner
                 ${isGrid ? 'flex-1 w-full mb-0' : 'w-full aspect-video mb-3'}
             `}>
                 {project.thumbnail ? (
@@ -210,7 +210,7 @@ export const ProjectCard = ({
                 )}
 
                 {/* Duration Badge */}
-                <div className="absolute bottom-2 right-2 bg-surface-body/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded">
+                <div className="absolute bottom-2 right-2 bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded">
                     {formatDuration(project.durationMs ?? 0)}
                 </div>
             </div>

@@ -286,7 +286,7 @@ export const TimelineToolbar: React.FC = () => {
 
 
     return (
-        <div className="h-10 flex items-center px-4 bg-surface-raised rounded-xl border border-border shrink-0 m-1">
+        <div className="h-10 flex items-center px-4 bg-surface rounded-xl border border-border shrink-0 m-1">
             {/* Left: Scissors cut button & AutoCut */}
             <div className="flex-1 flex items-center gap-2">
                 <Tooltip

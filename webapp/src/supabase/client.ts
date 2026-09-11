@@ -41,12 +41,57 @@ export function notifyUnauthorized() {
 }
 
 /**
+ * Whether the last token refresh could talk to the auth server at all.
+ *
+ * auth-js splits refresh failures in two and only tells us about one of them
+ * (GoTrueClient `_recoverAndRefresh`): a rejected token (400/401) removes the
+ * session and emits SIGNED_OUT, but an *unreachable* server — fetch threw, or
+ * 502/503/504 — is classed retryable, so the stale session is kept and **no
+ * event is emitted at all**. Nothing downstream ever learns, and the app sits
+ * there believing the persisted "signed in" while every call fails. We watch
+ * the refresh request here to close that gap.
+ */
+export type RefreshOutcome = 'reachable' | 'unreachable';
+type RefreshOutcomeHandler = (outcome: RefreshOutcome) => void;
+let refreshOutcomeHandler: RefreshOutcomeHandler | null = null;
+
+export function setRefreshOutcomeHandler(handler: RefreshOutcomeHandler) {
+    refreshOutcomeHandler = handler;
+}
+
+/** auth-js's own retryable-status list (auth-js lib/fetch.js NETWORK_ERROR_CODES) */
+const UNREACHABLE_STATUSES = [502, 503, 504];
+
+function isRefreshRequest(url: string) {
+    return url.includes('/auth/v1/token') && url.includes('grant_type=refresh_token');
+}
+
+/**
  * Shared by the supabase client and the Fastify API client
  * (src/api/client.ts) so both funnel 401s into the same sign-out path.
  */
 export const authAwareFetch: typeof fetch = async (url, options) => {
-    const response = await sentryFetch(url, options);
-    if (response.status === 401 && !url.toString().includes('/auth/v1/')) {
+    const href = url.toString();
+    const isRefresh = isRefreshRequest(href);
+
+    let response: Response;
+    try {
+        response = await sentryFetch(url, options);
+    } catch (err) {
+        // fetch threw — no response at all, so the server is unreachable
+        if (isRefresh) refreshOutcomeHandler?.('unreachable');
+        throw err;
+    }
+
+    if (isRefresh) {
+        // A 400/401 here means the server answered and rejected the token;
+        // auth-js turns that into SIGNED_OUT on its own.
+        refreshOutcomeHandler?.(
+            UNREACHABLE_STATUSES.includes(response.status) ? 'unreachable' : 'reachable',
+        );
+    }
+
+    if (response.status === 401 && !href.includes('/auth/v1/')) {
         notifyUnauthorized();
     }
     return response;

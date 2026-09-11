@@ -289,46 +289,50 @@ function Editor() {
                 </div>
             </Modal>
 
-            {/* Header / Toolbar */}
-            <Header />
-
-            {showDebugBar && (
-                <div className="bg-surface-raised border-b border-border flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
-                    {/* Bottom Row: Debug Tools */}
-                    <DebugBar />
-                </div>
-            )}
-
             <div id="editor-body" className="flex-1 flex overflow-hidden">
+                {/* Settings panel spans the full height, from the very top */}
                 <SettingsPanel />
-                <div
-                    id="video-player-container"
-                    className="flex-1 flex overflow-hidden relative items-center justify-center"
-                >
-                    <div
-                        id="canvas-sizing-container"
-                        ref={setContainerElement}
-                        className="relative flex items-center bg-surface-body justify-center shadow-2xl"
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            overflow: 'hidden'
-                        }}
-                    >
 
-                        {isLoading ? (
-                            <div className="flex flex-col items-center gap-4">
-                                <div className="spinner w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                <div className="text-text-main text-sm">{loadingStatus}</div>
-                            </div>
-                        ) : hasActiveProject ? (
-                            <div
-                                id="canvas-rendered-wrapper"
-                                style={{ position: 'relative', ...renderedStyle }}
-                            >
-                                <CanvasContainer />
-                            </div>
-                        ) : null}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* Header / Toolbar — starts at the settings panel's right edge */}
+                    <Header />
+
+                    {showDebugBar && (
+                        <div className="bg-surface border-b border-border flex flex-col shrink-0 z-[var(--z-index-overlay)] select-none">
+                            {/* Bottom Row: Debug Tools */}
+                            <DebugBar />
+                        </div>
+                    )}
+
+                    <div
+                        id="video-player-container"
+                        className="flex-1 flex overflow-hidden relative items-center justify-center"
+                    >
+                        <div
+                            id="canvas-sizing-container"
+                            ref={setContainerElement}
+                            className="relative flex items-center bg-surface-body justify-center shadow-2xl"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                overflow: 'hidden'
+                            }}
+                        >
+
+                            {isLoading ? (
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="spinner w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <div className="text-text-main text-sm">{loadingStatus}</div>
+                                </div>
+                            ) : hasActiveProject ? (
+                                <div
+                                    id="canvas-rendered-wrapper"
+                                    style={{ position: 'relative', ...renderedStyle }}
+                                >
+                                    <CanvasContainer />
+                                </div>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             </div>
