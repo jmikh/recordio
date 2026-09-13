@@ -10,7 +10,8 @@ import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdLayers, MdKeyboardArrowDown } 
 import { FiScissors } from 'react-icons/fi';
 import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
 import { RiArrowRightUpFill } from 'react-icons/ri';
-import { Slider, Button, Tooltip, AiAudioIcon } from '@shared/components';
+import { LuEraser } from 'react-icons/lu';
+import { Slider, Button, Tooltip } from '@shared/components';
 import { useToast } from '../../../components/Toast';
 import { analyzeForAutoCut } from '../../autocut/autoCutAnalyzer';
 import { getCachedSpeechSegments } from '../../autocut/vadService';
@@ -311,9 +312,10 @@ export const TimelineToolbar: React.FC = () => {
                             variant="ghost"
                             disabled={isAnalyzing}
                             onClick={handleAutoCut}
+                            aria-label="Remove silent and inactive segments"
                             className={isAnalyzing ? 'animate-pulse' : ''}
                         >
-                            <AiAudioIcon className="icon-lg" />
+                            <LuEraser className="icon-sm" />
                         </Button>
                     </Tooltip>
                 )}

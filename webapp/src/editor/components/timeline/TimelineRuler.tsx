@@ -42,13 +42,19 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
             const dpr = window.devicePixelRatio || 1;
 
-            // Full logical width of the ruler
-            const fullWidth = Math.max(totalWidth, (containerWidth || window.innerWidth) - headerWidth);
+            // containerWidth is the scroll container's clientWidth, which already
+            // excludes the header column. Only subtract headerWidth from the
+            // window-width fallback used before the ResizeObserver has measured.
+            const viewportWidth = containerWidth || (window.innerWidth - headerWidth);
+
+            // Full logical width of the ruler: at least the visible viewport so
+            // ticks run to the right edge even when the project fits on screen.
+            const fullWidth = Math.max(totalWidth, viewportWidth);
 
             // Viewport-aware: only render the visible portion + buffer
             const BUFFER = 200; // extra px each side for smooth scroll
             const viewStart = Math.max(0, scrollLeft - BUFFER);
-            const viewEnd = Math.min(fullWidth, scrollLeft + (containerWidth || window.innerWidth) + BUFFER);
+            const viewEnd = Math.min(fullWidth, scrollLeft + viewportWidth + BUFFER);
             const viewWidth = viewEnd - viewStart;
 
             canvas.width = viewWidth * dpr;
