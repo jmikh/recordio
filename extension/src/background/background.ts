@@ -23,7 +23,7 @@ import { initSentry, captureException } from '../utils/sentry';
 import { trackRecordingStarted, trackRecordingPaused, trackRecordingResumed, trackRecordingFinished, trackRecordingCanceled, trackRecordingError, getDistinctId, identifyUser } from '../utils/mixpanel';
 
 import { BADGE_RECORDING_COLOR_HEX, BADGE_PAUSED_COLOR_HEX, BADGE_TEXT_COLOR_HEX } from '../utils/colors';
-import { MSG_TYPES, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
+import { MSG_TYPES, type BaseMessage, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
 import {
     BRIDGE_MSG,
     buildImportUrl,
@@ -209,13 +209,23 @@ async function closeOffscreenDocument(): Promise<void> {
 
 // --- Cleanup Helpers ---
 
-/** Broadcasts STOP_RECORDING_EVENTS to all tabs (stops event capture in content scripts). */
-async function broadcastStopEvents(sessionId: string | null) {
-    const msg = { type: MSG_TYPES.STOP_RECORDING_EVENTS, payload: { sessionId } };
+/** Sends a message to every tab's content script; tabs without one are ignored.
+ *  Resolves once every tab has handled it, so callers can sequence DOM cleanup before capture. */
+async function broadcastToTabs(msg: BaseMessage) {
     const tabs = await chrome.tabs.query({});
-    for (const tab of tabs) {
-        if (tab.id) chrome.tabs.sendMessage(tab.id, msg).catch(() => { });
-    }
+    await Promise.all(tabs.map(tab =>
+        tab.id ? chrome.tabs.sendMessage(tab.id, msg).catch(() => { }) : undefined
+    ));
+}
+
+/** Broadcasts STOP_RECORDING_EVENTS to all tabs (stops event capture in content scripts). */
+function broadcastStopEvents(sessionId: string | null) {
+    return broadcastToTabs({ type: MSG_TYPES.STOP_RECORDING_EVENTS, payload: { sessionId } });
+}
+
+/** Closes the blur picker UI on every tab — call before any frames get captured. */
+function broadcastDisableBlurMode() {
+    return broadcastToTabs({ type: MSG_TYPES.BACKGROUND_CONTENT_DISABLE_BLUR_MODE });
 }
 
 /** Full cleanup: stops badge, resets state, closes offscreen doc if tab mode */
@@ -691,6 +701,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 const sessionId = crypto.randomUUID();
                 await saveState({ currentSessionId: sessionId });
 
+                // Close any open blur picker before the controller starts capturing
+                await broadcastDisableBlurMode();
+
                 if (currentState.controllerTabId) {
                     chrome.tabs.sendMessage(currentState.controllerTabId, {
                         type: MSG_TYPES.BACKGROUND_CONTROLLER_START_RECORDING,
@@ -759,6 +772,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
                 // Immediately flip badge back to green; interval already running
                 updateBadge();
+
+                // Close any open blur picker before frames are captured again
+                await broadcastDisableBlurMode();
 
                 if (currentState.recordingMode === 'tab') {
                     chrome.runtime.sendMessage({ type: MSG_TYPES.BACKGROUND_OFFSCREEN_RESUME }).catch(() => { });

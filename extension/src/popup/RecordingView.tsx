@@ -2,7 +2,8 @@
  * @fileoverview Recording View
  *
  * Shown while a recording is active (tab mode or controller/window mode).
- * Displays elapsed time and pause/resume/cancel/finish controls.
+ * The preview frame carries the elapsed time and mic/camera indicators as
+ * overlays; below it: a "Blur content" row, Pause/Resume + Discard, then Finish.
  * Routes commands to background which forwards them to the correct destination.
  *
  * Elapsed time is computed from storage state to stay in sync with the badge:
@@ -13,11 +14,12 @@ import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
 import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { FiSquare } from 'react-icons/fi';
+import { FiTrash2 } from 'react-icons/fi';
 import { IoPause, IoPlay } from 'react-icons/io5';
-import { MdCancel } from 'react-icons/md';
+import { MdBlurOn, MdChevronRight, MdDone } from 'react-icons/md';
 import { MSG_TYPES, type RecordingState } from '../shared/messageTypes';
 import { formatTime, useElapsed } from '../shared/recordingTime';
+import { enterBlurMode } from './blurMode';
 
 export function RecordingView({ recordingState }: { recordingState: RecordingState }) {
     const elapsed = useElapsed(recordingState);
@@ -65,58 +67,54 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
 
     const handleFinish = () => send(MSG_TYPES.POPUP_FINISH_RECORDING);
 
-    const handleCancel = async () => {
+    const handleDiscard = async () => {
         await send(MSG_TYPES.POPUP_CANCEL_RECORDING);
         window.close();
     };
 
-    const sourceLabel = recordingState.recordingMode === 'tab'
-        ? 'Recording current tab'
-        : 'Recording window / desktop';
-
     return (
-        <div className="flex flex-col gap-4 p-4">
-            {/* Timer row */}
-            <div className="flex items-center gap-3 px-3 py-3 rounded-[var(--radius-md)] bg-surface border border-border">
-                <div className={`w-2.5 h-2.5 rounded-full bg-destructive shrink-0 ${recordingState.isPaused ? '' : 'animate-pulse'}`} />
-                <span className="text-2xl font-bold tabular-nums tracking-wide text-text-highlighted flex-1">
-                    {formatTime(elapsed)}
-                </span>
-                {/* Mic / camera indicators */}
-                <div className="flex items-center gap-2">
-                    <span className={recordingState.hasAudio ? 'text-text-main' : 'text-text-disabled'}>
+        <div className="flex flex-col gap-3 p-3">
+            {/* Preview frame with timer + input indicators overlaid (black stand-in when no frame yet) */}
+            <div className="relative aspect-video rounded-md overflow-hidden bg-black">
+                {previewUrl && (
+                    <img src={previewUrl} alt="Recording preview" className="w-full h-full object-contain" />
+                )}
+                <div className="absolute top-2 right-2 flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-black/70">
+                    <span className={recordingState.hasAudio ? 'text-white' : 'text-white/60'}>
                         {recordingState.hasAudio
                             ? <BiMicrophone className="icon-md" />
                             : <BiMicrophoneOff className="icon-md" />}
                     </span>
-                    <span className={recordingState.hasCamera ? 'text-text-main' : 'text-text-disabled'}>
+                    <span className={recordingState.hasCamera ? 'text-white' : 'text-white/60'}>
                         {recordingState.hasCamera
                             ? <PiWebcamBold className="icon-md" />
                             : <PiWebcamSlashBold className="icon-md" />}
                     </span>
                 </div>
+                <div className="absolute bottom-2 left-2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 text-white">
+                    {recordingState.isPaused
+                        ? <IoPause className="icon-sm text-destructive animate-pulse" />
+                        : <div className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />}
+                    <span className="text-base font-bold tabular-nums tracking-wide">
+                        {formatTime(elapsed)}
+                    </span>
+                    {recordingState.isPaused && <span className="text-xs text-white/60">Paused</span>}
+                </div>
             </div>
 
-            {/* Preview thumbnail */}
-            {previewUrl && (
-                <div className="rounded-md overflow-hidden bg-black -mt-1">
-                    <img src={previewUrl} alt="Recording preview" className="w-full h-auto object-contain" />
-                </div>
-            )}
+            {/* Blur content — opens the element picker on the page */}
+            <Button
+                variant="base"
+                onClick={enterBlurMode}
+                className="w-full justify-start gap-3"
+            >
+                <MdBlurOn className="icon-md text-text-muted" />
+                Blur content
+                <MdChevronRight className="icon-md text-text-muted ml-auto" />
+            </Button>
 
-            {/* Paused banner */}
-            {recordingState.isPaused ? (
-                <div className="animate-fade-slide-in flex items-center justify-center gap-2 px-3 py-2 -mt-1 rounded-[var(--radius-md)] bg-destructive/10 border border-destructive/30">
-                    <IoPause className="icon-sm text-destructive shrink-0 animate-pulse" />
-                    <span className="text-sm text-destructive">Recording paused</span>
-                </div>
-            ) : (
-                <p className="text-xs text-text-muted text-center -mt-1">{sourceLabel}</p>
-            )}
-
-            {/* Controls */}
+            {/* Pause / Resume + Discard */}
             <div className="flex gap-2">
-                {/* Pause / Resume */}
                 <Button
                     variant="base"
                     onClick={handlePauseResume}
@@ -127,28 +125,26 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                         ? <><IoPlay className="icon-sm" /> Resume</>
                         : <><IoPause className="icon-sm" /> Pause</>}
                 </Button>
-
-                {/* Finish */}
                 <Button
-                    variant="primary"
-                    onClick={handleFinish}
+                    variant="base"
+                    onClick={handleDiscard}
                     disabled={busy}
                     className="flex-1 justify-center gap-1.5"
                 >
-                    <FiSquare className="icon-sm" />
-                    Finish
+                    <FiTrash2 className="icon-sm" />
+                    Discard
                 </Button>
             </div>
 
-            {/* Cancel */}
+            {/* Finish */}
             <Button
-                variant="ghost"
-                onClick={handleCancel}
+                variant="primary"
+                onClick={handleFinish}
                 disabled={busy}
-                className="w-full justify-center text-text-muted hover:text-destructive"
+                className="w-full justify-center gap-1.5"
             >
-                <MdCancel className="icon-sm" />
-                Cancel Recording
+                <MdDone className="icon-sm" />
+                Finish
             </Button>
         </div>
     );

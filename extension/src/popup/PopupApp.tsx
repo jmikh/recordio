@@ -11,13 +11,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import { GrProjects } from 'react-icons/gr';
 import { MdErrorOutline } from 'react-icons/md';
+import { Button, LogoLink } from '@shared/components';
 import { MSG_TYPES, STORAGE_KEYS, type RecordingState } from '../shared/messageTypes';
 import { getEditorOrigin } from '@shared/types/bridge';
 import { PreRecordingView } from './PreRecordingView';
 import { RecordingView } from './RecordingView';
-import logoLight from '@shared/assets/fulllogo-light.png';
+import { closeBlurMode } from './blurMode';
 
 export function PopupApp() {
     const [recordingState, setRecordingState] = useState<RecordingState | null>(null);
@@ -25,6 +25,9 @@ export function PopupApp() {
     const [ready, setReady] = useState(false);
 
     useEffect(() => {
+        // Opening the popup ends any blur-picking session left on a page
+        closeBlurMode();
+
         (async () => {
         const result = await chrome.storage.session.get([STORAGE_KEYS.RECORDING_STATE, STORAGE_KEYS.RECORDING_ERROR]);
             // Check for a recording save failure first
@@ -75,39 +78,44 @@ export function PopupApp() {
     }
 
     return (
-        <div className="bg-surface-body">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-                <img src={logoLight} alt="Recordio" className="h-5 w-auto" />
-                <GrProjects
-                    className="icon-md text-text-muted hover:text-text-main cursor-pointer transition-colors"
-                    onClick={() => chrome.tabs.create({ url: getEditorOrigin() })}
-                />
-            </div>
-            {recordingError ? (
-                <div className="flex flex-col gap-3 p-4">
-                    <div className="flex items-start gap-2.5">
-                        <MdErrorOutline className="icon-md text-destructive shrink-0 mt-0.5" />
-                        <div className="flex flex-col gap-1">
-                            <p className="text-sm text-text-main">Recording failed to save</p>
-                            <p className="text-xs text-text-muted">{recordingError}</p>
+        <div className="bg-surface-body p-1 flex flex-col gap-1">
+            {/* Logo doubles as the dashboard link */}
+            <Button
+                variant="ghost"
+                onClick={() => chrome.tabs.create({ url: getEditorOrigin() })}
+                aria-label="Open dashboard"
+                title="Open dashboard"
+                className="self-start hover:opacity-80 transition-opacity"
+            >
+                <LogoLink imgClassName="h-6 w-auto" />
+            </Button>
+            <div className="bg-surface border border-border rounded-[var(--radius-lg)] shadow-sm overflow-hidden">
+                {recordingError ? (
+                    <div className="flex flex-col gap-3 p-3">
+                        <div className="flex items-start gap-2.5">
+                            <MdErrorOutline className="icon-md text-destructive shrink-0 mt-0.5" />
+                            <div className="flex flex-col gap-1">
+                                <p className="text-sm text-text-main">Recording failed to save</p>
+                                <p className="text-xs text-text-muted">{recordingError}</p>
+                            </div>
                         </div>
+                        <p className="text-xs text-text-muted">
+                            If this keeps happening, contact{' '}
+                            <a
+                                href="mailto:john@recordio.io"
+                                className="text-primary underline"
+                                onClick={() => chrome.tabs.create({ url: 'mailto:john@recordio.io' })}
+                            >
+                                john@recordio.io
+                            </a>
+                        </p>
                     </div>
-                    <p className="text-xs text-text-muted">
-                        If this keeps happening, contact{' '}
-                        <a
-                            href="mailto:john@recordio.io"
-                            className="text-primary underline"
-                            onClick={() => chrome.tabs.create({ url: 'mailto:john@recordio.io' })}
-                        >
-                            john@recordio.io
-                        </a>
-                    </p>
-                </div>
-            ) : recordingState ? (
-                <RecordingView recordingState={recordingState} />
-            ) : (
-                <PreRecordingView />
-            )}
+                ) : recordingState ? (
+                    <RecordingView recordingState={recordingState} />
+                ) : (
+                    <PreRecordingView />
+                )}
+            </div>
         </div>
     );
 }

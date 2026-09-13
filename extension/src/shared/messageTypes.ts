@@ -22,6 +22,10 @@
  *     POPUP_CANCEL_RECORDING      Cancel and discard recording
  *     POPUP_FINISH_RECORDING      Finish and save recording
  *
+ *   POPUP → CONTENT (chrome.tabs.sendMessage to the active tab)
+ *     POPUP_ENABLE_BLUR_MODE      Enter element-blur picker mode on the page
+ *     POPUP_DISABLE_BLUR_MODE     Close the picker (sent to every tab when the popup opens)
+ *
  *   BACKGROUND → OFFSCREEN (chrome.runtime.sendMessage)
  *     BACKGROUND_OFFSCREEN_INIT     Initialize offscreen doc with stream + settings
  *     BACKGROUND_OFFSCREEN_PREPARE  Pre-warm camera/mic during countdown
@@ -52,6 +56,7 @@
  *   BACKGROUND → CONTENT (chrome.tabs.sendMessage broadcast)
  *     BACKGROUND_CONTENT_SHOW_COUNTDOWN
  *     BACKGROUND_CONTENT_HIDE_COUNTDOWN
+ *     BACKGROUND_CONTENT_DISABLE_BLUR_MODE
  *     START_RECORDING_EVENTS
  *     STOP_RECORDING_EVENTS
  *
@@ -172,6 +177,16 @@ export const MSG_TYPES = {
     BACKGROUND_CONTENT_SHOW_COUNTDOWN: 'BACKGROUND_CONTENT_SHOW_COUNTDOWN',
     /** Background → Content: hide countdown overlay (e.g. abort before it finishes) */
     BACKGROUND_CONTENT_HIDE_COUNTDOWN: 'BACKGROUND_CONTENT_HIDE_COUNTDOWN',
+
+    // ── Blur mode (pick page elements to blur before / while paused) ─────────
+    /** Popup → Content (active tab): enter the element-blur picker mode */
+    POPUP_ENABLE_BLUR_MODE: 'POPUP_ENABLE_BLUR_MODE',
+    /** Popup → Content (broadcast): close the picker — the popup is the control surface, so
+     *  opening it ends any picking session left on a page */
+    POPUP_DISABLE_BLUR_MODE: 'POPUP_DISABLE_BLUR_MODE',
+    /** Background → Content (broadcast): close the blur picker UI. Sent before recording
+     *  starts (window/desktop) or resumes so the toast/overlay never ends up in the video. */
+    BACKGROUND_CONTENT_DISABLE_BLUR_MODE: 'BACKGROUND_CONTENT_DISABLE_BLUR_MODE',
 } as const;
 
 export type MessageTypeName = typeof MSG_TYPES[keyof typeof MSG_TYPES];

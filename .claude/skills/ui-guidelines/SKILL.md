@@ -23,7 +23,7 @@ description: UI design system reference for this codebase — covers design toke
 
 E2e tests (`e2e/`) select elements by accessible semantics — role, label, visible text — never CSS classes. Anything a user can click, type into, or perceive as status must be addressable that way. Rollout plan + inventory: `plans/testable-ui-labels.md`.
 
-- **Icon-only buttons** (no visible text): always `aria-label` (`<Button variant="icon" icon={FaUndo} aria-label="Undo" />` — `Button` passes `aria-*` through). `title` alone is a weak fallback.
+- **Icon-only buttons** (no visible text): always `aria-label` (`<Button variant="ghost" icon={FaUndo} aria-label="Undo" />` — `Button` passes `aria-*` through). `title` alone is a weak fallback.
 - **Inputs**: a real `<label>`, or `aria-label`, or a stable semantic id (the `#project-name-input` pattern). Placeholder text is NOT a label — it changes with copy.
 - **Toasts / async status**: `role="status"` for info/success, `role="alert"` for errors — lets tests (and screen readers) await "any error appeared" generically.
 - **Modals**: `role="dialog"` + `aria-label` naming the dialog.
@@ -40,7 +40,7 @@ All in `shared/components/` (barrel-exported from `@shared/components`). Read th
 
 | Component | When to use |
 |---|---|
-| `Button` | Any clickable button. Variants: `base`, `primary`, `ghost`, `icon`, `destructive` |
+| `Button` | Any clickable button. Variants: `base`, `primary`, `ghost`, `destructive`. Icon-only buttons are `variant="ghost"` + `icon` prop — there is no `icon` variant |
 | `Modal` | Portal-rendered overlay dialog |
 | `XButton` | Small circular remove/close button |
 | `Toggle` | Boolean on/off switch, with optional label |
@@ -105,7 +105,7 @@ Defined in `shared/theme/index.css`. Light and dark themes are fully covered —
 
 ## Typography
 
-Global font: Satoshi (Fontshare, weights 400/500/700 only — 400 exists solely for the canvas timeline ruler). Default weight is **500**, applied globally on `html/body/#root` — write nothing for normal text.
+Global font: Manrope (Google Fonts, `--font-sans` in `shared/theme/index.css`; the variable face is loaded but UI uses only 500 and 700). Default weight is **500**, applied globally on `html/body/#root` — write nothing for normal text. Satoshi is still imported solely because `shared/painters/captionPainter.ts` draws video captions with it — never use it for UI.
 
 ### Size scale
 
@@ -172,7 +172,7 @@ All icons use standardized CSS classes instead of inline `size` props. Defined i
 
 ### Rules
 - **Never use inline `size={N}` on react-icons** — always use `className="icon-sm"` / `icon-md` / `icon-lg`
-- **Button `icon` prop**: Pass a component type (not element) to auto-size: `<Button variant="icon" icon={FaUndo} />`. Icon-variant buttons get `icon-md`; other variants get `icon-sm`.
+- **Button `icon` prop**: Pass a component type (not element) to auto-size: `<Button variant="ghost" icon={FaUndo} aria-label="Undo" />`. Icon-only buttons (no children) get `icon-md`; buttons with text alongside get `icon-sm`. There is no `icon` variant — icon-only buttons use `ghost`.
 - **Hero/decorative icons** (32px+) are the only exception — use inline `size` for one-off large display icons
 - Icons from `react-icons` accept `className`; CSS `width`/`height` override SVG attribute dimensions
 
@@ -187,7 +187,6 @@ Defined in `@layer components` in `shared/theme/index.css`.
 | `interactive-base` | Default button style |
 | `interactive-primary` | Primary CTA (purple bg) |
 | `interactive-ghost` | Borderless, subtle |
-| `interactive-icon` | Circular icon button, scale on hover |
 | `interactive-destructive` | Destructive action (red bg) |
 | `interactive-selected` | Secondary border + glow for selected state |
 | `chosen-dot` | Small primary-colored glowing dot |

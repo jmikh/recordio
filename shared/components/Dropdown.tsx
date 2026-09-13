@@ -34,6 +34,9 @@ interface DropdownProps<T> {
     ariaLabel?: string;
     /** Disables the trigger — read-only states keep the same layout */
     disabled?: boolean;
+    /** Size the menu to the trigger exactly (long labels truncate) instead of letting it grow —
+     *  for narrow containers like the extension popup */
+    matchTriggerWidth?: boolean;
 }
 
 export function Dropdown<T>({
@@ -49,6 +52,7 @@ export function Dropdown<T>({
     hideSuffixInTrigger = false,
     ariaLabel,
     disabled = false,
+    matchTriggerWidth = false,
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
     const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
@@ -63,12 +67,18 @@ export function Dropdown<T>({
         const spaceBelow = window.innerHeight - rect.bottom;
         const estimatedMenuHeight = 150; // conservative estimate
 
+        // Never let long labels push the menu past the viewport's right edge
+        const maxWidth = window.innerWidth - rect.left - 8;
+        const widthStyle: React.CSSProperties = matchTriggerWidth
+            ? { width: Math.min(rect.width, maxWidth) }
+            : { minWidth: rect.width, maxWidth };
+
         if (spaceBelow < estimatedMenuHeight) {
             setMenuStyle({
                 position: 'fixed',
                 bottom: window.innerHeight - rect.top + 4,
                 left: rect.left,
-                minWidth: rect.width,
+                ...widthStyle,
                 zIndex: 9999,
             });
         } else {
@@ -76,11 +86,11 @@ export function Dropdown<T>({
                 position: 'fixed',
                 top: rect.bottom + 4,
                 left: rect.left,
-                minWidth: rect.width,
+                ...widthStyle,
                 zIndex: 9999,
             });
         }
-    }, [isOpen]);
+    }, [isOpen, matchTriggerWidth]);
 
     // Handle click outside to close
     useEffect(() => {

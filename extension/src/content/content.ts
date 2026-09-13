@@ -10,6 +10,9 @@
  * 
  * Events are sent via chrome.runtime.sendMessage which broadcasts
  * to all extension contexts. The controller tab picks them up directly.
+ *
+ * Also hosts the blur picker (BlurManager): the popup enables it on the active
+ * tab, and it is closed whenever recording starts or resumes.
  */
 
 
@@ -17,6 +20,7 @@ import { initSentry } from '../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
 import { showCountdown } from './countdownOverlay';
+import { BlurManager } from './blurManager';
 
 // Initialize Sentry for error tracking
 initSentry('content');
@@ -34,6 +38,7 @@ window.addEventListener('recordio-cleanup', () => {
         hideCountdown();
         hideCountdown = null;
     }
+    blurManager.disable();
     // Remove listeners
     chrome.runtime.onMessage.removeListener(handleMessage);
 }, { once: true });
@@ -56,6 +61,7 @@ chrome.runtime.sendMessage({
 // --- State ---
 let eventRecorder: EventRecorder | null = null;
 let hideCountdown: (() => void) | null = null;
+const blurManager = new BlurManager();
 
 // --- Message Listener ---
 const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
@@ -70,6 +76,7 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
 
         case MSG_TYPES.BACKGROUND_CONTENT_SHOW_COUNTDOWN:
             console.log('[Content] SHOW_COUNTDOWN received');
+            blurManager.disable(); // picker UI must be gone before the tab is captured
             hideCountdown = showCountdown(
                 () => {
                     console.log('[Content] Countdown complete');
@@ -90,6 +97,15 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sen
                 hideCountdown = null;
             }
             break;
+
+        case MSG_TYPES.POPUP_ENABLE_BLUR_MODE:
+            blurManager.enable();
+            break;
+
+        case MSG_TYPES.POPUP_DISABLE_BLUR_MODE:
+        case MSG_TYPES.BACKGROUND_CONTENT_DISABLE_BLUR_MODE:
+            blurManager.disable();
+            break;
     }
 };
 
@@ -104,6 +120,7 @@ function handleStateResponse(response: any) {
 }
 
 function handleStartRecording(message: any) {
+    blurManager.disable(); // Ensure picker UI is gone before frames are captured
     const startTime = message.payload?.startTime || Date.now();
     startRecording(startTime);
 }

@@ -2,8 +2,8 @@
  * @fileoverview Pre-Recording View
  *
  * Shown when no recording is active. Lets the user configure mic + camera
- * (with live previews), then start a tab recording or open the controller
- * for window/desktop recording.
+ * (with live previews), pick a source (current tab, or screen / window via the
+ * controller picker), then Start.
  *
  * Preview streams are opened when a device is toggled on and always stopped
  * before handing off to recording. Three cleanup paths guarantee no leaks:
@@ -16,12 +16,13 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Button, Toggle, Dropdown } from '@shared/components';
+import { Button, Toggle, Dropdown, MultiToggle } from '@shared/components';
 import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
 import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { MdComputer, MdTab } from 'react-icons/md';
+import { MdBlurOn, MdChevronRight } from 'react-icons/md';
 import { MSG_TYPES } from '../shared/messageTypes';
 import { useAudioLevel } from '../shared/useAudioLevel';
+import { enterBlurMode } from './blurMode';
 import permissionsImage from '../assets/permissions-small.png';
 
 const PREFS_KEY = 'recordio_prefs';
@@ -67,6 +68,8 @@ export function PreRecordingView() {
     const [error, setError] = useState<string | null>(null);
     const [permissionError, setPermissionError] = useState<string | null>(null);
     const [canRecordTab, setCanRecordTab] = useState(true);
+    // Recording source — always opens on the current tab
+    const [source, setSource] = useState<'tab' | 'window'>('tab');
 
     // Guards getUserMedia calls that resolve after unmount/stopAllPreviews
     const unmountedRef = useRef(false);
@@ -282,15 +285,17 @@ export function PreRecordingView() {
         window.close();
     };
 
+    const handleStart = () => source === 'tab' ? handleStartRecording() : handleOpenSourcePicker();
+
     return (
-        <div className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-3 p-3">
             {/* Mic Row */}
             <div className={`rounded-[var(--radius-md)] border overflow-hidden transition-colors ${micEnabled ? 'border-primary/30 bg-surface' : 'border-border bg-surface'}`}>
                 <div className="flex items-center gap-3 px-3 py-2.5">
                     <span className={`${micEnabled ? 'text-primary' : 'text-text-muted'}`}>
                         {micEnabled ? <BiMicrophone className="icon-md" /> : <BiMicrophoneOff className="icon-md" />}
                     </span>
-                    {!micEnabled && <span className="text-sm text-text-main w-20 shrink-0">Microphone</span>}
+                    {!micEnabled && <span className="text-label w-20 shrink-0">Microphone</span>}
                     {micEnabled ? <AudioLevelBar level={audioLevel} /> : <div className="flex-1" />}
                     <Toggle value={micEnabled} onChange={handleMicToggle} />
                 </div>
@@ -303,6 +308,7 @@ export function PreRecordingView() {
                             }))}
                             value={selectedMicId}
                             onChange={handleMicDeviceChange}
+                            matchTriggerWidth
                         />
                     </div>
                 )}
@@ -314,7 +320,7 @@ export function PreRecordingView() {
                     <span className={`${camEnabled ? 'text-primary' : 'text-text-muted'}`}>
                         {camEnabled ? <PiWebcamBold className="icon-md" /> : <PiWebcamSlashBold className="icon-md" />}
                     </span>
-                    <span className="text-sm text-text-main w-20 shrink-0">Camera</span>
+                    <span className="text-label w-20 shrink-0">Camera</span>
                     <div className="flex-1" />
                     <Toggle value={camEnabled} onChange={handleCamToggle} />
                 </div>
@@ -337,11 +343,23 @@ export function PreRecordingView() {
                                 }))}
                                 value={selectedCamId}
                                 onChange={handleCamDeviceChange}
+                                matchTriggerWidth
                             />
                         )}
                     </div>
                 )}
             </div>
+
+            {/* Blur content — opens the element picker on the page */}
+            <Button
+                variant="base"
+                onClick={enterBlurMode}
+                className="w-full justify-start gap-3"
+            >
+                <MdBlurOn className="icon-md text-text-muted" />
+                Blur content
+                <MdChevronRight className="icon-md text-text-muted ml-auto" />
+            </Button>
 
             {permissionError && (
                 <div className="flex flex-col gap-2 px-1">
@@ -365,31 +383,30 @@ export function PreRecordingView() {
                 <p className="text-xs text-destructive px-1">{error}</p>
             )}
 
-            {!canRecordTab && (
+            {/* Source: current tab (offscreen capture) or screen / window (controller picker) */}
+            <MultiToggle
+                options={[
+                    { value: 'tab', label: 'Current Tab' },
+                    { value: 'window', label: 'Screen / Window' },
+                ]}
+                value={source}
+                onChange={setSource}
+            />
+
+            {source === 'tab' && !canRecordTab && (
                 <p className="text-xs text-text-muted px-1 text-center">
-                    Switch to a regular tab to start recording.
+                    Cannot start tab recording on this page.
                 </p>
             )}
 
             {/* Primary action */}
             <Button
                 variant="primary"
-                onClick={handleStartRecording}
-                disabled={starting || !canRecordTab}
+                onClick={handleStart}
+                disabled={starting || (source === 'tab' && !canRecordTab)}
                 className="w-full justify-center gap-2"
             >
-                <MdTab className="icon-md" />
-                {starting ? 'Starting…' : 'Record Tab'}
-            </Button>
-
-            {/* Window / Desktop */}
-            <Button
-                variant="base"
-                onClick={handleOpenSourcePicker}
-                className="w-full justify-center gap-2"
-            >
-                <MdComputer className="icon-md" />
-                Record Window
+                {starting ? 'Starting…' : 'Start'}
             </Button>
         </div>
     );
