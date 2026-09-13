@@ -153,7 +153,6 @@ export function VideoPage() {
                         <ThemeToggle />
                         <Button
                             variant="primary"
-                            size="sm"
                             onClick={() => { window.open(CHROME_EXTENSION_URL, '_blank'); }}
                         >
                             Record for free
@@ -214,7 +213,7 @@ export function VideoPage() {
                     {/* Right column — Sidebar */}
                     <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
                         <div className="border border-border rounded-xl p-5 bg-surface">
-                            <Button size="sm" fullWidth onClick={copyLink}>
+                            <Button fullWidth onClick={copyLink}>
                                 <TbCopy className="icon-sm" />
                                 {linkCopied ? 'Copied!' : 'Copy link'}
                             </Button>
@@ -228,7 +227,6 @@ export function VideoPage() {
                             </p>
                             <Button
                                 variant="primary"
-                                size="sm"
                                 onClick={() => { window.open(CHROME_EXTENSION_URL, '_blank'); }}
                             >
                                 Try Recordio

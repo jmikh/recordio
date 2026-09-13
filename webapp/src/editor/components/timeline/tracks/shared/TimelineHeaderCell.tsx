@@ -14,8 +14,6 @@ interface TimelineHeaderCellProps {
     infoElement?: React.ReactNode;
     /** Optional custom title element (e.g., tooltip-wrapped title). Replaces the default title span. */
     titleElement?: React.ReactNode;
-    /** When true, dims the title text to indicate the track is inactive */
-    disabled?: boolean;
     /** When true, shows a compact "…" placeholder instead of full header content */
     isCollapsed?: boolean;
     /** When provided, renders an eye icon button to toggle the apply state */
@@ -36,7 +34,6 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
     onToggleMute,
     infoElement,
     titleElement,
-    disabled,
     isCollapsed = false,
     applyEnabled,
     onToggleApply,
@@ -50,13 +47,13 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                 <>
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         {icon && (
-                            <span className={`flex-shrink-0 ${disabled ? 'text-text-muted' : 'text-text-main'}`}>
+                            <span className="flex-shrink-0 text-label">
                                 {icon}
                             </span>
                         )}
                         {titleElement ?? (
                             <span
-                                className={`truncate select-none text-sm ${disabled ? 'text-text-muted' : 'text-text-main'}`}
+                                className="truncate select-none text-label"
                                 title={title}
                             >
                                 {title}
@@ -68,12 +65,12 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                         {infoElement}
                         {hasAudio && onToggleMute && (
                             <Button
-                                variant="icon"
+                                variant="ghost"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onToggleMute();
                                 }}
-                                className={isMuted ? '!text-destructive' : ''}
+                                className={isMuted ? 'text-destructive' : ''}
                                 title={isMuted ? "Unmute" : "Mute"}
                             >
                                 {isMuted ? <MdVolumeOff className="icon-sm" /> : <MdVolumeUp className="icon-sm" />}
@@ -81,16 +78,18 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                         )}
                         {onToggleApply !== undefined && (
                             <Button
-                                variant="icon"
+                                variant="ghost"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onToggleApply();
                                 }}
-                                className={!applyEnabled ? '!text-text-disabled hover:!text-text-muted' : '!text-text-muted hover:!text-text-highlighted'}
+                                // Ghost already resolves to muted -> highlighted on hover,
+                                // so only the hidden state needs its own dimmer treatment.
+                                className={!applyEnabled ? 'text-text-disabled hover:text-text-muted' : ''}
+                                icon={applyEnabled ? AiOutlineEye : AiOutlineEyeInvisible}
+                                aria-label={applyEnabled ? 'Disable effect' : 'Enable effect'}
                                 title={applyEnabled ? 'Disable effect' : 'Enable effect'}
-                            >
-                                {applyEnabled ? <AiOutlineEye className="icon-md" /> : <AiOutlineEyeInvisible className="icon-md" />}
-                            </Button>
+                            />
                         )}
                     </div>
                 </>

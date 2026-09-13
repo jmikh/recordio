@@ -177,7 +177,6 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
                                 </div>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
                                     icon={LuTrash2}
                                     onClick={() => handleDelete(p.id)}
                                     disabled={busyId !== null}
@@ -207,7 +206,6 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
                                 </span>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
                                     icon={LuFolderInput}
                                     onClick={() => handleSwitch(ws)}
                                     disabled={busyId !== null}
@@ -235,7 +233,7 @@ export function CapRecoveryPanel({ cap, workspaceId, onRetry }: CapRecoveryPanel
                         <Button variant="primary" fullWidth onClick={handleUpgrade}>
                             Upgrade to Pro
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={onRetry}>
+                        <Button variant="ghost" onClick={onRetry}>
                             Try again
                         </Button>
                     </>

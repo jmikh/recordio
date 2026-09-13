@@ -210,10 +210,10 @@ export function DashboardSidebar({
                     <UserMenu openDirection="up" variant="row" onOpenSupportModal={onOpenSupport} />
                 ) : (
                     <div className="flex items-center gap-1 px-1">
-                        <Button variant="icon" icon={MdOutlineBugReport} onClick={onOpenSupport} title="Report a Bug" />
+                        <Button variant="ghost" icon={MdOutlineBugReport} onClick={onOpenSupport} title="Report a Bug" />
                         <ThemeToggle />
                         <div className="flex-1" />
-                        <Button variant="ghost" size="sm" onClick={onOpenAuthModal}>
+                        <Button variant="ghost" onClick={onOpenAuthModal}>
                             Sign In
                         </Button>
                     </div>

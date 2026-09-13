@@ -485,7 +485,7 @@ export function CaptionsSettings() {
                                 </div>
                             )}
 
-                            <p className="subtext">
+                            <p className="text-label">
                                 Powered by OpenAI Whisper — highest accuracy with multi-language support.
                             </p>
                         </div>
@@ -514,7 +514,6 @@ export function CaptionsSettings() {
                             <Tooltip text="Copy without timestamps" className="flex-1">
                                 <Button
                                     variant="base"
-                                    size="sm"
                                     fullWidth
                                     icon={TbCopy}
                                     onClick={() => {
@@ -529,7 +528,6 @@ export function CaptionsSettings() {
                             <Tooltip text="Download in SRT format" className="flex-1">
                                 <Button
                                     variant="base"
-                                    size="sm"
                                     fullWidth
                                     icon={TbDownload}
                                     onClick={handleDownloadSrt}
@@ -595,7 +593,7 @@ export function CaptionsSettings() {
                         ))}
                     </div>
                 ) : (
-                    <p className="subtext">
+                    <p className="text-label">
                         Transcribe automatically with AI to generate captions.
                     </p>
                 )}
@@ -699,7 +697,7 @@ export function CaptionsSettings() {
                 <div
                     ref={popoverRef}
                     onClick={(e) => e.stopPropagation()}
-                    className={`bg-surface-raised border border-border ${selection.isEditing ? 'rounded-lg' : 'rounded-full'} shadow-float flex items-center gap-0.5 px-1 py-1`}
+                    className="bg-surface-raised border border-border rounded-[var(--radius-md)] shadow-float flex items-center gap-0.5 px-1 py-1"
                     style={{
                         position: 'fixed',
                         bottom: window.innerHeight - selection.anchorRect.top + 4,
@@ -734,8 +732,7 @@ export function CaptionsSettings() {
                             {selection.wordIds.length === 1 && (
                                 <Tooltip text="Edit word">
                                     <Button
-                                        variant="icon"
-                                        className="size-7!"
+                                        variant="ghost"
                                         icon={MdEdit}
                                         onClick={() => setSelection({ ...selection, isEditing: true })}
                                     />
@@ -752,8 +749,7 @@ export function CaptionsSettings() {
                                         {hasVisible && (
                                             <Tooltip text="Hide from caption">
                                                 <Button
-                                                    variant="icon"
-                                                    className="size-7!"
+                                                    variant="ghost"
                                                     icon={MdVisibilityOff}
                                                     onClick={handleHideSelected}
                                                 />
@@ -762,8 +758,7 @@ export function CaptionsSettings() {
                                         {hasHidden && (
                                             <Tooltip text="Show">
                                                 <Button
-                                                    variant="icon"
-                                                    className="size-7!"
+                                                    variant="ghost"
                                                     icon={MdVisibility}
                                                     onClick={handleShowSelected}
                                                 />
@@ -775,7 +770,7 @@ export function CaptionsSettings() {
                             {/* Cut — removes the selected words' time range from the output */}
                             <Tooltip text="Cut from video">
                                 <Button
-                                    variant="icon"
+                                    variant="ghost"
                                     icon={FiScissors}
                                     onClick={handleCutSelected}
                                 />

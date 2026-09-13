@@ -74,9 +74,9 @@ export function TrialExtendLink({
             variant="ghost"
             onClick={handleClick}
             disabled={busy}
-            // interactive-ghost's h-9/px-3/text-sm win the cascade over plain
-            // utilities here — force the inline-link shape
-            className={`p-0! h-auto! text-xs! hover:underline ${className ?? ''}`}
+            // Utilities outrank @layer components, so these plainly override
+            // interactive-ghost's h-9/px-1/text-sm — no `!` needed.
+            className={`px-0 h-auto text-xs hover:underline ${className ?? ''}`}
         >
             {busy ? 'Extending…' : label}
         </Button>

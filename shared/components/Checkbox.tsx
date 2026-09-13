@@ -53,7 +53,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
                 )}
             </div>
             {label && (
-                <span className="text-xs text-text-muted">{label}</span>
+                <span className="text-label">{label}</span>
             )}
         </button>
     );

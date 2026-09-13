@@ -124,7 +124,7 @@ export function AuthModal({
                         <Button type="submit" variant="primary" disabled={loading || !devEmail || !devPassword} className="w-full">
                             {loading ? 'Signing in…' : 'Sign in / Create account'}
                         </Button>
-                        <p className="subtext mt-2">Account is auto-created on first sign-in.</p>
+                        <p className="text-label text-left mt-2">Account is auto-created on first sign-in.</p>
                     </form>
                 )}
 

@@ -239,7 +239,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                                 ariaLabel="Visibility"
                                 disabled={!isOwner}
                             />
-                            <p className="subtext">{policySubtitle}</p>
+                            <p className="text-label">{policySubtitle}</p>
                         </div>
                     </div>
 
@@ -268,7 +268,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                             <p className="text-sm text-text-main truncate">
                                 {meta.ownerName ?? meta.ownerEmail}{isOwner ? ' (you)' : ''}
                             </p>
-                            <p className="subtext truncate">{meta.ownerEmail}</p>
+                            <p className="text-label truncate">{meta.ownerEmail}</p>
                         </div>
                         <span className="text-xs text-text-muted">Creator</span>
                     </div>
@@ -281,7 +281,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                                 <p className="text-sm text-text-main truncate">
                                     {e.name ?? e.email}{e.user_id === userId ? ' (you)' : ''}
                                 </p>
-                                <p className="subtext truncate">{e.email}</p>
+                                <p className="text-label truncate">{e.email}</p>
                             </div>
                             <Dropdown
                                 options={editorRoleOptions}
@@ -297,7 +297,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                     ))}
 
                     {!isOwner && (
-                        <p className="subtext">Only the owner can change share settings.</p>
+                        <p className="text-label">Only the owner can change share settings.</p>
                     )}
                 </div>
 

@@ -70,7 +70,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
 
     return (
         <div className="flex items-center gap-3">
-            <span className="text-sm text-text-muted w-[80px] shrink-0">{title}</span>
+            <span className="text-label w-[80px] shrink-0">{title}</span>
             <div className="flex-1 min-w-0">
                 <Button
                     ref={buttonRef}

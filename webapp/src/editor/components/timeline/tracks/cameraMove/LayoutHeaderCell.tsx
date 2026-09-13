@@ -16,9 +16,8 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
     return (
         <TimelineHeaderCell
             title="Layout"
-            icon={<PiWebcamBold className="icon-md" />}
+            icon={<PiWebcamBold className="icon-sm" />}
             height={height}
-            disabled={!cameraMoveEnabled}
             isCollapsed={isCollapsed}
             applyEnabled={cameraMoveEnabled}
             onToggleApply={toggleCameraMoveEnabled}
@@ -27,8 +26,8 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
                     placement="top-right"
                     trigger={
                         <span
-                            className={`truncate select-none ${!cameraMoveEnabled ? 'text-text-muted' : 'text-text-main'}`}
-                            style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
+                            className="truncate select-none text-label"
+                            style={{ fontSize: isCollapsed ? 9 : 13, transition: 'font-size 150ms ease' }}
                         >
                             Layout
                         </span>

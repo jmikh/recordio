@@ -149,7 +149,7 @@ export function AdminPage() {
 
             <div className="w-full max-w-2xl">
                 <h1 className="heading-2 mb-1">Impersonate a user</h1>
-                <p className="subtext mb-6">
+                <p className="text-label mb-6">
                     Open the app as any user to inspect their experience. Everything you do is real
                     and audit-logged.
                 </p>

@@ -177,7 +177,7 @@ export function DownloadModal({
                             aria-label="Cloud export"
                         />
                     </div>
-                    <p className="subtext leading-relaxed">
+                    <p className="text-label leading-relaxed">
                         {cloudExport
                             ? "Keep working while we make your video — we'll notify you when it's ready."
                             : `Your video is made in this tab — keep it open and in focus (${localEstimate}).`}

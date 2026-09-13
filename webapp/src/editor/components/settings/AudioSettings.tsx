@@ -263,7 +263,7 @@ export const AudioSettingsPanel = () => {
                         </>
                     ) : (
                         <div className="flex items-center justify-between">
-                            <span className="text-sm text-text-muted">Screen Audio</span>
+                            <span className="text-label">Screen Audio</span>
                             <span className="text-xs text-text-disabled">Not Detected</span>
                         </div>
                     )}
@@ -296,7 +296,7 @@ export const AudioSettingsPanel = () => {
                         </>
                     ) : (
                         <div className="flex items-center justify-between">
-                            <span className="text-sm text-text-muted">Microphone</span>
+                            <span className="text-label">Microphone</span>
                             <span className="text-xs text-text-disabled">Not Detected</span>
                         </div>
                     )}

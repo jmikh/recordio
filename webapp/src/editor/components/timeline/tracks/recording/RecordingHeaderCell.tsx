@@ -23,17 +23,17 @@ export const RecordingHeaderCell: React.FC<RecordingHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Recording"
-            icon={<BiVideoRecording className="icon-md" />}
+            icon={<BiVideoRecording className="icon-sm" />}
             height={height}
             infoElement={
                 needsReset ? (
                     <Button
-                        variant="icon"
+                        variant="ghost"
                         onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             resetWindows();
                         }}
-                        className="!text-text-disabled hover:!text-text-muted"
+                        className="text-text-disabled hover:text-text-muted"
                         title="Reset to single window at 1× speed"
                     >
                         <LuUndo2 className="icon-sm" />

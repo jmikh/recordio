@@ -294,7 +294,7 @@ export const TimelineToolbar: React.FC = () => {
                     position="top-start"
                 >
                     <Button
-                        variant="icon"
+                        variant="ghost"
                         disabled={!canSplit}
                         onClick={canSplit ? handleSplit : undefined}
                         onMouseEnter={() => setScissorsHovered(true)}
@@ -308,7 +308,7 @@ export const TimelineToolbar: React.FC = () => {
                 {showAutoCut && (
                     <Tooltip text="Remove silent and inactive segments" position="top-start">
                         <Button
-                            variant="icon"
+                            variant="ghost"
                             disabled={isAnalyzing}
                             onClick={handleAutoCut}
                             className={isAnalyzing ? 'animate-pulse' : ''}
@@ -381,7 +381,6 @@ export const TimelineToolbar: React.FC = () => {
                 <Tooltip text="Fit timeline to screen">
                     <Button
                         variant="ghost"
-                        size="sm"
                         onClick={handleFit}
                         className="px-2 py-0.5"
                     >
@@ -389,7 +388,7 @@ export const TimelineToolbar: React.FC = () => {
                     </Button>
                 </Tooltip>
                 <Button
-                    variant="icon"
+                    variant="ghost"
                     icon={MdRemove}
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
                 />
@@ -404,7 +403,7 @@ export const TimelineToolbar: React.FC = () => {
                     />
                 </div>
                 <Button
-                    variant="icon"
+                    variant="ghost"
                     icon={MdAdd}
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
                 />

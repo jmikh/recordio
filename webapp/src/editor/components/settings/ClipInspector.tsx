@@ -63,7 +63,7 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
     return (
         <CollapsibleCard title="Clip" icon={<PiVideoBold className="icon-md" />} notCollapsible>
             <div className="flex flex-col gap-5">
-                <p className="subtext">Check the box to apply to all clips.</p>
+                <p className="text-label">Check the box to apply to all clips.</p>
 
                 {/* Speed — custom label row with inline checkbox */}
                 <div>
@@ -75,9 +75,9 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
                                     onChange={handleToggleSpeedAll}
                                 />
                             </Tooltip>
-                            <span className="text-sm text-text-muted">Speed</span>
+                            <span className="text-label">Speed</span>
                         </div>
-                        <span className="text-xs text-text-muted">
+                        <span className="text-label">
                             {(win.speed || 1).toFixed(1)}x
                         </span>
                     </div>
@@ -94,19 +94,19 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
                 <div className="flex flex-col gap-2 pt-2 border-t border-border">
                     {isLastWindow ? (
                         <Tooltip text="Cannot delete the only remaining clip">
-                            <Button disabled size="sm" fullWidth className="opacity-50">
+                            <Button disabled fullWidth className="opacity-50">
                             <span>Delete Clip</span>
                         </Button>
                         </Tooltip>
                     ) : (
-                        <Button onClick={handleDelete} size="sm" fullWidth className="text-danger hover:text-danger">
+                        <Button onClick={handleDelete} fullWidth className="text-danger hover:text-danger">
                             <span>Delete Clip</span>
                         </Button>
                     )}
 
                     {/* Reset */}
                     <Tooltip text="Resets the timeline to one full clip">
-                        <Button onClick={handleReset} disabled={isAlreadyReset} size="sm" fullWidth className={isAlreadyReset ? 'opacity-50' : ''}>
+                        <Button onClick={handleReset} disabled={isAlreadyReset} fullWidth className={isAlreadyReset ? 'opacity-50' : ''}>
                             <span>Reset</span>
                         </Button>
                     </Tooltip>

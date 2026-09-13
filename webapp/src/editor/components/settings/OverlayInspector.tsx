@@ -128,12 +128,11 @@ export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block })
             {/* Type Selector */}
             <CollapsibleCard title={OVERLAY_TYPE_LABELS[item.type]} icon={OVERLAY_TYPE_ICONS[item.type]} notCollapsible>
                 <div className="flex flex-col gap-2">
-                    <p className="subtext">Change overlay type:</p>
+                    <p className="text-label">Change overlay type:</p>
                     <div className="grid grid-cols-2 gap-1.5">
                         {(['blur', 'text', 'arrow', 'border'] as OverlayItemType[]).map(type => (
                             <Button
                                 key={type}
-                                size="sm"
                                 variant={item.type === type ? 'primary' : undefined}
                                 onClick={() => handleChangeType(type)}
                             >
@@ -165,10 +164,10 @@ export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block })
 
             {/* Delete */}
             <div className="flex items-center gap-2 px-1">
-                <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
+                <Button onClick={handleDelete} className="flex-1 text-danger hover:text-danger">
                     <span>Delete Block</span>
                 </Button>
-                <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
+                <Button onClick={handleDeleteAll} className="flex-1 text-danger hover:text-danger">
                     <span>Delete All</span>
                 </Button>
             </div>
@@ -202,8 +201,8 @@ const OverlayItemSettings: React.FC<OverlayItemSettingsProps> = ({
     ) => (
         <div key={key}>
             <div className="flex justify-between items-center mb-1.5">
-                <span className="text-sm text-text-muted">{label}</span>
-                <span className="text-xs text-text-muted">
+                <span className="text-label">{label}</span>
+                <span className="text-label">
                     {(sliderProps.valueTransform ? sliderProps.valueTransform(value) : value).toFixed(sliderProps.decimals ?? 0)}{units}
                 </span>
             </div>

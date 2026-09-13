@@ -135,9 +135,28 @@ Use these instead of hand-rolling the combos:
 | `heading-2` | `text-lg font-bold text-text-highlighted` | All page titles, modal titles, section headings |
 | `text-eyebrow` | `text-2xs font-bold uppercase tracking-widest text-text-muted` | Tiny uppercase group label above a section (sidebar groups, settings list headers). Never hand-roll `uppercase tracking-widest` |
 | `text-badge` | `text-2xs font-bold leading-none` | Pill/chip/counter typography; bg, padding, and radius stay local |
-| `subtext` | `text-xs text-text-muted text-left` | Helper text in settings panels |
+| `text-label` | `text-xs text-text-muted` | Text that names or annotates something rather than being content — see below |
 
 Color overrides compose: `text-eyebrow text-primary` works (utilities beat `@layer components`).
+
+#### When to use `text-label`
+
+Anything whose job is to *name or annotate* a thing, rather than be the thing:
+
+- **Control labels** — the text beside a `Toggle`, `Slider`, `Checkbox`, `ColorButton`, dropdown
+- **A control's value readout** — the `12px` / `2%` opposite a slider's label
+- **Timeline track header titles** — "Screen", "Spotlight", "Layout"
+- **Card metadata** — timestamps like "Created 3 days ago", counts, secondary attributes
+- **Helper/explanatory text** — the sentence under a setting saying what it does
+
+Not for: card/list-row **titles**, which are content — those stay `text-sm`.
+
+`text-label` replaced the old `subtext` class, which was the same thing plus `text-left`.
+If you need that alignment (helper text inside a `text-center` block), add `text-left`
+explicitly rather than reintroducing a second class.
+
+Override the colour with a utility where a state needs it (`text-label text-text-main`).
+The token has no disabled variant: labels do not dim when their control is disabled.
 
 ---
 
@@ -175,7 +194,7 @@ Defined in `@layer components` in `shared/theme/index.css`.
 | `focus-ring` | `focus-visible` ring using primary color |
 | `scrollbar-hide` | Hides scrollbar cross-browser |
 | `scrollbar-thin` | Thin styled scrollbar |
-| `subtext` | `text-xs text-text-muted text-left` |
+| `text-label` | Names/annotates a control, track or card (see Typography) |
 | `heading-1` | Hero modal/page title (see Typography) |
 | `heading-2` | Page/modal/section title (see Typography) |
 | `text-eyebrow` | Uppercase group label (see Typography) |

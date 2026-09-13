@@ -1,11 +1,9 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode, type ComponentType } from 'react';
 
-type ButtonVariant = 'base' | 'primary' | 'ghost' | 'icon' | 'destructive';
-type ButtonSize = 'default' | 'sm';
+type ButtonVariant = 'base' | 'primary' | 'ghost' | 'destructive';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: ButtonVariant;
-    size?: ButtonSize;
     fullWidth?: boolean;
     icon?: ComponentType<{ className?: string }>;
     children?: ReactNode;
@@ -15,7 +13,6 @@ const variantClass: Record<ButtonVariant, string> = {
     base: 'interactive-base',
     primary: 'interactive-primary',
     ghost: 'interactive-ghost',
-    icon: 'interactive-icon',
     destructive: 'interactive-destructive',
 };
 
@@ -35,33 +32,35 @@ function warnIfUnlabeled(icon: ComponentType | undefined, props: ButtonHTMLAttri
 /**
  * Unified Button component.
  * Maps `variant` to the corresponding `interactive-*` CSS class,
- * bakes in flex centering + gap, and supports size / fullWidth helpers.
+ * bakes in flex centering + gap, and supports the fullWidth helper.
+ *
+ * Every button is one size: the variant's own text-sm/h-9. There is no size
+ * prop — a button that needs to be smaller is a sign it isn't a button.
  *
  * Pass `icon` to render a standardized icon. Button icons are auto-sized:
- *   - variant="icon" → icon-md (16px)
- *   - all other variants → icon-sm (14px)
+ *   - icon-only button (no children) → icon-md (16px)
+ *   - button with text alongside     → icon-sm (14px)
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     variant = 'base',
-    size = 'default',
     fullWidth = false,
     icon: Icon,
     className = '',
     children,
     ...rest
 }, ref) => {
-    if (variant === 'icon' && !children) warnIfUnlabeled(Icon, rest);
+    const iconOnly = Boolean(Icon) && !children;
+    if (iconOnly) warnIfUnlabeled(Icon, rest);
 
     const base = variantClass[variant];
-    const sizeClass = size === 'sm' ? 'text-xs' : '';
     const widthClass = fullWidth ? 'w-full' : '';
-    const layoutClass = variant === 'icon' ? '' : 'flex items-center justify-center gap-2';
-    const iconSizeClass = variant === 'icon' ? 'icon-md' : 'icon-sm';
+    const layoutClass = 'flex items-center justify-center gap-2';
+    const iconSizeClass = iconOnly ? 'icon-md' : 'icon-sm';
 
     return (
         <button
             ref={ref}
-            className={`${base} ${layoutClass} ${sizeClass} ${widthClass} ${className}`}
+            className={`${base} ${layoutClass} ${widthClass} ${className}`}
             {...rest}
         >
             {Icon && <Icon className={iconSizeClass} />}

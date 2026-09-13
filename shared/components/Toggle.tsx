@@ -80,7 +80,7 @@ export const Toggle: React.FC<ToggleProps> = ({
         return (
             <div className={`flex items-center justify-between ${className}`}>
                 <div className="flex items-center gap-1.5">
-                    <span className="text-sm text-text-muted">{label}</span>
+                    <span className="text-label">{label}</span>
                     {children}
                 </div>
                 {toggleButton}

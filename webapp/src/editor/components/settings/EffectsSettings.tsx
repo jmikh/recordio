@@ -206,7 +206,7 @@ export const EffectsSettings = () => {
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                            <label className="text-sm text-text-muted">Hotkeys Enabled</label>
+                            <label className="text-label">Hotkeys Enabled</label>
                             <HotkeyTooltip />
                         </div>
                         <Toggle

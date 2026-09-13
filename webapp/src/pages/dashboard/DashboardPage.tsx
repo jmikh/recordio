@@ -529,7 +529,6 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                         <div className="w-px h-5 bg-border" />
                         <Button
                             variant="ghost"
-                            size="sm"
                             onClick={() => {
                                 const allIds = tabFiltered.map(p => p.id);
                                 if (selectedIds.size === allIds.length) {
@@ -543,14 +542,12 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                         </Button>
                         <Button
                             variant="destructive"
-                            size="sm"
                             onClick={() => setShowBulkDeleteModal(true)}
                             disabled={isBulkDeleting}
                         >
                             Delete
                         </Button>
                         <Button
-                            size="sm"
                             onClick={exitSelectMode}
                         >
                             Cancel

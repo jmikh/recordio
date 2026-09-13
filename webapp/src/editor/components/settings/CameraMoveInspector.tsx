@@ -94,7 +94,7 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
     return (
         <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold className="icon-md" />} notCollapsible headerAction={<CameraMoveTooltip />}>
             <div className="flex flex-col gap-5">
-                <p className="subtext">Adjust the camera position, size, and shape for this segment.</p>
+                <p className="text-label">Adjust the camera position, size, and shape for this segment.</p>
 
                 {/* Hide Camera Toggle */}
                 <Toggle
@@ -124,7 +124,6 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
                         {/* Fill Screen */}
                         <Button
                             onClick={handleFillScreen}
-                            size="sm"
                             fullWidth
                             className="text-text-muted hover:text-text"
                         >
@@ -137,8 +136,8 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
                 {/* Transition Duration */}
                 <div>
                     <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-sm text-text-muted">Transition</span>
-                        <span className="text-xs text-text-muted">
+                        <span className="text-label">Transition</span>
+                        <span className="text-label">
                             {(segment.transitionDurationMs / 1000).toFixed(2)}s
                         </span>
                     </div>
@@ -166,10 +165,10 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
 
                 {/* Delete */}
                 <div className="flex items-center gap-2">
-                    <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
+                    <Button onClick={handleDelete} className="flex-1 text-danger hover:text-danger">
                         <span>Delete This</span>
                     </Button>
-                    <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
+                    <Button onClick={handleDeleteAll} className="flex-1 text-danger hover:text-danger">
                         <span>Delete All</span>
                     </Button>
                 </div>

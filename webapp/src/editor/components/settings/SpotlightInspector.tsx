@@ -145,7 +145,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     return (
         <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine className="icon-md" />} notCollapsible headerAction={<SpotlightTooltip />}>
             <div className="flex flex-col gap-5">
-                <p className="subtext">Check the box to apply to all spotlights.</p>
+                <p className="text-label">Check the box to apply to all spotlights.</p>
 
                 {/* Scale — no checkbox, each is independent */}
                 <Slider
@@ -171,9 +171,9 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                                     onChange={handleToggleDimAll}
                                 />
                             </Tooltip>
-                            <span className="text-sm text-text-muted">Dim</span>
+                            <span className="text-label">Dim</span>
                         </div>
-                        <span className="text-xs text-text-muted">
+                        <span className="text-label">
                             {Math.round(segment.dimOpacity * 100)}%
                         </span>
                     </div>
@@ -197,9 +197,9 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                                     onChange={handleToggleTransitionAll}
                                 />
                             </Tooltip>
-                            <span className="text-sm text-text-muted">Transition</span>
+                            <span className="text-label">Transition</span>
                         </div>
-                        <span className="text-xs text-text-muted">
+                        <span className="text-label">
                             {(segment.transitionDurationMs / 1000).toFixed(2)}s
                         </span>
                     </div>
@@ -235,10 +235,10 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
 
                 {/* Delete */}
                 <div className="flex items-center gap-2">
-                    <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
+                    <Button onClick={handleDelete} className="flex-1 text-danger hover:text-danger">
                         <span>Delete This</span>
                     </Button>
-                    <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
+                    <Button onClick={handleDeleteAll} className="flex-1 text-danger hover:text-danger">
                         <span>Delete All</span>
                     </Button>
                 </div>
@@ -248,7 +248,6 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
                     <Tooltip text={!hasHoveredCards ? 'Could not automatically detect areas in the recording suitable for spotlighting.' : ''}>
                         <Button
                             variant="primary"
-                            size="sm"
                             fullWidth
                             onClick={() => { resetSpotlights(); selectSpotlight(null); }}
                             disabled={!hasHoveredCards}

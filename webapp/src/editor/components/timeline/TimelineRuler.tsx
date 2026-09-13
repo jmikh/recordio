@@ -33,6 +33,10 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
         let cancelled = false;
 
+        // Same token the ruler draws with, read once for the preload spec below.
+        const themeFontFamily = (getComputedStyle(document.documentElement)
+            .getPropertyValue('--font-sans') || 'sans-serif').replace(/['"]/g, '');
+
         const draw = () => {
             if (cancelled) return;
 
@@ -100,8 +104,9 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
                     ctx.lineTo(x, height);
                     const label = formatTimeCode(t);
                     ctx.fillText(label, x + 4, 2);
-                    // Satoshi only ships 500/700 — 700 is too heavy here, so a
-                    // hairline stroke fakes the in-between weight.
+                    // 700 is too heavy here, so a hairline stroke fakes the
+                    // in-between weight. (Now that the UI font is loaded as a
+                    // variable face, this could become a real intermediate weight.)
                     ctx.save();
                     ctx.strokeStyle = textColor;
                     ctx.lineWidth = 0.35;
@@ -119,18 +124,18 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
         // Draw with fallback immediately so the ruler isn't blank
         draw();
 
-        // Actively trigger + wait for the Satoshi font binary to download.
+        // Actively trigger + wait for the UI font binary to download.
         // document.fonts.load() returns a promise that resolves only once the
         // font data is actually usable (unlike .check() which only tests if
         // an @font-face rule is registered).
-        const fontSpec = '500 10px Satoshi';
+        const fontSpec = `500 10px ${themeFontFamily}`;
         document.fonts.load(fontSpec).then(() => {
             if (!cancelled) draw();
         });
 
         // Safety net: if the CSS @import hasn't been parsed yet when load()
         // was called, the promise resolves immediately with nothing. Listen
-        // for any future font-load events and redraw when Satoshi arrives.
+        // for any future font-load events and redraw when the font arrives.
         const onFontLoad = () => {
             if (!cancelled && document.fonts.check(fontSpec)) {
                 draw();

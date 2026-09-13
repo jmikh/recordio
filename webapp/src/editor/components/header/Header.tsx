@@ -126,14 +126,14 @@ export const Header = () => {
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1">
                         <Button
-                            variant="icon"
+                            variant="ghost"
                             icon={LuUndo2}
                             onClick={() => undo()}
                             disabled={pastStates.length === 0}
                             title="Undo (Cmd+Z)"
                         />
                         <Button
-                            variant="icon"
+                            variant="ghost"
                             icon={LuRedo2}
                             onClick={() => redo()}
                             disabled={futureStates.length === 0}
@@ -150,7 +150,6 @@ export const Header = () => {
 
                             {<Button
                                 variant="ghost"
-                                size="sm"
                                 onClick={() => useUIStore.getState().toggleDebugBar()}
                                 title="Toggle Debug Bar"
                                 className="px-2 py-1 h-auto"

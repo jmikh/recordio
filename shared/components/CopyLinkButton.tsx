@@ -27,7 +27,7 @@ export const CopyLinkButton = ({ url, className = '', title = 'Copy link' }: Cop
         <button
             type="button"
             onClick={handleClick}
-            className={`interactive-icon ${className}`}
+            className={`interactive-ghost ${className}`}
             title={copied ? 'Copied!' : title}
         >
             {copied ? <LuCheck className="icon-sm text-success" /> : <LuLink className="icon-sm" />}

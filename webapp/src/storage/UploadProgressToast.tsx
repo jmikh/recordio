@@ -29,14 +29,12 @@ export function UploadProgressToast() {
                 <div className="flex justify-end gap-2 mt-3">
                     <Button
                         variant="ghost"
-                        size="sm"
                         onClick={() => useSyncStatusStore.getState().setMediaUploadError(null)}
                     >
                         Dismiss
                     </Button>
                     <Button
                         variant="primary"
-                        size="sm"
                         onClick={() => {
                             const retry = mediaUploadError.onRetry;
                             useSyncStatusStore.getState().setMediaUploadError(null);

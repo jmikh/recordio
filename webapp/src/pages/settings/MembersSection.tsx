@@ -380,7 +380,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                                                 {isResending ? <LuLoader className="icon-sm animate-spin" /> : 'Resend'}
                                             </Button>
                                             <Button
-                                                variant="icon"
+                                                variant="ghost"
                                                 icon={isRescinding ? LuLoader : LuX}
                                                 disabled={isRescinding || isResending}
                                                 onClick={() => handleRescind(inv.id, inv.email)}

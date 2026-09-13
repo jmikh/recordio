@@ -253,7 +253,7 @@ export const ProjectCard = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-text-muted">
+                    <span className="text-label">
                         {showUpdatedAt && project.updatedAt
                             ? `Updated ${timeAgo(project.updatedAt)}`
                             : `Created ${timeAgo(project.createdAt)}`

@@ -15,9 +15,8 @@ export const OverlayHeaderCell: React.FC<OverlayHeaderCellProps> = ({ height, is
     return (
         <TimelineHeaderCell
             title="Overlay"
-            icon={<LuLayers3 className="icon-md" />}
+            icon={<LuLayers3 className="icon-sm" />}
             height={height}
-            disabled={!overlayEnabled}
             isCollapsed={isCollapsed}
             applyEnabled={overlayEnabled}
             onToggleApply={toggleOverlayEnabled}

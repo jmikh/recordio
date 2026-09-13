@@ -107,7 +107,7 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
     return (
         <CollapsibleCard title="Zoom" icon={<TbZoomIn className="icon-md" />} notCollapsible>
             <div className="flex flex-col gap-5">
-                <p className="subtext">Check the box to apply to all zooms.</p>
+                <p className="text-label">Check the box to apply to all zooms.</p>
                 {/* Transition Duration — custom label row with inline checkbox */}
                 <div>
                     <div className="flex justify-between items-center mb-1.5">
@@ -118,9 +118,9 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
                                     onChange={handleToggleTransitionAll}
                                 />
                             </Tooltip>
-                            <span className="text-sm text-text-muted">Transition</span>
+                            <span className="text-label">Transition</span>
                         </div>
-                        <span className="text-xs text-text-muted">
+                        <span className="text-label">
                             {(segment.transitionDurationMs / 1000).toFixed(2)}s
                         </span>
                     </div>
@@ -156,17 +156,17 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
 
                 {/* Delete */}
                 <div className="flex items-center gap-2">
-                    <Button onClick={handleDelete} size="sm" className="flex-1 text-danger hover:text-danger">
+                    <Button onClick={handleDelete} className="flex-1 text-danger hover:text-danger">
                         <span>Delete This</span>
                     </Button>
-                    <Button onClick={handleDeleteAll} size="sm" className="flex-1 text-danger hover:text-danger">
+                    <Button onClick={handleDeleteAll} className="flex-1 text-danger hover:text-danger">
                         <span>Delete All</span>
                     </Button>
                 </div>
 
                 {/* Auto Generate */}
                 {hasTrackableContent && (
-                    <Button variant="primary" size="sm" onClick={() => { resetZooms(); selectZoom(null); }}>
+                    <Button variant="primary" onClick={() => { resetZooms(); selectZoom(null); }}>
                         <span>Regenerate Auto Zooms</span>
                     </Button>
                 )}

@@ -120,12 +120,12 @@ export const Slider: React.FC<SliderProps> = ({
             {(label || showTooltip) && (
                 <div className="flex justify-between items-center mb-1.5">
                     {label && (
-                        <label className="text-sm text-text-muted">
+                        <label className="text-label">
                             {label}
                         </label>
                     )}
                     {showTooltip && (
-                        <span className="text-xs text-text-muted">
+                        <span className="text-label">
                             {valueTransform(value).toFixed(decimals)}{units}
                         </span>
                     )}

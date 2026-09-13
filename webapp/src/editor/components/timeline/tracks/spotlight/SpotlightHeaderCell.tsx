@@ -16,9 +16,8 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Spotlight"
-            icon={<RiLightbulbFlashLine className="icon-md" />}
+            icon={<RiLightbulbFlashLine className="icon-sm" />}
             height={height}
-            disabled={!spotlightEnabled}
             isCollapsed={isCollapsed}
             applyEnabled={spotlightEnabled}
             onToggleApply={toggleSpotlightEnabled}
@@ -27,8 +26,8 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
                     placement="top-right"
                     trigger={
                         <span
-                            className={`truncate select-none ${!spotlightEnabled ? 'text-text-muted' : 'text-text-main'}`}
-                            style={{ fontSize: isCollapsed ? 9 : 14, transition: 'font-size 150ms ease' }}
+                            className="truncate select-none text-label"
+                            style={{ fontSize: isCollapsed ? 9 : 13, transition: 'font-size 150ms ease' }}
                         >
                             Spotlight
                         </span>
