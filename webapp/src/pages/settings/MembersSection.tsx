@@ -261,7 +261,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
             </div>
 
             {/* Seat summary — seats are invite-driven (billing revamp Step 6) */}
-            <div className="border border-border rounded-md p-5 flex flex-col gap-2">
+            <div className="border border-border rounded-[var(--radius-md)] p-5 flex flex-col gap-2">
                 <div className="flex items-baseline justify-between gap-4">
                     <div>
                         <span className="text-2xl font-bold text-text-highlighted">{billedMembers.length}</span>
@@ -285,7 +285,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
 
             {/* Invite form — admin/owner only (billing grows on acceptance) */}
             {isAdmin ? (
-                <div className="border border-border rounded-md p-5">
+                <div className="border border-border rounded-[var(--radius-md)] p-5">
                     <h3 className="text-sm font-bold text-text-highlighted mb-3">Invite a teammate</h3>
                     <form onSubmit={handleInvite} className="flex gap-2">
                         <input
@@ -330,7 +330,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                     <span className="text-eyebrow">Active Members</span>
                     <span className="text-xs text-text-muted">{details.members.length}</span>
                 </p>
-                <div className="flex flex-col divide-y divide-border border border-border rounded-md overflow-hidden">
+                <div className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-md)] overflow-hidden">
                     {details.members.map(member => (
                         <MemberRow
                             key={member.user_id}
@@ -360,7 +360,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                             const isRescinding = rescindingId === inv.id;
                             const isResending  = resendingId === inv.email;
                             return (
-                                <div key={inv.id} className="flex items-center gap-3 px-4 py-3 border border-dashed border-border rounded-md">
+                                <div key={inv.id} className="flex items-center gap-3 px-4 py-3 border border-dashed border-border rounded-[var(--radius-md)]">
                                     <div className="w-9 h-9 rounded-full bg-state-inactive flex items-center justify-center shrink-0">
                                         <LuMail className="icon-sm text-text-muted" />
                                     </div>

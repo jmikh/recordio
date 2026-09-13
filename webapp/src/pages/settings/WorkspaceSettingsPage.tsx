@@ -13,6 +13,9 @@ import type { WorkspaceDetails } from './types';
 
 type SectionId = 'members' | 'billing';
 
+// Every section sits in its own bordered surface card on the tinted page ground
+const SECTION_CARD = 'bg-surface border border-border rounded-[var(--radius-lg)] p-6';
+
 // Legacy tab URLs (/workspace/settings/members|billing) and #hash links target
 // a section of the unified page.
 function readScrollTarget(): SectionId | null {
@@ -113,7 +116,7 @@ export function WorkspaceSettingsPage() {
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto flex flex-col gap-10 pb-16">
+        <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-16">
             {/* Page header */}
             <div>
                 <h1 className="heading-2">Workspace settings</h1>
@@ -123,18 +126,18 @@ export function WorkspaceSettingsPage() {
             </div>
 
             {loading ? (
-                <div className="flex items-center gap-2 text-text-muted text-sm">
+                <div className={`${SECTION_CARD} flex items-center gap-2 text-text-muted text-sm`}>
                     <LuLoader className="icon-sm animate-spin" /> Loading…
                 </div>
             ) : !details ? (
-                <p className="text-sm text-text-muted">Could not load workspace settings.</p>
+                <p className={`${SECTION_CARD} text-sm text-text-muted`}>Could not load workspace settings.</p>
             ) : (
                 <>
-                    <section>
+                    <section className={SECTION_CARD}>
                         <GeneralSection details={details} isAdmin={isAdmin} onRenamed={handleRenamed} />
                     </section>
 
-                    <section id="settings-members" className="border-t border-border pt-10">
+                    <section id="settings-members" className={SECTION_CARD}>
                         <MembersSection
                             details={details}
                             currentUserId={userId}
@@ -148,7 +151,7 @@ export function WorkspaceSettingsPage() {
                 </>
             )}
 
-            <section id="settings-billing" className="border-t border-border pt-10">
+            <section id="settings-billing" className={SECTION_CARD}>
                 <BillingSection onGoToMembers={() => scrollTo('members')} />
             </section>
         </div>

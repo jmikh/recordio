@@ -444,7 +444,7 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                                     </p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                                     {sortedProjects.map((item: ProjectListItem) => (
                                         <ProjectCard
                                             key={item.id}
@@ -495,7 +495,7 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
                                 <p className="text-sm text-text-muted">Trash is empty</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                                 {trashProjects.map(item => (
                                     <ProjectCard
                                         key={item.id}

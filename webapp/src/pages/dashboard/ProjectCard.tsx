@@ -156,7 +156,7 @@ export const ProjectCard = ({
             onClick={handleClick}
             className={`
                 group relative flex bg-surface flex-col rounded-xl cursor-pointer transition-all border overflow-hidden
-                ${isGrid ? 'p-4 aspect-4/3 gap-3' : 'p-3'}
+                ${isGrid ? '' : 'p-3'}
                 ${selectMode && selected
                     ? 'border-primary ring-2 ring-primary/30'
                     : isActive
@@ -181,10 +181,10 @@ export const ProjectCard = ({
                 </button>
             )}
 
-            {/* Thumbnail */}
+            {/* Thumbnail — full-bleed 16:9 across the top in grid; inset in the sidebar */}
             <div className={`
-                bg-surface-body rounded-lg overflow-hidden shrink-0 border border-border relative shadow-inner
-                ${isGrid ? 'flex-1 w-full mb-0' : 'w-full aspect-video mb-3'}
+                bg-surface-body overflow-hidden shrink-0 relative w-full aspect-video
+                ${isGrid ? 'border-b border-border' : 'rounded-lg border border-border mb-3 shadow-inner'}
             `}>
                 {project.thumbnail ? (
                     <img src={project.thumbnail} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -216,7 +216,7 @@ export const ProjectCard = ({
             </div>
 
             {/* Info */}
-            <div className="w-full min-w-0 shrink-0">
+            <div className={`w-full min-w-0 shrink-0 ${isGrid ? 'p-3' : ''}`}>
                 <div className="flex items-center justify-between">
                     {isRenaming ? (
                         <input
@@ -230,7 +230,9 @@ export const ProjectCard = ({
                                 if (e.key === 'Escape') setIsRenaming(false);
                             }}
                             onClick={e => e.stopPropagation()}
-                            className="text-text-highlighted text-sm min-w-0 mr-2 w-full bg-surface border border-primary rounded px-1 py-0 outline-none"
+                            aria-label="Project name"
+                            placeholder="Enter a title"
+                            className="text-text-highlighted text-sm min-w-0 mr-2 w-full bg-transparent border-none p-0 outline-none placeholder:text-text-muted"
                         />
                     ) : (
                         <h3 className="truncate text-text-highlighted text-sm min-w-0 mr-2">

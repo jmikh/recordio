@@ -106,19 +106,19 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
     const planSeatPrice = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
 
     return (
-        <div className="w-full flex flex-col gap-8">
+        <div className="w-full flex flex-col gap-6">
             <div>
                 <h2 className="heading-2 mb-1">Plans & Billing</h2>
                 <p className="text-sm text-text-muted">Manage your plan and payment details.</p>
             </div>
 
             {/* ── Current plan status ── */}
-            <div className="border border-border rounded-lg p-5 flex flex-col gap-5">
+            <div className="border border-border rounded-[var(--radius-md)] p-5 flex flex-col gap-5">
 
                 {/* Plan name + manage button */}
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex flex-col gap-1">
-                        <p className="text-xs text-text-muted uppercase tracking-wide">Current plan</p>
+                        <p className="text-eyebrow">Current plan</p>
                         <p className="text-sm font-bold text-text-highlighted">
                             {isTrialing ? 'Pro (Trial)' : entitlements.state === 'free' ? 'Free' : 'Pro'}
                             {hasActivePlan && subscription != null && (
@@ -200,7 +200,7 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
                 <p className="text-sm text-text-muted">Only workspace admins can manage billing.</p>
             )}
             {!hasActivePlan && isAdmin && (
-                <div className="border border-border rounded-lg p-5 flex flex-col gap-4">
+                <div className="border border-border rounded-[var(--radius-md)] p-5 flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <h3 className="text-sm font-bold text-text-highlighted">Upgrade to Pro</h3>

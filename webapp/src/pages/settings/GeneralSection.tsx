@@ -38,7 +38,7 @@ export function GeneralSection({ details, isAdmin, onRenamed }: {
 
     return (
         <div className="w-full">
-            <h2 className="heading-2 mb-6">General</h2>
+            <h2 className="heading-2 mb-4">General</h2>
             <div className="flex flex-col gap-1.5">
                 <label className="text-sm text-text-main">Workspace Name</label>
                 <div className="flex gap-2">
