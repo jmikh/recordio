@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { LuLoader, LuMail, LuX } from 'react-icons/lu';
-import { Button, Dropdown } from '@shared/components';
+import { LuLoader, LuMail, LuMailX, LuX } from 'react-icons/lu';
+import { Button, Dropdown, Modal } from '@shared/components';
 import { apiErrorMessage, invokeFunction } from '../../api/client';
-import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useToast } from '../../components/Toast';
 import { trackWorkspaceInviteFailed } from '../../analytics';
 import { captureError } from '../../lib/sentry';
-import { PRICE_MONTHLY, PRICE_YEARLY } from '../../billing/prices';
 import type { WorkspaceDetails, WorkspaceInvitation, WorkspaceMember } from './types';
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
@@ -117,9 +115,47 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
     );
 }
 
+// ── Invitation failure modal ──────────────────────────────────────────────────
+
+/**
+ * Invite failures carry a reason the admin has to act on (seat limits, an
+ * already-invited address, a member that already exists), so they get a
+ * dismissible modal rather than a toast that scrolls away.
+ */
+function InviteFailedModal({ failure, onClose }: {
+    failure: { email: string; message: string; resend: boolean };
+    onClose: () => void;
+}) {
+    return (
+        <Modal isOpen onClose={onClose} maxWidth="max-w-[460px]" ariaLabel="Invitation failed">
+            <div className="flex items-center gap-3 mb-4">
+                <LuMailX className="icon-lg text-destructive shrink-0" />
+                <h2 className="heading-2">
+                    {failure.resend ? 'Failed to resend invitation' : 'Failed to send invitation'}
+                </h2>
+            </div>
+
+            <p className="text-sm text-text-main mb-2">
+                We couldn’t invite <span className="text-text-highlighted">{failure.email}</span> to this workspace.
+            </p>
+
+            <div
+                role="alert"
+                className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-[var(--radius-sm)] text-xs mb-6"
+            >
+                {failure.message}
+            </div>
+
+            <Button variant="primary" onClick={onClose} className="w-full">
+                Close
+            </Button>
+        </Modal>
+    );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MembersSection({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationSent, onInvitationRescinded, onGoToBilling }: {
+export function MembersSection({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationSent, onInvitationRescinded }: {
     details: WorkspaceDetails;
     currentUserId: string | null;
     /** Active subscription — the single plan includes collaboration (billing revamp Step 1) */
@@ -129,18 +165,19 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     /** A sent or resent invitation (replaces any prior one for the email) */
     onInvitationSent: (invitation: WorkspaceInvitation) => void;
     onInvitationRescinded: (invitationId: string) => void;
-    onGoToBilling?: () => void;
 }) {
     const { addToast }                    = useToast();
-    const { subscription }                = useWorkspaceStore();
     const [inviteEmail, setInviteEmail]   = useState('');
     const [inviteRole, setInviteRole]     = useState<'viewer' | 'creator'>('creator');
     const [inviting, setInviting]         = useState(false);
     const [removingId, setRemovingId]     = useState<string | null>(null);
     const [rescindingId, setRescindingId] = useState<string | null>(null);
     const [resendingId, setResendingId]   = useState<string | null>(null);
+    const [inviteFailure, setInviteFailure] = useState<{ email: string; message: string; resend: boolean } | null>(null);
 
     const isAdmin = details.role === 'admin';
+    // Seats are bought by the owner alone — an admin out of seats has to ask
+    const isOwner = currentUserId === details.owner_id;
 
     // Seat pre-purchase (plans/seat-prepurchase-oneshot.md): purchased =
     // subscription seats; used = creator/admin members (the owner is
@@ -151,11 +188,30 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     const reservedSeats  = details.invitations.filter(i => i.role !== 'viewer').length;
     const availableSeats = Math.max(0, purchasedSeats - usedSeats - reservedSeats);
     const noSeatLeft     = availableSeats === 0;
-    const viewerMembers  = details.members.filter(m => m.role === 'viewer');
-    const seatPrice      = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
     // With every seat taken, the creator option is disabled — fall back to viewer
     const effectiveInviteRole: 'viewer' | 'creator' = noSeatLeft && inviteRole === 'creator' ? 'viewer' : inviteRole;
-    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+    // Addresses the workspace already knows: a member can't be invited at all,
+    // and a pending invitation is REPLACED by the server (delete + reinsert),
+    // so re-sending the same role is really a resend — steer to that button
+    // instead of silently issuing a second, identical invitation.
+    const typedEmail     = inviteEmail.trim().toLowerCase();
+    const existingMember = typedEmail ? details.members.find(m => m.email.toLowerCase() === typedEmail) : undefined;
+    const existingInvite = typedEmail ? details.invitations.find(i => i.email.toLowerCase() === typedEmail) : undefined;
+    // A pending invite for a DIFFERENT role is still worth sending — it swaps the role
+    const duplicateInvite = existingInvite?.role === effectiveInviteRole;
+    const inviteBlocked   = Boolean(existingMember) || duplicateInvite;
+
+    // Only say what the seat bar above can't — a routine invite needs no hint
+    const inviteHint =
+        existingMember  ? `${existingMember.email} is already a member of this workspace.`
+      : duplicateInvite ? `${typedEmail} already has a pending ${effectiveInviteRole} invitation — use Resend below.`
+      : existingInvite  ? `${typedEmail} is already invited as ${existingInvite.role} — sending replaces that invitation.`
+      : noSeatLeft      ? (isOwner
+                            ? 'No creator seats available — add a seat above to invite more creators.'
+                            : 'No creator seats available — ask the workspace owner to add seats.')
+      : effectiveInviteRole === 'viewer' ? 'Viewers are free — library access only.'
+      : null;
 
     const inputClass = "px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
@@ -163,16 +219,11 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     if (!hasTeamAccess) {
         return (
             <div className="w-full">
-                <h2 className="heading-2 mb-2">Members</h2>
-                <p className="text-sm text-text-muted">
-                    Adding team members is a Pro feature.{' '}
-                    <button
-                        type="button"
-                        className="text-primary hover:underline cursor-pointer"
-                        onClick={onGoToBilling}
-                    >
-                        Upgrade to Pro →
-                    </button>
+                <h3 className="text-sm font-bold text-text-highlighted">Members</h3>
+                <p className="text-xs text-text-muted mt-1">
+                    {isOwner
+                        ? 'Adding team members is a Pro feature.'
+                        : 'Adding team members is a Pro feature — the workspace owner buys the seats.'}
                 </p>
             </div>
         );
@@ -183,7 +234,7 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         const email = inviteEmail.trim().toLowerCase();
-        if (!email) return;
+        if (!email || inviteBlocked) return;
         setInviting(true);
         try {
             const { data, error } = await invokeFunction('workspace-invite', {
@@ -211,7 +262,11 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                 error_name: failure?.name,
                 is_offline: !navigator.onLine,
             });
-            addToast({ type: 'error', title: await apiErrorMessage(err, 'Failed to send invitation') });
+            setInviteFailure({
+                email,
+                message: await apiErrorMessage(err, 'Something went wrong while sending the invitation.'),
+                resend: false,
+            });
         } finally {
             setInviting(false);
         }
@@ -271,7 +326,11 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
             addToast({ type: 'success', title: `Invitation resent to ${email}` });
         } catch (err) {
             captureError(err, { flow: 'workspace', phase: 'invite_resend', workspaceId: details.id, extra: { role } });
-            addToast({ type: 'error', title: await apiErrorMessage(err, 'Failed to resend invitation') });
+            setInviteFailure({
+                email,
+                message: await apiErrorMessage(err, 'Something went wrong while resending the invitation.'),
+                resend: true,
+            });
         } finally {
             setResendingId(null);
         }
@@ -281,47 +340,6 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
 
     return (
         <div className="w-full flex flex-col gap-6">
-            {/* Header */}
-            <div>
-                <h2 className="heading-2">Members</h2>
-                <p className="text-sm text-text-muted mt-0.5">Invite teammates and manage their access.</p>
-            </div>
-
-            {/* Seat summary — purchased seats vs. seats in use / reserved */}
-            <div className="border border-border rounded-[var(--radius-md)] p-5 flex flex-col gap-2">
-                <div className="flex items-baseline justify-between gap-4 flex-wrap">
-                    <p className="text-sm text-text-muted">
-                        <span className="text-2xl font-bold text-text-highlighted">{usedSeats}</span>
-                        {' '}of {plural(purchasedSeats, 'seat')} used ·
-                        {' '}${purchasedSeats * seatPrice}/mo
-                        {subscription?.billingInterval === 'yearly' ? ', billed yearly' : ''}
-                    </p>
-                    {viewerMembers.length > 0 && (
-                        <span className="text-sm text-text-muted">
-                            {plural(viewerMembers.length, 'viewer')} · free
-                        </span>
-                    )}
-                </div>
-                <p className="text-xs text-text-muted">
-                    {reservedSeats > 0 && `${reservedSeats} reserved by pending ${reservedSeats === 1 ? 'invite' : 'invites'}. `}
-                    {noSeatLeft
-                        ? 'All purchased seats are taken.'
-                        : `${plural(availableSeats, 'seat')} available for new creators or admins.`}
-                    {isAdmin && (
-                        <>
-                            {' '}
-                            <button
-                                type="button"
-                                className="text-primary hover:underline cursor-pointer"
-                                onClick={onGoToBilling}
-                            >
-                                {noSeatLeft ? 'Add seats →' : 'Manage seats →'}
-                            </button>
-                        </>
-                    )}
-                </p>
-            </div>
-
             {/* Invite form — admin/owner only; creators need a free purchased seat */}
             {isAdmin ? (
                 <div className="border border-border rounded-[var(--radius-md)] p-5">
@@ -333,7 +351,8 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                             placeholder="colleague@example.com"
                             value={inviteEmail}
                             onChange={e => setInviteEmail(e.target.value)}
-                            className={`${inputClass} flex-1`}
+                            aria-invalid={inviteBlocked || undefined}
+                            className={`${inputClass} flex-1 ${inviteBlocked ? 'border-destructive' : ''}`}
                         />
                         <Dropdown<'creator' | 'viewer'>
                             options={[
@@ -348,18 +367,18 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                         <Button
                             type="submit"
                             variant="primary"
-                            disabled={inviting || !inviteEmail.trim()}
+                            disabled={inviting || !typedEmail || inviteBlocked}
                         >
-                            {inviting ? 'Sending…' : 'Send Invite'}
+                            {inviting
+                                ? 'Sending…'
+                                : existingInvite && !duplicateInvite ? 'Update Invite' : 'Send Invite'}
                         </Button>
                     </form>
-                    <p className="text-xs text-text-muted mt-2">
-                        {noSeatLeft
-                            ? 'No creator seats available — add seats to invite more creators.'
-                            : effectiveInviteRole === 'viewer'
-                                ? 'Viewers are free — library access only.'
-                                : `Uses 1 of your ${plural(purchasedSeats, 'purchased seat')} (${availableSeats} available).`}
-                    </p>
+                    {inviteHint && (
+                        <p role="status" className={`text-xs mt-2 ${inviteBlocked ? 'text-destructive' : 'text-text-muted'}`}>
+                            {inviteHint}
+                        </p>
+                    )}
                 </div>
             ) : (
                 <p className="text-sm text-text-muted">Only workspace admins can invite members.</p>
@@ -434,6 +453,10 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                         })}
                     </div>
                 </div>
+            )}
+
+            {inviteFailure && (
+                <InviteFailedModal failure={inviteFailure} onClose={() => setInviteFailure(null)} />
             )}
         </div>
     );

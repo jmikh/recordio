@@ -9,9 +9,9 @@ test.describe('smoke (authenticated)', () => {
         await expect(page.getByText('Sign in to keep recording')).toBeHidden();
     });
 
-    test('can open workspace settings → Plans & Billing', async ({ page }) => {
+    test('can open workspace settings → Plan & members', async ({ page }) => {
         await page.goto('/workspace/settings/billing');
-        await expect(page.getByText('Plans & Billing').first()).toBeVisible();
+        await expect(page.getByText('Plan & members').first()).toBeVisible();
         await expect(page.getByText('Sign in to keep recording')).toBeHidden();
     });
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LuLoader } from 'react-icons/lu';
+import { LuLoader, LuLock } from 'react-icons/lu';
 import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
@@ -42,12 +42,20 @@ export function WorkspaceSettingsPage() {
     const [loading, setLoading] = useState(true);
     const scrollTarget = useRef(readScrollTarget());
 
-    const isAdmin = workspaceRole === 'admin';
+    // The owner is synthesized as 'admin' server-side (workspace-get /
+    // -get-default / -list), so admin covers owner. `details.role` is the
+    // authoritative copy; the store's role is what we have before it loads.
+    const role = details?.role ?? workspaceRole;
+    const isAdmin = role === 'admin';
+    // Role known and not admin — nothing on this page is theirs to see
+    const accessDenied = role !== null && !isAdmin;
 
     useEffect(() => { trackWorkspaceSettingsPageLoaded(workspaceId); }, []);
 
     useEffect(() => {
         if (!workspaceId) return;
+        // Viewers and creators get the no-access state — don't fetch details for them
+        if (workspaceRole !== null && workspaceRole !== 'admin') { setLoading(false); return; }
         setLoading(true);
         (async () => {
             try {
@@ -61,7 +69,7 @@ export function WorkspaceSettingsPage() {
                 setLoading(false);
             }
         })();
-    }, [workspaceId]);
+    }, [workspaceId, workspaceRole]);
 
     // Honor a deep-linked section once the sections have rendered
     useEffect(() => {
@@ -135,6 +143,30 @@ export function WorkspaceSettingsPage() {
     // in use; pending creator/admin invitations reserve seats.
     const usedSeats = Math.max(1, details?.members.filter(m => m.role === 'creator' || m.role === 'admin').length ?? 1);
     const reservedSeats = details?.invitations.filter(i => i.role !== 'viewer').length ?? 0;
+    const viewerCount = details?.members.filter(m => m.role === 'viewer').length ?? 0;
+
+    if (accessDenied) {
+        return (
+            <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-16">
+                <div>
+                    <h1 className="heading-2">Workspace settings</h1>
+                </div>
+                <div role="status" className={`${SECTION_CARD} flex items-start gap-3`}>
+                    <LuLock className="icon-lg text-text-muted shrink-0 mt-0.5" />
+                    <div>
+                        <h2 className="text-sm font-bold text-text-highlighted">
+                            You don't have access to workspace settings
+                        </h2>
+                        <p className="text-sm text-text-muted mt-1">
+                            Only admins and the owner of {workspaceName ?? 'this workspace'} can
+                            manage its name, members and plan. You're {role === 'viewer' ? 'a viewer' : 'a creator'} here —
+                            ask an admin if you need access.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-16">
@@ -153,12 +185,25 @@ export function WorkspaceSettingsPage() {
             ) : !details ? (
                 <p className={`${SECTION_CARD} text-sm text-text-muted`}>Could not load workspace settings.</p>
             ) : (
-                <>
-                    <section className={SECTION_CARD}>
-                        <GeneralSection details={details} isAdmin={isAdmin} onRenamed={handleRenamed} />
-                    </section>
+                <section className={SECTION_CARD}>
+                    <GeneralSection details={details} isAdmin={isAdmin} onRenamed={handleRenamed} />
+                </section>
+            )}
 
-                    <section id="settings-members" className={SECTION_CARD}>
+            {/* Plan, seats and members are one story — the seats you buy are the
+                seats you hand out — so they share a card instead of cross-linking */}
+            <section id="settings-billing" className={`${SECTION_CARD} flex flex-col gap-6`}>
+                <h2 className="heading-2">Plan & members</h2>
+
+                <BillingSection
+                    usedSeats={usedSeats}
+                    reservedSeats={reservedSeats}
+                    viewerCount={viewerCount}
+                    onSeatsChanged={handleSeatsChanged}
+                />
+
+                {details && (
+                    <div id="settings-members" className="pt-6 border-t border-border scroll-mt-6">
                         <MembersSection
                             details={details}
                             currentUserId={userId}
@@ -167,19 +212,9 @@ export function WorkspaceSettingsPage() {
                             onMemberRoleChanged={handleMemberRoleChanged}
                             onInvitationSent={handleInvitationSent}
                             onInvitationRescinded={handleInvitationRescinded}
-                            onGoToBilling={() => scrollTo('billing')}
                         />
-                    </section>
-                </>
-            )}
-
-            <section id="settings-billing" className={SECTION_CARD}>
-                <BillingSection
-                    onGoToMembers={() => scrollTo('members')}
-                    usedSeats={usedSeats}
-                    seatFloor={usedSeats + reservedSeats}
-                    onSeatsChanged={handleSeatsChanged}
-                />
+                    </div>
+                )}
             </section>
         </div>
     );

@@ -130,7 +130,7 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
         expect(await memberRole(ws.id, user.id)).toEqual([]);
     });
 
-    it('accepts: joins with the invitation role, marks accepted, sets the default workspace; a second accept fails used', async () => {
+    it('accepts: joins with the invitation role, deletes the invitation, sets the default workspace; a second accept fails used', async () => {
         const user = await freshUser();
         const ws = await freshWorkspace();
         const inv = await seedWorkspaceInvitation(pool, {
@@ -146,7 +146,7 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
         expect(await memberRole(ws.id, user.id)).toEqual([{ role: 'creator' }]);
         const { rows: invRows } = await pool.query(
             'SELECT status FROM workspace_invitations WHERE id = $1', [inv.id]);
-        expect(invRows).toEqual([{ status: 'accepted' }]);
+        expect(invRows).toEqual([]);
         expect(await getDefaultWorkspaceId(pool, user.id)).toBe(ws.id);
 
         const again = await post(testApp().app, { token: inv.token }, t);

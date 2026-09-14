@@ -8,9 +8,11 @@
  * creator/admin roles (the invite reserved a seat, so this only fails
  * when seats were reduced in between — the belt); then ONE atomic
  * data-modifying-CTE statement: member row UPSERTS (re-invite updates
- * the role) + invitation marked accepted + the joined workspace becomes
- * the caller's default. Nothing here touches Stripe — seats are bought
- * in advance, never on acceptance.
+ * the role) + the invitation row is DELETED (the membership is the
+ * record of the accepted invite; every reader filters status =
+ * 'pending', so a kept row is dead weight) + the joined workspace
+ * becomes the caller's default. Nothing here touches Stripe — seats are
+ * bought in advance, never on acceptance.
  *
  * Business failures are 200 + { error } with the SQL fn's EXACT
  * messages — AcceptInvitePage displays them (the asset-upload
@@ -109,8 +111,8 @@ export const workspaceInviteAcceptRoutes: FastifyPluginAsyncTypebox = async (app
                     ON CONFLICT (workspace_id, user_id) DO UPDATE
                         SET role = EXCLUDED.role, updated_at = now()
                 ),
-                accepted AS (
-                    UPDATE workspace_invitations SET status = 'accepted' WHERE id = $4
+                consumed AS (
+                    DELETE FROM workspace_invitations WHERE id = $4
                 )
                 UPDATE user_profiles
                 SET default_workspace_id = $1, updated_at = now()

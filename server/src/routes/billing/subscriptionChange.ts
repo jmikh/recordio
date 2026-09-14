@@ -9,17 +9,19 @@
  * (remove members / cancel invites first). Proration is always_invoice
  * in both directions — an increase invoices the prorated remainder now,
  * a decrease credits the unused remainder to the Stripe customer
- * balance (never cash; it offsets the next invoice). Caller must be a
- * workspace admin/owner. On apply, the DB row is updated immediately so
- * the client's refreshSubscription() reflects the change before the
+ * balance (never cash; it offsets the next invoice). Caller must be the
+ * workspace OWNER — seat purchases are not an admin power. On apply,
+ * the DB row is updated immediately so the client's
+ * refreshSubscription() reflects the change before the
  * Stripe webhook (which stays authoritative) syncs again.
  *
  * The edge fn's `subscription_workspace_get` RPC (SECURITY DEFINER, admin
  * check via assert_workspace_admin/auth.uid()) is EXCLUSIVE to that edge
  * fn — its logic is ported inline below and the SQL function becomes a
- * decommission-checklist orphan. Its 403/404 split is preserved: the RPC
- * raised PT403 for non-admin/deleted-workspace (edge fn → 403) but
- * returned NULL for admin-with-no-subscription (→ 404).
+ * decommission-checklist orphan. Its 403/404 split is preserved (with
+ * the check narrowed from admin-or-owner to owner): PT403 for
+ * non-owner/deleted-workspace (edge fn → 403), NULL for
+ * owner-with-no-subscription (→ 404).
  *
  * dryRun stays REQUIRED — the edge fn treated a missing dryRun as falsy
  * and silently APPLIED the change; failing 400 beats defaulting to the
@@ -104,11 +106,12 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                 'stripe.dry_run': dryRun,
             });
 
-            // Admin check + subscription in one query, keeping the RPC's
-            // 403/404 split: no row = not owner/admin (or deleted
-            // workspace), row with NULL status = admin but no
-            // subscription row. Owner counts without a member row
-            // (revamp Step 2).
+            // Owner check + subscription in one query, keeping the RPC's
+            // 403/404 split: no row = not the owner (or deleted
+            // workspace), row with NULL status = owner but no
+            // subscription row. Seat purchases are the owner's alone —
+            // admins manage people, not the plan. The owner has no
+            // member row (revamp Step 2).
             const { rows } = await app.deps.db.query(
                 `SELECT s.status, s.billing_interval, s.seats,
                         s.stripe_customer_id, s.stripe_subscription_id
@@ -117,15 +120,7 @@ export const subscriptionChangeRoutes: FastifyPluginAsyncTypebox<SubscriptionCha
                      ON s.workspace_id = w.id
                  WHERE w.id = $1
                    AND w.deleted_at IS NULL
-                   AND (
-                       w.owner_id = $2
-                       OR EXISTS (
-                           SELECT 1 FROM workspace_members wm
-                           WHERE wm.workspace_id = w.id
-                             AND wm.user_id = $2
-                             AND wm.role = 'admin'
-                       )
-                   )`,
+                   AND w.owner_id = $2`,
                 [workspaceId, req.user!.id],
             );
             const sub = rows[0] as SubscriptionRow | undefined;

@@ -19,10 +19,12 @@
  * subscription row with a NULL stripe_customer_id also 404s (edge fn's
  * `!sub?.stripe_customer_id`).
  *
- * Revamp Step 6: the portal is admin/owner-only — it exposes payment
- * methods, invoices, and the cancel button. Non-admin MEMBERS get an
- * explicit 403 (no point information-hiding what /subscription-get
- * already shows them); non-members keep the parity 404.
+ * Revamp Step 6: the portal is OWNER-only — it exposes payment
+ * methods, invoices, and the cancel button, and the plan is the owner's
+ * (admins manage people, not the subscription). MEMBERS who aren't the
+ * owner — admins included — get an explicit 403 (no point
+ * information-hiding what /subscription-get already shows them);
+ * non-members keep the parity 404.
  *
  * Request:  { returnUrl, workspaceId }
  * Response: { url }
@@ -32,7 +34,7 @@ import { Type } from '@sinclair/typebox';
 
 interface PortalRow {
     stripe_customer_id: string | null;
-    is_admin: boolean;
+    is_owner: boolean;
 }
 
 export const stripePortalRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -56,20 +58,11 @@ export const stripePortalRoutes: FastifyPluginAsyncTypebox = async (app) => {
             const { returnUrl, workspaceId } = req.body;
             req.logCtx.set({ 'workspace.id': workspaceId });
 
-            // Membership keeps the parity 404; the admin flag adds the
-            // Step 6 authority split. Owner counts without a member row
-            // (revamp Step 2).
+            // Membership keeps the parity 404; the owner flag adds the
+            // authority split. The owner has no member row (revamp Step 2).
             const { rows } = await app.deps.db.query(
                 `SELECT s.stripe_customer_id,
-                        (
-                            w.owner_id = $2
-                            OR EXISTS (
-                                SELECT 1 FROM workspace_members wm
-                                WHERE wm.workspace_id = s.workspace_id
-                                  AND wm.user_id = $2
-                                  AND wm.role = 'admin'
-                            )
-                        ) AS is_admin
+                        (w.owner_id = $2) AS is_owner
                  FROM subscriptions s
                  JOIN workspaces w ON w.id = s.workspace_id
                  WHERE s.workspace_id = $1
@@ -85,8 +78,8 @@ export const stripePortalRoutes: FastifyPluginAsyncTypebox = async (app) => {
             );
             const row = rows[0] as PortalRow | undefined;
 
-            if (row && !row.is_admin) {
-                return reply.code(403).send({ error: 'Requires admin role in this workspace' });
+            if (row && !row.is_owner) {
+                return reply.code(403).send({ error: 'Requires workspace ownership' });
             }
             const customerId = row?.stripe_customer_id;
             if (!customerId) {

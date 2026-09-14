@@ -1,6 +1,6 @@
 /**
  * POST /stripe-checkout — full HTTP stack via app.inject() with fake
- * deps. The route reads the DB: caller must be admin-or-owner of the
+ * deps. The route reads the DB: caller must be the OWNER of the
  * workspace, and the quantity is the CHOSEN seat count (seat
  * pre-purchase, plans/seat-prepurchase-oneshot.md) floored at the seats
  * already in use (owner + creator/admin members) — so the happy path
@@ -204,7 +204,7 @@ describe.runIf(hasTestDb())('POST /stripe-checkout (e2e, real Postgres)', () => 
         expect(deps.stripe.checkoutSessions).toHaveLength(0);
     });
 
-    it('403 for a creator member and for a non-member (billing is admin/owner-only)', async () => {
+    it('403 for a creator member and for a non-member (billing is owner-only)', async () => {
         const ws = await ownedWorkspace();
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
         const { app, deps } = testApp();
@@ -212,7 +212,7 @@ describe.runIf(hasTestDb())('POST /stripe-checkout (e2e, real Postgres)', () => 
         const asCreator = await post(app, bodyFor(ws.id, SEEDED_USER_2_ID),
             await userToken({ sub: SEEDED_USER_2_ID }));
         expect(asCreator.statusCode).toBe(403);
-        expect(asCreator.json()).toEqual({ error: 'Requires admin role in this workspace' });
+        expect(asCreator.json()).toEqual({ error: 'Requires workspace ownership' });
 
         const stranger = await seedWorkspace(pool, { ownerId: SEEDED_USER_2_ID });
         createdWorkspaces.push(stranger.id);
@@ -223,16 +223,16 @@ describe.runIf(hasTestDb())('POST /stripe-checkout (e2e, real Postgres)', () => 
         expect(deps.stripe.checkoutSessions).toHaveLength(0);
     });
 
-    it('200 for an invited admin member', async () => {
+    it('403 for an invited ADMIN member — buying the plan is the owner\u2019s alone', async () => {
         const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_2_ID });
         createdWorkspaces.push(ws.id);
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
         const { app, deps } = testApp();
 
         const res = await post(app, bodyFor(ws.id), await userToken({ sub: SEEDED_USER_ID }));
-        expect(res.statusCode).toBe(200);
-        // owner + 1 admin member = 2 seats in use
-        expect(deps.stripe.checkoutSessions[0]).toMatchObject({ quantity: 2 });
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: 'Requires workspace ownership' });
+        expect(deps.stripe.checkoutSessions).toHaveLength(0);
     });
 
     it('contributes workspace/interval to the canonical request event', async () => {

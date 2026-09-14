@@ -7,7 +7,7 @@
  * in use). The floor is the current used count — a workspace
  * re-upgrading after a lapse keeps its members, so its checkout must
  * cover them (1 for the normal solo-owner upgrade). Caller must be
- * admin-or-owner of the workspace (billing mutations are admin-only).
+ * the OWNER of the workspace (billing mutations are owner-only).
  *
  * Kept for parity, flagged as a smell in the plan: userEmail is
  * client-supplied and forwarded to Stripe unchecked against the token's
@@ -84,25 +84,18 @@ export const stripeCheckoutRoutes: FastifyPluginAsyncTypebox<StripeCheckoutRoute
                 return reply.code(403).send({ error: 'Unauthorized: User ID mismatch' });
             }
 
-            // Billing mutations are admin/owner-only (same predicate as
-            // /subscription-change).
+            // Billing mutations are OWNER-only (same predicate as
+            // /subscription-change and /stripe-portal): the subscription is
+            // the owner's, admins manage people rather than the plan.
             const { rows: authzRows } = await app.deps.db.query(
                 `SELECT 1 FROM workspaces w
                  WHERE w.id = $1
                    AND w.deleted_at IS NULL
-                   AND (
-                       w.owner_id = $2
-                       OR EXISTS (
-                           SELECT 1 FROM workspace_members wm
-                           WHERE wm.workspace_id = w.id
-                             AND wm.user_id = $2
-                             AND wm.role = 'admin'
-                       )
-                   )`,
+                   AND w.owner_id = $2`,
                 [workspaceId, req.user!.id],
             );
             if (authzRows.length === 0) {
-                return reply.code(403).send({ error: 'Requires admin role in this workspace' });
+                return reply.code(403).send({ error: 'Requires workspace ownership' });
             }
 
             const { used } = await getSeatUsage(app.deps.db, workspaceId);

@@ -121,8 +121,8 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
         ]);
     });
 
-    it.each(['viewer', 'creator'] as const)(
-        'non-admin member (%s): 403 — the portal is admin/owner-only (revamp Step 6), no Stripe call',
+    it.each(['viewer', 'creator', 'admin'] as const)(
+        'non-owner member (%s): 403 — the portal is owner-only, no Stripe call',
         async (role) => {
             const { app, deps } = testApp();
             const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
@@ -131,20 +131,10 @@ describe.runIf(hasTestDb())('POST /stripe-portal (e2e, real Postgres)', () => {
 
             const res = await post(app, validBody(ws.id), await memberToken());
             expect(res.statusCode).toBe(403);
-            expect(res.json()).toEqual({ error: 'Requires admin role in this workspace' });
+            expect(res.json()).toEqual({ error: 'Requires workspace ownership' });
             expect(deps.stripe.portalSessions).toHaveLength(0);
         },
     );
-
-    it('invited ADMIN member: 200 (admin authority equals the owner here)', async () => {
-        const { app } = testApp();
-        const ws = await seedWs({ ownerId: SEEDED_USER_2_ID });
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
-        await seedSubscription(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
-
-        const res = await post(app, validBody(ws.id), await memberToken());
-        expect(res.statusCode).toBe(200);
-    });
 
     it('non-member: 404 with the exact edge-function body, no Stripe call', async () => {
         const { app, deps } = testApp();

@@ -44,7 +44,7 @@ test.describe('billing (seat pre-purchase)', () => {
         const upgrade = page.getByRole('button', { name: 'Upgrade to Pro', exact: true });
         await expect(upgrade).toBeVisible();
         // Solo owner → the checkout starts at one seat
-        await expect(page.getByLabel('Seats')).toHaveText('1');
+        await expect(page.getByLabel('Seats', { exact: true })).toHaveText('1');
 
         const [popup] = await Promise.all([page.waitForEvent('popup'), upgrade.click()]);
         await popup.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
@@ -66,10 +66,10 @@ test.describe('billing (seat pre-purchase)', () => {
         // Survives a reload — the row is really there
         await page.reload();
         await expect(page.getByText('Pro · 1 seat')).toBeVisible();
-        await expect(page.getByText('1 of 1 seat used')).toBeVisible();
+        await expect(page.getByRole('img', { name: /1 of 1 seat used/ })).toBeVisible();
     });
 
-    test('admin buys seats, then invites creators up to the limit', async ({ page }) => {
+    test('owner buys seats, then invites creators up to the limit', async ({ page }) => {
         await seedProSubscription(stripeEnv!, {
             workspaceId: ws.workspaceId,
             userId: ws.userId,
@@ -79,27 +79,27 @@ test.describe('billing (seat pre-purchase)', () => {
 
         await page.goto('/workspace/settings/billing');
         await expect(page.getByText('Pro · 1 seat')).toBeVisible();
-        await expect(page.getByText('1 of 1 seat used')).toBeVisible();
+        await expect(page.getByRole('img', { name: /1 of 1 seat used/ })).toBeVisible();
 
         // Buy two more seats
         const addSeat = page.getByRole('button', { name: 'Add seat', exact: true });
         await addSeat.click();
         await addSeat.click();
-        await expect(page.getByLabel('Seats')).toHaveText('3');
+        await expect(page.getByLabel('Seats', { exact: true })).toHaveText('3');
         await expect(page.getByText(/Charged today: \$/)).toBeVisible({ timeout: 20_000 });
         await page.getByRole('button', { name: 'Update seats' }).click();
         await expect(page.getByText('Seats updated to 3')).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText('Pro · 3 seats')).toBeVisible();
-        await expect(page.getByText('1 of 3 seats used')).toBeVisible();
+        await expect(page.getByRole('img', { name: /1 of 3 seats used/ })).toBeVisible();
 
         await page.reload();
         await expect(page.getByText('Pro · 3 seats')).toBeVisible();
-        await expect(page.getByText('1 of 3 seats used')).toBeVisible();
+        await expect(page.getByRole('img', { name: /1 of 3 seats used/ })).toBeVisible();
 
         // Two creator invites fill the purchased seats…
         await invite(page, 'e2e-creator-a@example.com', 'Creator');
         await invite(page, 'e2e-creator-b@example.com', 'Creator');
-        await expect(page.getByText('2 reserved by pending invites')).toBeVisible();
+        await expect(page.getByRole('img', { name: /2 reserved by pending invitations/ })).toBeVisible();
         await expect(page.getByText('No creator seats available')).toBeVisible();
         // …so the role picker can only offer Viewer now
         await expect(page.getByRole('button', { name: 'Invite role' })).toHaveText(/Viewer/);
