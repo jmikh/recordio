@@ -54,7 +54,7 @@ export interface DomainLogFields {
     'asset.type'?: string;
     'storage.path_count'?: number;
     'storage.bytes'?: number;
-    'email.template'?: 'welcome' | 'workspace-invite' | 'seat-change';
+    'email.template'?: 'welcome' | 'workspace-invite';
     /** Target user of a minted impersonation token (/admin-impersonate) */
     'admin.target_user_id'?: string;
     /** Request made with an impersonation token — the admin's user id (audit trail) */

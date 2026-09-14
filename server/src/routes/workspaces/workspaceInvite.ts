@@ -5,13 +5,19 @@
  * lower(email); role enum enforced by the schema (replaces the
  * 'Invalid role' RAISE); invitations don't expire.
  *
+ * Seat pre-purchase (plans/seat-prepurchase-oneshot.md): inviting
+ * requires an active subscription, and a creator/admin invite needs a
+ * FREE purchased seat — pending creator/admin invitations reserve one,
+ * so an admin can never invite more people than they bought seats for.
+ * Viewers are free (hidden VIEWER_CEILING backstop).
+ *
  * The SQL fn's pg_net hop to /send-workspace-invite-email becomes an
  * IN-PROCESS call to the shared service — fire-and-forget with a
  * logged failure (pg_net parity: invite creation succeeds even if the
  * email fails).
  *
  * Request:  { workspaceId, email, role }
- * Response: { invitationId, token } | 403 { error }
+ * Response: { invitationId, token } | 403/409 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
@@ -21,7 +27,12 @@ import {
 } from '@shared/api/workspaces';
 import { getWorkspaceEntitlements } from '../../services/entitlements.js';
 import { isWorkspaceAdmin } from '../../services/projectAccess.js';
-import { VIEWER_CEILING } from '../../services/seatBilling.js';
+import {
+    getSeatUsage,
+    NO_SEATS_AVAILABLE_ERROR,
+    seatsAvailable,
+    VIEWER_CEILING,
+} from '../../services/seatBilling.js';
 import { sendWorkspaceInviteEmail } from '../../services/workspaceInviteEmail.js';
 
 export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -49,8 +60,8 @@ export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 return reply.code(403).send({ error: 'Requires admin role in this workspace' });
             }
 
-            // Collaboration is Pro-only (revamp Step 6) — free AND trial
-            // workspaces are strictly solo; dunning (past_due) keeps rights.
+            // Collaboration is Pro-only — free AND trial workspaces are
+            // strictly solo; dunning (past_due) keeps rights.
             const entitlements = await getWorkspaceEntitlements(db, app.deps.clock, workspaceId);
             if (!entitlements.canInvite) {
                 return reply
@@ -58,10 +69,10 @@ export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     .send({ error: 'Inviting members requires an active subscription' });
             }
 
-            // Hidden viewer ceiling (abuse backstop, revamp Step 6) —
-            // accepted viewers + pending viewer invites both count, or the
-            // ceiling is trivially bypassed by mass-inviting.
             if (role === 'viewer') {
+                // Hidden viewer ceiling (abuse backstop) — accepted viewers
+                // + pending viewer invites both count, or the ceiling is
+                // trivially bypassed by mass-inviting.
                 const { rows: viewerRows } = await db.query(
                     `SELECT
                         (SELECT COUNT(*) FROM workspace_members wm
@@ -76,6 +87,14 @@ export const workspaceInviteRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     return reply
                         .code(403)
                         .send({ error: 'Viewer limit reached — contact support to increase it' });
+                }
+            } else {
+                // A creator/admin invite reserves a purchased seat. The
+                // re-invited email is excluded from the pending count so
+                // resending never blocks on its own reservation.
+                const usage = await getSeatUsage(db, workspaceId, { excludeInviteEmail: email });
+                if (seatsAvailable(usage) === 0) {
+                    return reply.code(403).send({ error: NO_SEATS_AVAILABLE_ERROR });
                 }
             }
 

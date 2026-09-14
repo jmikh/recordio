@@ -1,9 +1,10 @@
 /**
  * POST /stripe-checkout — full HTTP stack via app.inject() with fake
- * deps. Since revamp Step 6 the route reads the DB: caller must be
- * admin-or-owner of the workspace, and quantity is the COMPUTED
- * billed-seat count (owner + creator/admin members) — so the happy
- * path lives in the real-Postgres e2e tier; the validation tier covers
+ * deps. The route reads the DB: caller must be admin-or-owner of the
+ * workspace, and the quantity is the CHOSEN seat count (seat
+ * pre-purchase, plans/seat-prepurchase-oneshot.md) floored at the seats
+ * already in use (owner + creator/admin members) — so the happy path
+ * lives in the real-Postgres e2e tier; the validation tier covers
  * everything that fails before the first query.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -88,6 +89,12 @@ describe('POST /stripe-checkout (auth + validation, no db)', () => {
         expect(res.statusCode).toBe(400);
     });
 
+    it('400 when seats is below 1 or not an integer', async () => {
+        const { app } = testApp();
+        expect((await post(app, { ...validBody, seats: 0 }, await userToken())).statusCode).toBe(400);
+        expect((await post(app, { ...validBody, seats: 1.5 }, await userToken())).statusCode).toBe(400);
+    });
+
     it('403 with the exact edge-function body when userId does not match the token', async () => {
         const { app, deps } = testApp();
         const res = await post(app, { ...validBody, userId: 'user-2' }, await userToken());
@@ -137,7 +144,7 @@ describe.runIf(hasTestDb())('POST /stripe-checkout (e2e, real Postgres)', () => 
         return { ...validBody, userId, workspaceId };
     }
 
-    it('owner: 200, defaults to yearly — full session params, quantity computed (solo owner = 1)', async () => {
+    it('owner: 200, defaults to yearly and to the seats in use — full session params (solo owner = 1)', async () => {
         const ws = await ownedWorkspace();
         const { app, deps } = testApp();
         const res = await post(app, bodyFor(ws.id), await userToken({ sub: SEEDED_USER_ID }));
@@ -161,22 +168,43 @@ describe.runIf(hasTestDb())('POST /stripe-checkout (e2e, real Postgres)', () => 
         ]);
     });
 
-    it('quantity is the computed billed count: creator member = 2, viewers free (post-lapse re-upgrade path)', async () => {
+    it('seats chosen at checkout become the quantity', async () => {
         const ws = await ownedWorkspace();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
         const { app, deps } = testApp();
 
-        const res = await post(app, { ...bodyFor(ws.id), interval: 'monthly' },
+        const res = await post(app, { ...bodyFor(ws.id), interval: 'monthly', seats: 3 },
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
         expect(deps.stripe.checkoutSessions[0]).toMatchObject({
             price: 'price_m',
-            quantity: 2,
+            quantity: 3,
             metadata: expect.objectContaining({ interval: 'monthly' }),
         });
     });
 
-    it('403 for a creator member and for a non-member (billing is admin/owner-only, Step 6)', async () => {
+    it('default quantity is the seats in use: creator member = 2, viewers free (post-lapse re-upgrade path)', async () => {
+        const ws = await ownedWorkspace();
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
+        const { app, deps } = testApp();
+
+        const res = await post(app, bodyFor(ws.id), await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+        expect(deps.stripe.checkoutSessions[0]).toMatchObject({ quantity: 2 });
+    });
+
+    it('400 when the chosen seats do not cover the current members; no session', async () => {
+        const ws = await ownedWorkspace();
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'admin' });
+        const { app, deps } = testApp();
+
+        const res = await post(app, { ...bodyFor(ws.id), seats: 1 },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toEqual({ error: 'Checkout needs at least 2 seats for the current members' });
+        expect(deps.stripe.checkoutSessions).toHaveLength(0);
+    });
+
+    it('403 for a creator member and for a non-member (billing is admin/owner-only)', async () => {
         const ws = await ownedWorkspace();
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
         const { app, deps } = testApp();
@@ -203,7 +231,7 @@ describe.runIf(hasTestDb())('POST /stripe-checkout (e2e, real Postgres)', () => 
 
         const res = await post(app, bodyFor(ws.id), await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
-        // owner + 1 admin member = 2 billed seats
+        // owner + 1 admin member = 2 seats in use
         expect(deps.stripe.checkoutSessions[0]).toMatchObject({ quantity: 2 });
     });
 

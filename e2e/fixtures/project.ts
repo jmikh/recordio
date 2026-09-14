@@ -17,7 +17,7 @@ import path from 'node:path';
 import { ProjectImpl } from '../../webapp/src/core/Project';
 import { cloudStoragePath } from '../../shared/utils/projectMedia';
 import type { UserEvents } from '../../shared/types';
-import { TEST_USER, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, API_URL } from './testUser';
+import { TEST_USER, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, API_URL, type E2eCredentials } from './testUser';
 
 const SCREEN_WEBM = path.join(import.meta.dirname, 'assets/screen.webm');
 export const SCREEN_DURATION_MS = 2000; // matches the generated fixture video
@@ -41,17 +41,19 @@ async function jsonOrThrow(res: Response, what: string) {
     return res.json();
 }
 
-async function signIn(): Promise<{ token: string; userId: string }> {
+/** Supabase password grant — the main e2e user by default; fixtures/billing.ts passes its own. */
+export async function signIn(user: E2eCredentials = TEST_USER): Promise<{ token: string; userId: string }> {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: TEST_USER.email, password: TEST_USER.password }),
+        body: JSON.stringify({ email: user.email, password: user.password }),
     });
     const data = await jsonOrThrow(res, 'supabase password sign-in');
     return { token: data.access_token, userId: data.user.id };
 }
 
-async function api(route: string, token: string, body: unknown) {
+/** POST a Fastify route with the bearer token; throws on non-2xx. */
+export async function api(route: string, token: string, body: unknown) {
     const res = await fetch(`${API_URL}/${route}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

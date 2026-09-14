@@ -12,6 +12,14 @@ loadEnv({ path: path.join(rootDir, '.env.test') });
 // Where the logged-in browser session is cached. auth.setup.ts writes it; every
 // other test reuses it so tests start already authenticated (no login per test).
 export const STORAGE_STATE = path.join(import.meta.dirname, '.auth/user.json');
+// The billing specs run as a user of their own (fixtures/testUser.ts BILLING_USER).
+export const BILLING_STORAGE_STATE = path.join(import.meta.dirname, '.auth/billing-user.json');
+
+// Defaults match the standard local stack (webapp 3001 → server 8080). Override
+// both to point the suite at a second stack without touching the running one:
+//   E2E_WEBAPP_PORT=3002 E2E_API_URL=http://localhost:8081 npm run test:e2e
+const WEBAPP_PORT = Number(process.env.E2E_WEBAPP_PORT || 3001);
+const WEBAPP_URL = `http://localhost:${WEBAPP_PORT}`;
 
 export default defineConfig({
     testDir: './tests',
@@ -25,7 +33,7 @@ export default defineConfig({
     ],
 
     use: {
-        baseURL: 'http://localhost:3001',
+        baseURL: WEBAPP_URL,
         // A scrubbable timeline of the run — open with `npm run test:e2e:report` after a failure.
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
@@ -34,11 +42,21 @@ export default defineConfig({
 
     projects: [
         // Logs in once and saves the session. Everything else depends on it.
-        { name: 'setup', testMatch: /.*\.setup\.ts/ },
+        { name: 'setup', testMatch: /auth\.setup\.ts/ },
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
             dependencies: ['setup'],
+            testIgnore: /billing\.spec\.ts/,
+        },
+        // Billing upgrades / resets a workspace's subscription, so it runs as
+        // its own user (never the main e2e user's workspace) with its own session.
+        { name: 'billing-setup', testMatch: /billing\.setup\.ts/ },
+        {
+            name: 'billing',
+            testMatch: /billing\.spec\.ts/,
+            use: { ...devices['Desktop Chrome'], storageState: BILLING_STORAGE_STATE },
+            dependencies: ['billing-setup'],
         },
     ],
 
@@ -46,9 +64,14 @@ export default defineConfig({
     // for it. If you already have `npm run dev:webapp` running, this reuses it.
     // NOTE: this does NOT start Supabase / the Fastify server — see e2e/README.md.
     webServer: {
-        command: 'npm run dev:webapp',
-        cwd: rootDir,
-        url: 'http://localhost:3001',
+        command: `npx vite --port ${WEBAPP_PORT}`,
+        cwd: path.join(rootDir, 'webapp'),
+        url: WEBAPP_URL,
+        // E2E_API_URL also steers the webapp's API base (process env beats .env files in Vite)
+        env: {
+            ...(process.env as Record<string, string>),
+            ...(process.env.E2E_API_URL ? { VITE_API_URL: process.env.E2E_API_URL } : {}),
+        },
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
         stdout: 'pipe',

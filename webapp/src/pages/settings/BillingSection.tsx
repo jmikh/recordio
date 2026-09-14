@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { LuCheck, LuCreditCard, LuExternalLink, LuShieldCheck } from 'react-icons/lu';
+import { LuCheck, LuCreditCard, LuShieldCheck, LuExternalLink, LuMinus, LuPlus } from 'react-icons/lu';
 import { MARKETING_ORIGIN } from '@shared/urls';
 import { Button } from '@shared/components';
 import { AuthManager } from '../../auth/AuthManager';
-import { invokeFunction } from '../../api/client';
+import { apiErrorMessage, invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useUserStore } from '../../auth/useUserStore';
 import { useEntitlements } from '../../billing/useEntitlements';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import { useToast } from '../../components/Toast';
-import { StripeService } from '../../billing/StripeService';
+import { StripeService, type SubscriptionChangePreview } from '../../billing/StripeService';
 import { PRICE_MONTHLY, PRICE_YEARLY } from '../../billing/prices';
 import type { BillingInterval } from './types';
 
@@ -26,15 +26,58 @@ const PRO_HIGHLIGHTS = [
     'Restore deleted videos for 30 days',
 ];
 
+const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+
+// ─── Seat stepper ─────────────────────────────────────────────────────────────
+
+function SeatStepper({ value, min, onChange, disabled }: {
+    value: number;
+    min: number;
+    onChange: (value: number) => void;
+    disabled?: boolean;
+}) {
+    return (
+        <div className="flex items-center gap-1 shrink-0" role="group" aria-label="Seat count">
+            <Button
+                variant="ghost"
+                icon={LuMinus}
+                aria-label="Remove seat"
+                onClick={() => onChange(value - 1)}
+                disabled={disabled || value <= min}
+            />
+            <output aria-label="Seats" className="min-w-8 text-center text-sm font-bold text-text-highlighted">
+                {value}
+            </output>
+            <Button
+                variant="ghost"
+                icon={LuPlus}
+                aria-label="Add seat"
+                onClick={() => onChange(value + 1)}
+                disabled={disabled}
+            />
+        </div>
+    );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
- * No seat stepper since billing revamp Step 6 — seats are invite-driven
- * derived state (each accepted creator/admin invite bills, removals
- * credit); the section shows them read-only. Billing mutations
- * (checkout, portal) are admin/owner-only.
+ * Seats are purchased in advance (plans/seat-prepurchase-oneshot.md):
+ * the checkout card picks how many to buy, the active-plan stepper
+ * changes the count later (increase = prorated charge now, decrease =
+ * unused time credited to the Stripe balance). Billing mutations
+ * (checkout, seats, portal) are admin/owner-only.
  */
-export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }) {
+export function BillingSection({ onGoToMembers, usedSeats = 1, seatFloor = 1, onSeatsChanged }: {
+    onGoToMembers?: () => void;
+    /** Owner + creator/admin members — the checkout minimum */
+    usedSeats?: number;
+    /** usedSeats + pending creator/admin invitations — the minimum when reducing seats */
+    seatFloor?: number;
+    /** The purchased count changed on the server — hosts refresh their seat displays */
+    onSeatsChanged?: (seats: number) => void;
+}) {
     const { hasActivePlan, subscription, workspaceId, workspaceRole } = useWorkspaceStore();
     const entitlements = useEntitlements();
     const { userId, email, isAuthenticated } = useUserStore();
@@ -44,6 +87,7 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
 
     // ── Checkout flow state ───────────────────────────────────────────────────
     const [billingInterval, setBillingInterval] = useState<BillingInterval>('yearly');
+    const [checkoutSeats,   setCheckoutSeats]   = useState(usedSeats);
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [checkingStatus,  setCheckingStatus]  = useState(false);
     const [checkoutSuccess, setCheckoutSuccess] = useState(false);
@@ -55,7 +99,46 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
     const isTrialing = entitlements.state === 'trial';
     const isActive   = hasActivePlan && subscription?.status === 'active';
 
+    // ── Purchased-seat stepper state (active plan) ────────────────────────────
     const currentSeats = subscription?.seats ?? 1;
+    const [draftSeats, setDraftSeats]               = useState(currentSeats);
+    const [seatPreview, setSeatPreview]             = useState<SubscriptionChangePreview | null>(null);
+    const [seatPreviewLoading, setSeatPreviewLoading] = useState(false);
+    const [seatPreviewError, setSeatPreviewError]   = useState<string | null>(null);
+    const [applyingSeats, setApplyingSeats]         = useState(false);
+    const seatsDirty = isActive && draftSeats !== currentSeats;
+
+    // Follow the server's count (after apply / refresh / workspace switch)
+    useEffect(() => { setDraftSeats(currentSeats); }, [currentSeats]);
+    // The checkout minimum can only grow (members loaded after mount)
+    useEffect(() => { setCheckoutSeats(s => Math.max(s, usedSeats)); }, [usedSeats]);
+
+    // Debounced dry-run preview of the seat change
+    useEffect(() => {
+        if (!seatsDirty || !workspaceId) {
+            setSeatPreview(null);
+            setSeatPreviewError(null);
+            setSeatPreviewLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setSeatPreviewLoading(true);
+        setSeatPreview(null);
+        setSeatPreviewError(null);
+        const timer = setTimeout(async () => {
+            const { preview, error } = await StripeService.subscriptionChange({
+                workspaceId, newSeats: draftSeats, dryRun: true,
+            });
+            if (cancelled) return;
+            setSeatPreviewLoading(false);
+            if (error || !preview) {
+                setSeatPreviewError(await apiErrorMessage(error, 'Could not calculate the price change.'));
+                return;
+            }
+            setSeatPreview(preview);
+        }, 500);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [seatsDirty, draftSeats, workspaceId]);
 
     // ── Poll for checkout activation ──────────────────────────────────────────
     useEffect(() => {
@@ -71,23 +154,42 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
                 setCheckoutSuccess(true);
                 setCheckingStatus(false);
                 await AuthManager.refreshSubscription();
+                onSeatsChanged?.(data.subscription.seats);
             }
         }, 1000);
         return () => clearInterval(poll);
-    }, [checkingStatus, userId, checkoutSuccess]);
+    }, [checkingStatus, userId, checkoutSuccess, workspaceId, onSeatsChanged]);
 
     // ── Handlers ──────────────────────────────────────────────────────────────
     const handleCheckout = async () => {
         if (!isAuthenticated || !userId || !email || hasActivePlan) return;
         setCheckoutLoading(true);
         setCheckoutError(null);
-        const { error: err } = await StripeService.createCheckoutSession(userId, email, billingInterval, workspaceId);
+        const { error: err } = await StripeService.createCheckoutSession(
+            userId, email, billingInterval, workspaceId, checkoutSeats,
+        );
         setCheckoutLoading(false);
         if (err) {
-            setCheckoutError(err.message || 'Failed to start checkout. Please try again.');
+            setCheckoutError(await apiErrorMessage(err, err.message || 'Failed to start checkout. Please try again.'));
         } else {
             setCheckingStatus(true);
         }
+    };
+
+    const handleApplySeats = async () => {
+        if (!workspaceId || !seatsDirty) return;
+        setApplyingSeats(true);
+        const { error: err } = await StripeService.subscriptionChange({
+            workspaceId, newSeats: draftSeats, dryRun: false,
+        });
+        setApplyingSeats(false);
+        if (err) {
+            addToast({ type: 'error', title: await apiErrorMessage(err, 'Failed to update seats') });
+            return;
+        }
+        addToast({ type: 'success', title: `Seats updated to ${draftSeats}` });
+        onSeatsChanged?.(draftSeats);
+        await AuthManager.refreshSubscription();
     };
 
     const handleManage = async () => {
@@ -103,7 +205,9 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
 
     const seatPrice     = billingInterval === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
     const savings       = Math.round((1 - PRICE_YEARLY / PRICE_MONTHLY) * 100);
-    const planSeatPrice = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
+    const planIsYearly  = subscription?.billingInterval === 'yearly';
+    const planSeatPrice = planIsYearly ? PRICE_YEARLY : PRICE_MONTHLY;
+    const seatWord      = (n: number) => (n === 1 ? 'seat' : 'seats');
 
     return (
         <div className="w-full flex flex-col gap-6">
@@ -122,19 +226,21 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
                         <p className="text-sm font-bold text-text-highlighted">
                             {isTrialing ? 'Pro (Trial)' : entitlements.state === 'free' ? 'Free' : 'Pro'}
                             {hasActivePlan && subscription != null && (
-                                <span className="text-text-muted ml-1.5">· {subscription.seats} seat{subscription.seats !== 1 ? 's' : ''}</span>
+                                <span className="text-text-muted ml-1.5">
+                                    {' '}· {subscription.seats} {seatWord(subscription.seats)}
+                                </span>
                             )}
                         </p>
                         {isTrialing && entitlements.trialEndsAt && (
                             <p className="text-xs text-text-muted">
-                                Trial ends {new Date(entitlements.trialEndsAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                                Trial ends {formatDate(entitlements.trialEndsAt)}
                             </p>
                         )}
                         <TrialExtendLink className="self-start" />
                         {hasActivePlan && !isTrialing && subscription?.currentPeriodEnd && (
                             <p className="text-xs text-text-muted">
                                 {subscription.cancelAt ? 'Access until' : 'Renews'}{' '}
-                                {new Date(subscription.cancelAt ?? subscription.currentPeriodEnd).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                                {formatDate((subscription.cancelAt ?? subscription.currentPeriodEnd).toISOString())}
                                 {subscription.billingInterval && (
                                     <span className="ml-1 capitalize">· {subscription.billingInterval}</span>
                                 )}
@@ -149,28 +255,84 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
                     )}
                 </div>
 
-                {/* ── Seats (read-only — invite-driven since revamp Step 6) ── */}
+                {/* ── Purchased seats (admins change them here) ── */}
                 {isActive && (
-                    <div className="flex flex-col gap-1.5 pt-4 border-t border-border">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-text-muted">Seats</span>
-                            <span className="text-sm font-bold text-text-highlighted">
-                                {currentSeats} × ${planSeatPrice} = ${currentSeats * planSeatPrice}/mo
-                                {subscription?.billingInterval === 'yearly' ? ', billed yearly' : ''}
-                            </span>
+                    <div className="flex flex-col gap-3 pt-4 border-t border-border">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <p className="text-sm font-bold text-text-highlighted">Seats</p>
+                                <p className="text-xs text-text-muted">
+                                    {draftSeats} × ${planSeatPrice} = ${draftSeats * planSeatPrice}/mo
+                                    {planIsYearly ? ', billed yearly' : ''}
+                                </p>
+                            </div>
+                            {isAdmin && (
+                                <SeatStepper
+                                    value={draftSeats}
+                                    min={seatFloor}
+                                    onChange={setDraftSeats}
+                                    disabled={applyingSeats}
+                                />
+                            )}
                         </div>
                         <p className="text-xs text-text-muted">
-                            Seats adjust automatically as members join or leave.{' '}
+                            Creator and admin seats are bought in advance; viewers are free.
+                            {seatFloor > 1 && ` ${seatFloor} ${seatWord(seatFloor)} in use or reserved by pending invites.`}
                             {isAdmin && (
-                                <button type="button" onClick={onGoToMembers} className="underline hover:text-text-main cursor-pointer">
-                                    Manage members
-                                </button>
+                                <>
+                                    {' '}
+                                    <button type="button" onClick={onGoToMembers} className="underline hover:text-text-main cursor-pointer">
+                                        Manage members
+                                    </button>
+                                </>
                             )}
                         </p>
+                        {seatsDirty && (
+                            <div
+                                role="status"
+                                className="bg-primary/10 border border-primary/30 rounded-md px-3 py-2 text-xs text-text-highlighted flex flex-col gap-1"
+                            >
+                                {seatPreviewLoading && <span>Calculating the price change…</span>}
+                                {seatPreviewError && <span className="text-destructive">{seatPreviewError}</span>}
+                                {seatPreview && (
+                                    <>
+                                        <span>
+                                            {seatPreview.immediateCharge >= 0
+                                                ? `Charged today: $${seatPreview.immediateCharge.toFixed(2)}`
+                                                : `Credited to your balance: $${Math.abs(seatPreview.immediateCharge).toFixed(2)}`}
+                                        </span>
+                                        <span>
+                                            Next renewal: ${seatPreview.nextRenewalAmount.toFixed(2)} on {formatDate(seatPreview.nextRenewalDate)}
+                                        </span>
+                                        {draftSeats < currentSeats && (
+                                            <span className="text-text-muted">
+                                                Unused time for removed seats is credited to your next invoice.
+                                            </span>
+                                        )}
+                                    </>
+                                )}
+                                <div className="flex items-center gap-2 pt-1">
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleApplySeats}
+                                        disabled={applyingSeats || seatPreviewLoading}
+                                    >
+                                        {applyingSeats ? 'Updating…' : 'Update seats'}
+                                    </Button>
+                                    <Button
+                                        variant="base"
+                                        onClick={() => setDraftSeats(currentSeats)}
+                                        disabled={applyingSeats}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Non-admins can see the plan, not manage it (revamp Step 6) */}
+                {/* Non-admins can see the plan, not manage it */}
                 {hasActivePlan && !isAdmin && (
                     <p className="text-xs text-text-muted">Only workspace admins can manage billing.</p>
                 )}
@@ -195,7 +357,7 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
             </div>
 
             {/* ── Upgrade — compact; the full comparison lives on the marketing site.
-                 Admin/owner-only: checkout is a billing mutation (revamp Step 6) ── */}
+                 Admin/owner-only: checkout is a billing mutation ── */}
             {!hasActivePlan && !isAdmin && (
                 <p className="text-sm text-text-muted">Only workspace admins can manage billing.</p>
             )}
@@ -233,6 +395,22 @@ export function BillingSection({ onGoToMembers }: { onGoToMembers?: () => void }
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Seats to buy — creator/admin seats are purchased up front */}
+                    <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+                        <div>
+                            <p className="text-sm font-bold text-text-highlighted">Seats</p>
+                            <p className="text-xs text-text-muted">
+                                {checkoutSeats} × ${seatPrice} = ${checkoutSeats * seatPrice}/mo · for you and your creators; viewers are free
+                            </p>
+                        </div>
+                        <SeatStepper
+                            value={checkoutSeats}
+                            min={usedSeats}
+                            onChange={setCheckoutSeats}
+                            disabled={checkoutLoading || checkingStatus}
+                        />
                     </div>
 
                     {/* Pro-only highlights */}

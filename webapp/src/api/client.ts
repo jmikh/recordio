@@ -132,3 +132,21 @@ export async function invokeFunctionUpload<T = unknown>(
         xhr.send(form);
     });
 }
+
+/**
+ * Best-effort user-facing message for a failed invokeFunction call: the
+ * server's `{ error }` body for HTTP failures (business-rule 4xx bodies
+ * are written to be shown — seat limits, viewer ceiling, floors), else
+ * the fallback. Reads a clone so the Response stays usable by callers.
+ */
+export async function apiErrorMessage(error: unknown, fallback: string): Promise<string> {
+    if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+        try {
+            const body = (await error.context.clone().json()) as { error?: unknown };
+            if (typeof body?.error === 'string' && body.error) return body.error;
+        } catch {
+            // non-JSON body — fall through
+        }
+    }
+    return fallback;
+}

@@ -1,15 +1,16 @@
 /**
  * POST /workspace-invite-accept — joins the caller to the invitation's
- * workspace (Part 2 Batch 3; seat auto-scaling revamp Step 6). Token+
- * pending lookup; the invite email must match the caller's token email
- * (auth.email() → the verified JWT's email claim); a lapsed-subscription
- * guard (acceptance consumes a billed seat — a workspace that is no
- * longer pro must not grow); then ONE atomic data-modifying-CTE
- * statement: member row UPSERTS (re-invite updates the role) +
- * invitation marked accepted + the joined workspace becomes the
- * caller's default. Creator/admin acceptance then syncs the Stripe
- * quantity (Step 6 — seats are consumed on acceptance, never on
- * pending invites; the sync never throws or blocks the join).
+ * workspace (Part 2 Batch 3; seat pre-purchase model,
+ * plans/seat-prepurchase-oneshot.md). Token+pending lookup; the invite
+ * email must match the caller's token email (auth.email() → the
+ * verified JWT's email claim); a lapsed-subscription guard (a workspace
+ * that is no longer pro must not grow); a seat-capacity guard for
+ * creator/admin roles (the invite reserved a seat, so this only fails
+ * when seats were reduced in between — the belt); then ONE atomic
+ * data-modifying-CTE statement: member row UPSERTS (re-invite updates
+ * the role) + invitation marked accepted + the joined workspace becomes
+ * the caller's default. Nothing here touches Stripe — seats are bought
+ * in advance, never on acceptance.
  *
  * Business failures are 200 + { error } with the SQL fn's EXACT
  * messages — AcceptInvitePage displays them (the asset-upload
@@ -24,7 +25,7 @@ import {
     WorkspaceInviteAcceptResponseSchema,
 } from '@shared/api/workspaces';
 import { getWorkspaceEntitlements } from '../../services/entitlements.js';
-import { syncSeatQuantity } from '../../services/seatBilling.js';
+import { ACCEPT_NO_SEATS_ERROR, getSeatUsage } from '../../services/seatBilling.js';
 
 export const workspaceInviteAcceptRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -70,8 +71,7 @@ export const workspaceInviteAcceptRoutes: FastifyPluginAsyncTypebox = async (app
                 return { error: 'You already own this workspace' };
             }
 
-            // Lapse guard (revamp Step 6): acceptance consumes a billed
-            // seat, so a workspace that is no longer pro must not grow.
+            // Lapse guard: a workspace that is no longer pro must not grow.
             // Step 7 will revoke pending invites on lapse; this is the
             // belt underneath it.
             const entitlements = await getWorkspaceEntitlements(
@@ -79,6 +79,24 @@ export const workspaceInviteAcceptRoutes: FastifyPluginAsyncTypebox = async (app
             );
             if (!entitlements.canInvite) {
                 return { error: "This workspace's subscription is no longer active" };
+            }
+
+            // Seat capacity: a creator/admin role occupies a purchased seat.
+            // An existing creator/admin member re-invited with the other
+            // seat role already holds one, so only a NEW seat is checked.
+            if (inv.role !== 'viewer') {
+                const { rows: memberRows } = await db.query(
+                    `SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`,
+                    [inv.workspaceId, userId],
+                );
+                const currentRole = (memberRows[0] as { role: string } | undefined)?.role;
+                const alreadyHoldsSeat = currentRole === 'creator' || currentRole === 'admin';
+                if (!alreadyHoldsSeat) {
+                    const usage = await getSeatUsage(db, inv.workspaceId);
+                    if (usage.purchased === null || usage.used >= usage.purchased) {
+                        return { error: ACCEPT_NO_SEATS_ERROR };
+                    }
+                }
             }
 
             // One statement — data-modifying CTEs are atomic, and the Db
@@ -99,22 +117,6 @@ export const workspaceInviteAcceptRoutes: FastifyPluginAsyncTypebox = async (app
                 WHERE user_id = $2`,
                 [inv.workspaceId, userId, inv.role, inv.id],
             );
-
-            // Seats are consumed on acceptance (revamp Step 6): sync the
-            // Stripe quantity to the recomputed count. Never throws — a
-            // billing hiccup must not fail the join.
-            if (inv.role !== 'viewer') {
-                const { rows: nameRows } = await db.query(
-                    'SELECT name FROM user_profiles WHERE user_id = $1',
-                    [userId],
-                );
-                await syncSeatQuantity(app.deps, inv.workspaceId, {
-                    kind: 'joined',
-                    memberEmail: inv.email,
-                    memberName: (nameRows[0] as { name: string | null } | undefined)?.name ?? null,
-                    role: inv.role,
-                }, req.log);
-            }
 
             return { workspaceId: inv.workspaceId, role: inv.role };
         },

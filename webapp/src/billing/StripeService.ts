@@ -20,7 +20,14 @@ export class StripeService {
      *
      * In the browser: opens Stripe checkout in a popup window.
      */
-    static async createCheckoutSession(userId: string, userEmail: string, interval: 'monthly' | 'yearly' = 'yearly', workspaceId: string | null = null): Promise<{ error?: Error }> {
+    static async createCheckoutSession(
+        userId: string,
+        userEmail: string,
+        interval: 'monthly' | 'yearly' = 'yearly',
+        workspaceId: string | null = null,
+        /** Seats to buy — creator/admin seats are purchased in advance (plans/seat-prepurchase-oneshot.md) */
+        seats = 1,
+    ): Promise<{ error?: Error }> {
         try {
             // Open popup IMMEDIATELY in the synchronous click handler stack
             // to prevent mobile Safari and other browsers from blocking it.
@@ -33,6 +40,7 @@ export class StripeService {
                 userId,
                 userEmail,
                 interval,
+                seats,
                 workspaceId,
                 successUrl: redirectUrl,
                 cancelUrl,
@@ -83,8 +91,9 @@ export class StripeService {
     }
 
     /**
-     * Preview or apply a subscription seat/interval change (single plan
-     * since the billing revamp — no plan changes).
+     * Preview or apply a purchased-seat / interval change (single plan
+     * since the billing revamp — no plan changes). newSeats is the seat
+     * count to move to; the server floors it at seats in use or reserved.
      *
      * dryRun = true  → returns preview with cost breakdown, no side effects
      * dryRun = false → applies the change; DB is updated immediately + webhook syncs

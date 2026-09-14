@@ -9,11 +9,6 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-    buildSeatChangeEmailHtml,
-    seatChangeSubject,
-    type SeatChangeEmailOpts,
-} from '../src/emails/seatChangeEmail.js';
 import { buildWelcomeEmailHtml, WELCOME_EMAIL_SUBJECT } from '../src/emails/welcomeEmail.js';
 import {
     APP_URL,
@@ -21,36 +16,7 @@ import {
     workspaceInviteSubject,
 } from '../src/emails/workspaceInviteEmail.js';
 
-const seatChangeBase: Omit<SeatChangeEmailOpts, 'kind' | 'increased'> = {
-    workspaceName: "John's Workspace",
-    memberLabel: 'John Mikhail',
-    role: 'creator',
-    seats: 2,
-    recurringTotal: '$30/month',
-};
-
-const seatVariant = (name: string, opts: SeatChangeEmailOpts) => ({
-    name,
-    subject: seatChangeSubject(opts),
-    html: buildSeatChangeEmailHtml(opts),
-});
-
 const previews = [
-    seatVariant('seat-change-joined', { ...seatChangeBase, kind: 'joined', increased: true }),
-    seatVariant('seat-change-removed', {
-        ...seatChangeBase,
-        kind: 'removed',
-        increased: false,
-        seats: 1,
-        recurringTotal: '$15/month',
-    }),
-    seatVariant('seat-change-role', { ...seatChangeBase, kind: 'role_changed', increased: true }),
-    seatVariant('seat-change-no-price', {
-        ...seatChangeBase,
-        kind: 'joined',
-        increased: true,
-        recurringTotal: null,
-    }),
     {
         name: 'workspace-invite',
         subject: workspaceInviteSubject('John Mikhail', "John's Workspace"),

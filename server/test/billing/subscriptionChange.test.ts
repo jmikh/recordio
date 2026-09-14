@@ -6,8 +6,12 @@
  * the in-memory fake (canned subscription/prices/preview, recorded
  * updates); its real adapter has its own integration test.
  *
- * Single plan since billing revamp Step 1: no newPlan in the request —
- * the route only changes seats and/or interval on the per-seat price.
+ * Seat pre-purchase (plans/seat-prepurchase-oneshot.md): `newSeats` is
+ * the purchased count to move to, floored at the seats in use or
+ * reserved by pending creator/admin invitations; omitted = keep the
+ * current count (interval-only change). Proration is always_invoice in
+ * both directions (a decrease previews as a negative immediate charge —
+ * the balance credit).
  *
  * Isolation: unique workspace ids, targeted deletes in afterEach
  * (members/subscriptions cascade). Tokens are hand-signed with SEEDED user
@@ -27,6 +31,7 @@ import {
     SEEDED_USER_ID,
     seedSubscription,
     seedWorkspace,
+    seedWorkspaceInvitation,
     seedWorkspaceMember,
 } from '../helpers/db.js';
 
@@ -262,13 +267,39 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         expect(res.json()).toEqual({ error: 'Downgrade from yearly to monthly billing is not supported' });
     });
 
-    it('400 no-op guard: same seats and interval', async () => {
+    it('400 no-op guard: same seats and interval (explicit and omitted newSeats alike)', async () => {
         const { app } = testApp();
         const ws = await seedSubscribedWorkspace();
 
-        const res = await post(app, validBody(ws.id, { newSeats: 5 }), await adminToken());
-        expect(res.statusCode).toBe(400);
-        expect(res.json()).toEqual({ error: 'No change in seats or billing interval' });
+        const explicit = await post(app, validBody(ws.id, { newSeats: 5 }), await adminToken());
+        expect(explicit.statusCode).toBe(400);
+        expect(explicit.json()).toEqual({ error: 'No change in seats or billing interval' });
+
+        const omitted = await post(app, { workspaceId: ws.id, dryRun: true }, await adminToken());
+        expect(omitted.statusCode).toBe(400);
+        expect(omitted.json()).toEqual({ error: 'No change in seats or billing interval' });
+    });
+
+    it('400 seat floor: members holding seats + pending creator/admin invitations; a stale owner row never inflates it', async () => {
+        const { app, deps } = testApp();
+        const ws = await seedSubscribedWorkspace();
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
+        await seedWorkspaceInvitation(pool, { workspaceId: ws.id, email: 'reserved@example.com', role: 'admin' });
+        await seedWorkspaceInvitation(pool, { workspaceId: ws.id, email: 'viewer@example.com', role: 'viewer' });
+        // Pre-Step-2 data: an owner member row must not count as a second seat
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
+
+        // floor = owner + creator member + pending admin invite = 3
+        const below = await post(app, validBody(ws.id, { newSeats: 2 }), await adminToken());
+        expect(below.statusCode).toBe(400);
+        expect(below.json()).toEqual({
+            error: 'Cannot reduce below 3 seats — 3 are in use or reserved by pending invitations',
+        });
+        expect(deps.stripe.invoicePreviews).toHaveLength(0);
+
+        const atFloor = await post(app, validBody(ws.id, { newSeats: 3 }), await adminToken());
+        expect(atFloor.statusCode).toBe(200);
+        expect(deps.stripe.invoicePreviews[0]).toMatchObject({ item: { id: 'si_1', quantity: 3 } });
     });
 
     it('404 when the subscription row has no Stripe subscription id', async () => {
@@ -295,22 +326,17 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         expect(res.json()).toEqual({ error: 'No subscription item found on Stripe subscription' });
     });
 
-    it('dryRun interval change: quantity is the COMPUTED billed count, newSeats ignored; billingInterval stays CURRENT (edge-fn smell, kept)', async () => {
+    it('dryRun seat increase: preview at newSeats, renewal = price × newSeats, row untouched', async () => {
         const { app, deps } = testApp();
         const ws = await seedSubscribedWorkspace();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
         const before = await getSubRow(ws.id);
 
-        const res = await post(
-            app,
-            validBody(ws.id, { newSeats: 8, newInterval: 'yearly', dryRun: true }),
-            await adminToken(),
-        );
+        const res = await post(app, validBody(ws.id, { newSeats: 8 }), await adminToken());
         expect(res.statusCode).toBe(200);
         expect(res.json()).toMatchObject({
             immediateCharge: 30, // amount_due 3000 / 100
-            nextRenewalAmount: 200, // price_y 10000 * 2 computed seats / 100 — NOT newSeats 8
-            billingInterval: 'monthly', // parity: current, not target
+            nextRenewalAmount: 80, // price_m 1000 * 8 seats / 100
+            billingInterval: 'monthly',
             nextRenewalDate: new Date(PERIOD_END * 1000).toISOString(),
             currency: 'usd',
         });
@@ -318,7 +344,7 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
             {
                 customer: CUS_ID,
                 subscription: SUB_ID,
-                item: { id: 'si_1', quantity: 2, price: 'price_y' },
+                item: { id: 'si_1', quantity: 8 },
                 proration_behavior: 'always_invoice',
             },
         ]);
@@ -326,36 +352,53 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
         expect(await getSubRow(ws.id)).toEqual(before);
     });
 
-    it('a stale owner membership row never inflates the computed quantity (pre-Step-2 data pin)', async () => {
+    it('dryRun seat decrease previews the balance credit as a negative immediate charge', async () => {
         const { app, deps } = testApp();
+        deps.stripe.invoicePreview = { amount_due: -1500, subtotal: -1500, total: -1500, currency: 'usd', lines: { data: [] } };
         const ws = await seedSubscribedWorkspace();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_ID, role: 'admin' });
 
-        const res = await post(app, validBody(ws.id, { newInterval: 'yearly', dryRun: true }), await adminToken());
+        const res = await post(app, validBody(ws.id, { newSeats: 3 }), await adminToken());
         expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ immediateCharge: -15, nextRenewalAmount: 30 });
         expect(deps.stripe.invoicePreviews[0]).toMatchObject({
-            item: { id: 'si_1', quantity: 1, price: 'price_y' },
+            item: { id: 'si_1', quantity: 3 },
+            proration_behavior: 'always_invoice',
         });
     });
 
-    it('apply interval upgrade: newSeats ignored, quantity computed, DB row written', async () => {
+    it('dryRun interval change with newSeats omitted carries the CURRENT seats; billingInterval stays current (edge-fn smell, kept)', async () => {
         const { app, deps } = testApp();
         const ws = await seedSubscribedWorkspace();
-        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
+
+        const res = await post(app, { workspaceId: ws.id, newInterval: 'yearly', dryRun: true }, await adminToken());
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({
+            nextRenewalAmount: 500, // price_y 10000 * 5 current seats / 100
+            billingInterval: 'monthly', // parity: current, not target
+        });
+        expect(deps.stripe.invoicePreviews).toEqual([
+            {
+                customer: CUS_ID,
+                subscription: SUB_ID,
+                item: { id: 'si_1', quantity: 5, price: 'price_y' },
+                proration_behavior: 'always_invoice',
+            },
+        ]);
+    });
+
+    it('apply seat increase: Stripe quantity set, DB seats written, interval unchanged', async () => {
+        const { app, deps } = testApp();
+        const ws = await seedSubscribedWorkspace();
         const before = await getSubRow(ws.id);
 
-        const res = await post(
-            app,
-            validBody(ws.id, { newSeats: 8, newInterval: 'yearly', dryRun: false }),
-            await adminToken(),
-        );
+        const res = await post(app, validBody(ws.id, { newSeats: 8, dryRun: false }), await adminToken());
         expect(res.statusCode).toBe(200);
-        expect(res.json()).toEqual({ success: true, seats: 2, billingInterval: 'yearly' });
+        expect(res.json()).toEqual({ success: true, seats: 8, billingInterval: 'monthly' });
         expect(deps.stripe.subscriptionUpdates).toEqual([
             {
                 id: SUB_ID,
                 params: {
-                    items: [{ id: 'si_1', quantity: 2, price: 'price_y' }],
+                    items: [{ id: 'si_1', quantity: 8 }],
                     proration_behavior: 'always_invoice',
                 },
             },
@@ -364,30 +407,51 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
 
         // First migrated route with a DB write — assert the resulting state
         const after = await getSubRow(ws.id);
-        expect(after).toMatchObject({ seats: 2, billing_interval: 'yearly' });
+        expect(after).toMatchObject({ seats: 8, billing_interval: 'monthly' });
         expect(after.updated_at.getTime()).toBeGreaterThanOrEqual(before.updated_at.getTime());
     });
 
-    it('apply interval upgrade (trialing): update carries the price, DB interval written', async () => {
+    it('apply seats + interval upgrade together: update carries both, DB row written', async () => {
+        const { app, deps } = testApp();
+        const ws = await seedSubscribedWorkspace();
+
+        const res = await post(
+            app,
+            validBody(ws.id, { newSeats: 2, newInterval: 'yearly', dryRun: false }),
+            await adminToken(),
+        );
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ success: true, seats: 2, billingInterval: 'yearly' });
+        expect(deps.stripe.subscriptionUpdates[0]).toEqual({
+            id: SUB_ID,
+            params: {
+                items: [{ id: 'si_1', quantity: 2, price: 'price_y' }],
+                proration_behavior: 'always_invoice',
+            },
+        });
+        expect(await getSubRow(ws.id)).toMatchObject({ seats: 2, billing_interval: 'yearly' });
+    });
+
+    it('apply interval upgrade (trialing) with newSeats omitted keeps the current seats', async () => {
         const { app, deps } = testApp();
         const ws = await seedSubscribedWorkspace({ status: 'trialing' });
 
         const res = await post(
             app,
-            validBody(ws.id, { newInterval: 'yearly', dryRun: false }),
+            { workspaceId: ws.id, newInterval: 'yearly', dryRun: false },
             await adminToken(),
         );
         expect(res.statusCode).toBe(200);
-        expect(res.json()).toEqual({ success: true, seats: 1, billingInterval: 'yearly' });
+        expect(res.json()).toEqual({ success: true, seats: 5, billingInterval: 'yearly' });
         expect(deps.stripe.subscriptionUpdates[0]).toEqual({
             id: SUB_ID,
             params: {
-                items: [{ id: 'si_1', quantity: 1, price: 'price_y' }],
+                items: [{ id: 'si_1', quantity: 5, price: 'price_y' }],
                 proration_behavior: 'always_invoice',
             },
         });
         expect(await getSubRow(ws.id)).toMatchObject({
-            seats: 1,
+            seats: 5,
             billing_interval: 'yearly',
         });
     });
@@ -419,9 +483,5 @@ describe.runIf(hasTestDb())('POST /subscription-change (e2e, real Postgres)', ()
             'stripe.dry_run': true,
             user_id: SEEDED_USER_ID,
         });
-        // Deprecated newSeats (sent by stale webapp bundles) is warned about
-        expect(lines.some((l) =>
-            typeof l.msg === 'string' && (l.msg as string).includes('deprecated newSeats ignored'),
-        )).toBe(true);
     });
 });

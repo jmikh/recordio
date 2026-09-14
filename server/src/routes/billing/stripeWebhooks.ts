@@ -38,7 +38,8 @@
  *
  * Single plan since billing revamp Step 1: no plan derivation (the old
  * price.metadata.plan_type read is gone — old and new prices both
- * work), seats always mirrors the subscription item's quantity.
+ * work), seats always mirrors the subscription item's quantity — the
+ * PURCHASED seat count (plans/seat-prepurchase-oneshot.md).
  *
  * Response: { received: true }
  */
@@ -46,7 +47,6 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import type { FastifyRequest } from 'fastify';
 import { logEvent } from '../../logging.js';
-import { computeBilledSeats } from '../../services/seatBilling.js';
 import type {
     StripeCheckoutSession,
     StripeSubscription,
@@ -199,20 +199,6 @@ export const stripeWebhooksRoutes: FastifyPluginAsyncTypebox = async (app) => {
             'stripe.event_type': eventType,
         });
 
-        // Drift detector (revamp Step 6): Stripe's quantity should always
-        // match the computed billed-seat count — a mismatch means a seat
-        // sync was missed (it self-heals on the next seat event). Log-only.
-        const computed = await computeBilledSeats(app.deps.db, existing.workspace_id);
-        if (seats !== computed) {
-            req.log.warn(
-                {
-                    'workspace.id': existing.workspace_id,
-                    stripe_quantity: seats,
-                    computed_seats: computed,
-                },
-                'seat quantity drift between Stripe and member count',
-            );
-        }
     }
 
     async function handleSubscriptionDeleted(

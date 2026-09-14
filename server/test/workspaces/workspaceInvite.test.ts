@@ -1,17 +1,19 @@
 /**
- * POST /workspace-invite — Part 2 Batch 3; revamp Step 6 gates.
+ * POST /workspace-invite — Part 2 Batch 3; seat pre-purchase gates
+ * (plans/seat-prepurchase-oneshot.md).
  * Pins: fresh-invitation insert (lowercased email), re-invite replaces
  * the prior row, and the email leg is fire-and-forget — a failing email
  * send never fails the invite (pg_net parity), success sends via the
- * shared service. Step 6: inviting requires an active subscription
- * (free AND trial are solo — trials never unlock collaboration;
- * past_due keeps rights through dunning); viewer invites respect the
- * hidden VIEWER_CEILING (pending viewer invites count toward it).
+ * shared service. Inviting requires an active subscription (free AND
+ * trial are solo — trials never unlock collaboration; past_due keeps
+ * rights through dunning); a creator/admin invite needs a FREE
+ * purchased seat, and pending creator/admin invitations reserve one;
+ * viewer invites respect the hidden VIEWER_CEILING instead.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type pg from 'pg';
 import { buildApp, type App } from '../../src/app.js';
-import { VIEWER_CEILING } from '../../src/services/seatBilling.js';
+import { NO_SEATS_AVAILABLE_ERROR, VIEWER_CEILING } from '../../src/services/seatBilling.js';
 import { createFakeDeps, type FakeDeps } from '../fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from '../helpers/tokens.js';
 import {
@@ -81,12 +83,15 @@ describe.runIf(hasTestDb())('POST /workspace-invite (e2e, real Postgres)', () =>
         return { app, deps, lines };
     }
 
-    async function adminWorkspace(subscriptionStatus: string | null = 'active') {
-        const ws = await seedWorkspace(pool); // owner (implicit admin): SEEDED_USER_ID
+    /**
+     * Owner (implicit admin) = SEEDED_USER_ID. Seats default to 3 so the
+     * non-capacity tests have room; capacity tests pass their own count.
+     */
+    async function adminWorkspace(subscriptionStatus: string | null = 'active', seats = 3) {
+        const ws = await seedWorkspace(pool);
         createdWorkspaces.push(ws.id);
-        // Inviting requires an active subscription (revamp Step 6)
         if (subscriptionStatus !== null) {
-            await seedSubscription(pool, { workspaceId: ws.id, status: subscriptionStatus });
+            await seedSubscription(pool, { workspaceId: ws.id, status: subscriptionStatus, seats });
         }
         return ws;
     }
@@ -156,6 +161,41 @@ describe.runIf(hasTestDb())('POST /workspace-invite (e2e, real Postgres)', () =>
         const res = await post(app, { workspaceId: ws.id, email: 'x@y.z', role: 'creator' },
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
+    });
+
+    it('creator seats: 3 purchased = owner + two invites; the third is refused, viewers are not, a resend does not self-block', async () => {
+        const ws = await adminWorkspace('active', 3);
+        const { app } = testApp();
+        const t = await userToken({ sub: SEEDED_USER_ID });
+
+        expect((await post(app, { workspaceId: ws.id, email: 'a@example.com', role: 'creator' }, t)).statusCode).toBe(200);
+        expect((await post(app, { workspaceId: ws.id, email: 'b@example.com', role: 'admin' }, t)).statusCode).toBe(200);
+
+        const blocked = await post(app, { workspaceId: ws.id, email: 'c@example.com', role: 'creator' }, t);
+        expect(blocked.statusCode).toBe(403);
+        expect(blocked.json()).toEqual({ error: NO_SEATS_AVAILABLE_ERROR });
+        const { rows } = await pool.query(
+            `SELECT 1 FROM workspace_invitations WHERE workspace_id = $1 AND email = 'c@example.com'`, [ws.id]);
+        expect(rows).toEqual([]);
+
+        // Viewers never consume a seat
+        expect((await post(app, { workspaceId: ws.id, email: 'v@example.com', role: 'viewer' }, t)).statusCode).toBe(200);
+
+        // Resending to an already-pending seat invite replaces its row —
+        // its own reservation must not block it (role change included)
+        expect((await post(app, { workspaceId: ws.id, email: 'A@example.com', role: 'creator' }, t)).statusCode).toBe(200);
+        expect((await post(app, { workspaceId: ws.id, email: 'a@example.com', role: 'admin' }, t)).statusCode).toBe(200);
+    });
+
+    it('members holding seats count against capacity: 2 purchased + a creator member = no seat left', async () => {
+        const ws = await adminWorkspace('active', 2);
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' });
+
+        const { app } = testApp();
+        const res = await post(app, { workspaceId: ws.id, email: 'x@y.z', role: 'creator' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: NO_SEATS_AVAILABLE_ERROR });
     });
 
     it('viewer ceiling: pending viewer invites count; re-inviting one of them does not self-block', async () => {

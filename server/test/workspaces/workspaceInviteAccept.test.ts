@@ -1,19 +1,21 @@
 /**
- * POST /workspace-invite-accept — Part 2 Batch 3; revamp Step 6.
+ * POST /workspace-invite-accept — Part 2 Batch 3; seat pre-purchase
+ * (plans/seat-prepurchase-oneshot.md).
  * Business failures come back as 200 + { error } with the SQL fn's
  * EXACT messages (AcceptInvitePage displays them). Dedicated auth users
  * — accepting mutates default_workspace_id, and the email-match check
  * needs the token's email claim to line up with the invitation.
  *
- * Step 6: acceptance requires the workspace to still be pro (lapse
- * guard); creator/admin acceptance syncs the Stripe quantity to the
- * COMPUTED billed count + emails the plan owner; viewers never touch
- * Stripe; a Stripe failure never fails the join (load-bearing pin).
+ * Acceptance requires the workspace to still be pro (lapse guard) and,
+ * for creator/admin roles, a free purchased seat (used < purchased —
+ * the belt under the invite-time reservation). Nothing touches Stripe
+ * or email: seats are bought in advance, never on acceptance.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { buildApp, type App } from '../../src/app.js';
+import { ACCEPT_NO_SEATS_ERROR } from '../../src/services/seatBilling.js';
 import { createFakeDeps, type FakeDeps } from '../fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from '../helpers/tokens.js';
 import {
@@ -84,37 +86,26 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
     }
 
     /**
-     * Pro workspace (owner SEEDED_USER_ID = user1@gmail.com) with a
-     * Stripe-linked subscription — acceptance requires pro since Step 6.
-     * Seed the returned stripeSubscriptionId into the fake Stripe map
-     * (seat sync reads it) via seedFakeSub.
+     * Pro workspace (owner SEEDED_USER_ID = user1@gmail.com). Seats
+     * default to 2: the owner's plus one free seat for the invitee.
      */
-    async function freshWorkspace(opts: { status?: string } = {}) {
+    async function freshWorkspace(opts: { status?: string; seats?: number } = {}) {
         const ws = await seedWorkspace(pool);
         createdWorkspaces.push(ws.id);
-        const stripeSubscriptionId = `sub_accept_${randomUUID().slice(0, 8)}`;
         await seedSubscription(pool, {
             workspaceId: ws.id,
             status: opts.status ?? 'active',
-            stripeSubscriptionId,
+            seats: opts.seats ?? 2,
         });
-        return { ...ws, stripeSubscriptionId };
+        return ws;
     }
 
-    function seedFakeSub(deps: FakeDeps, stripeSubscriptionId: string, quantity = 1) {
-        deps.stripe.subscriptions.set(stripeSubscriptionId, {
-            id: stripeSubscriptionId,
-            status: 'active',
-            customer: 'cus_accept_test',
-            items: {
-                data: [{
-                    id: 'si_accept_1',
-                    quantity,
-                    current_period_end: 1800000000,
-                    price: { id: 'price_m', unit_amount: 1500, recurring: { interval: 'month' } },
-                }],
-            },
-        });
+    async function memberRole(workspaceId: string, userId: string) {
+        const { rows } = await pool.query(
+            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+            [workspaceId, userId],
+        );
+        return rows as Array<{ role: string }>;
     }
 
     it("unknown token → 200 { error: 'Invitation not found or already used' }", async () => {
@@ -136,12 +127,7 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
             await userToken({ sub: user.id, email: user.email }));
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({ error: 'This invitation was sent to a different email address' });
-
-        const { rows } = await pool.query(
-            'SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, user.id],
-        );
-        expect(rows).toEqual([]);
+        expect(await memberRole(ws.id, user.id)).toEqual([]);
     });
 
     it('accepts: joins with the invitation role, marks accepted, sets the default workspace; a second accept fails used', async () => {
@@ -151,18 +137,13 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
             workspaceId: ws.id, email: user.email.toUpperCase(), role: 'creator',
         });
 
-        const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId);
+        const { app } = testApp();
         const t = await userToken({ sub: user.id, email: user.email });
         const res = await post(app, { token: inv.token }, t);
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({ workspaceId: ws.id, role: 'creator' });
 
-        const { rows: memberRows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, user.id],
-        );
-        expect(memberRows).toEqual([{ role: 'creator' }]);
+        expect(await memberRole(ws.id, user.id)).toEqual([{ role: 'creator' }]);
         const { rows: invRows } = await pool.query(
             'SELECT status FROM workspace_invitations WHERE id = $1', [inv.id]);
         expect(invRows).toEqual([{ status: 'accepted' }]);
@@ -172,56 +153,58 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
         expect(again.json()).toEqual({ error: 'Invitation not found or already used' });
     });
 
-    it('creator acceptance syncs the Stripe quantity to the COMPUTED count, updates DB seats, emails the plan owner', async () => {
+    it('creator acceptance never touches Stripe or email; purchased seats unchanged', async () => {
         const user = await freshUser();
-        const ws = await freshWorkspace();
+        const ws = await freshWorkspace({ seats: 2 });
         const inv = await seedWorkspaceInvitation(pool, {
             workspaceId: ws.id, email: user.email, role: 'creator',
         });
 
         const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId, 1);
         const res = await post(app, { token: inv.token },
             await userToken({ sub: user.id, email: user.email }));
-        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ workspaceId: ws.id, role: 'creator' });
 
-        // Quantity SET to computed (owner 1 + creator 1), never incremented
-        expect(deps.stripe.subscriptionUpdates).toEqual([{
-            id: ws.stripeSubscriptionId,
-            params: {
-                items: [{ id: 'si_accept_1', quantity: 2 }],
-                proration_behavior: 'always_invoice',
-            },
-        }]);
+        expect(deps.stripe.subscriptionUpdates).toEqual([]);
+        expect(deps.email.sent).toEqual([]);
         const { rows } = await pool.query(
             'SELECT seats FROM subscriptions WHERE workspace_id = $1', [ws.id]);
         expect(rows).toEqual([{ seats: 2 }]);
-
-        // Seat-change email to the plan owner (seeded owner = user1)
-        expect(deps.email.sent).toHaveLength(1);
-        expect(deps.email.sent[0].to).toBe('user1@gmail.com');
-        expect(deps.email.sent[0].subject).toContain('your plan is now 2 seats');
-        expect(deps.email.sent[0].html).toContain('$30/month');
     });
 
-    it('viewer acceptance never touches Stripe and sends no email', async () => {
+    it('no free seat (used == purchased) → 200 { error }, no member row', async () => {
         const user = await freshUser();
-        const ws = await freshWorkspace();
+        const ws = await freshWorkspace({ seats: 1 }); // owner fills the only seat
+        const inv = await seedWorkspaceInvitation(pool, {
+            workspaceId: ws.id, email: user.email, role: 'creator',
+        });
+
+        const res = await post(testApp().app, { token: inv.token },
+            await userToken({ sub: user.id, email: user.email }));
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ error: ACCEPT_NO_SEATS_ERROR });
+        expect(await memberRole(ws.id, user.id)).toEqual([]);
+
+        const { rows } = await pool.query(
+            'SELECT status FROM workspace_invitations WHERE id = $1', [inv.id]);
+        expect(rows).toEqual([{ status: 'pending' }]);
+    });
+
+    it('viewer acceptance needs no seat: joins a full workspace, Stripe untouched', async () => {
+        const user = await freshUser();
+        const ws = await freshWorkspace({ seats: 1 });
         const inv = await seedWorkspaceInvitation(pool, {
             workspaceId: ws.id, email: user.email, role: 'viewer',
         });
 
         const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId);
         const res = await post(app, { token: inv.token },
             await userToken({ sub: user.id, email: user.email }));
         expect(res.json()).toEqual({ workspaceId: ws.id, role: 'viewer' });
-
         expect(deps.stripe.subscriptionUpdates).toEqual([]);
-        expect(deps.email.sent).toEqual([]);
     });
 
-    it("lapsed workspace → 200 { error }, no member row (Step 6 lapse guard)", async () => {
+    it("lapsed workspace → 200 { error }, no member row (lapse guard)", async () => {
         const user = await freshUser();
         const ws = await freshWorkspace({ status: 'canceled' });
         const inv = await seedWorkspaceInvitation(pool, {
@@ -232,33 +215,7 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
             await userToken({ sub: user.id, email: user.email }));
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({ error: "This workspace's subscription is no longer active" });
-
-        const { rows } = await pool.query(
-            'SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, user.id]);
-        expect(rows).toEqual([]);
-    });
-
-    it('a Stripe failure never fails the join (load-bearing pin)', async () => {
-        const user = await freshUser();
-        const ws = await freshWorkspace();
-        const inv = await seedWorkspaceInvitation(pool, {
-            workspaceId: ws.id, email: user.email, role: 'creator',
-        });
-
-        // Fake Stripe has NO subscription seeded → getSubscription throws
-        const { app, deps } = testApp();
-        const res = await post(app, { token: inv.token },
-            await userToken({ sub: user.id, email: user.email }));
-        expect(res.statusCode).toBe(200);
-        expect(res.json()).toEqual({ workspaceId: ws.id, role: 'creator' });
-
-        const { rows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, user.id]);
-        expect(rows).toEqual([{ role: 'creator' }]);
-        expect(deps.stripe.subscriptionUpdates).toEqual([]);
-        expect(deps.email.sent).toEqual([]);
+        expect(await memberRole(ws.id, user.id)).toEqual([]);
     });
 
     it('owner accepting an invite to their OWN workspace → error, no member row created', async () => {
@@ -276,39 +233,49 @@ describe.runIf(hasTestDb())('POST /workspace-invite-accept (e2e, real Postgres)'
             await userToken({ sub: user.id, email: user.email }));
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({ error: 'You already own this workspace' });
-
-        const { rows } = await pool.query(
-            'SELECT 1 FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, user.id]);
-        expect(rows).toHaveLength(0);
+        expect(await memberRole(ws.id, user.id)).toHaveLength(0);
     });
 
-    it('re-inviting an existing member UPSERTS their role', async () => {
+    it('re-inviting an existing viewer as admin UPSERTS the role — it needs a free seat', async () => {
         const user = await freshUser();
-        const ws = await freshWorkspace();
+        const ws = await freshWorkspace({ seats: 2 });
         await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: user.id, role: 'viewer' });
         const inv = await seedWorkspaceInvitation(pool, {
             workspaceId: ws.id, email: user.email, role: 'admin',
         });
 
-        const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId);
-        const res = await post(app, { token: inv.token },
+        const res = await post(testApp().app, { token: inv.token },
             await userToken({ sub: user.id, email: user.email }));
         expect(res.json()).toEqual({ workspaceId: ws.id, role: 'admin' });
+        expect(await memberRole(ws.id, user.id)).toEqual([{ role: 'admin' }]);
+    });
 
-        const { rows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, user.id],
-        );
-        expect(rows).toEqual([{ role: 'admin' }]);
-        // viewer → admin crosses the billed boundary: quantity synced to 2
-        expect(deps.stripe.subscriptionUpdates).toEqual([{
-            id: ws.stripeSubscriptionId,
-            params: {
-                items: [{ id: 'si_accept_1', quantity: 2 }],
-                proration_behavior: 'always_invoice',
-            },
-        }]);
+    it('re-inviting an existing viewer as creator in a full workspace → error, role untouched', async () => {
+        const user = await freshUser();
+        const ws = await freshWorkspace({ seats: 1 });
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: user.id, role: 'viewer' });
+        const inv = await seedWorkspaceInvitation(pool, {
+            workspaceId: ws.id, email: user.email, role: 'creator',
+        });
+
+        const res = await post(testApp().app, { token: inv.token },
+            await userToken({ sub: user.id, email: user.email }));
+        expect(res.json()).toEqual({ error: ACCEPT_NO_SEATS_ERROR });
+        expect(await memberRole(ws.id, user.id)).toEqual([{ role: 'viewer' }]);
+    });
+
+    it('an existing creator re-invited as admin already holds a seat — accepted even when full', async () => {
+        const user = await freshUser();
+        const ws = await freshWorkspace({ seats: 2 });
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: user.id, role: 'creator' });
+        // used = owner + this creator = 2 = purchased
+        const inv = await seedWorkspaceInvitation(pool, {
+            workspaceId: ws.id, email: user.email, role: 'admin',
+        });
+
+        const res = await post(testApp().app, { token: inv.token },
+            await userToken({ sub: user.id, email: user.email }));
+        expect(res.json()).toEqual({ workspaceId: ws.id, role: 'admin' });
+        expect(await memberRole(ws.id, user.id)).toEqual([{ role: 'admin' }]);
     });
 });

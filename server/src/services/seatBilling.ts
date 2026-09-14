@@ -1,173 +1,84 @@
 /**
- * Seat auto-scaling (billing revamp Step 6,
- * plans/workspace-billing-revamp/workspace-billing-revamp-step-6.md).
+ * Seat capacity — the seat pre-purchase model
+ * (plans/seat-prepurchase-oneshot.md).
  *
- * The billed quantity is DERIVED STATE, never arithmetic: it is always
- * recomputed as `1 (owner) + creator/admin member rows` and SET on the
- * Stripe subscription — no +1/−1 deltas to drift. Every seat-affecting
- * event (invite acceptance, member removal, role change across the
- * viewer↔creator/admin boundary) calls syncSeatQuantity after its DB
- * write commits; a failed Stripe sync never blocks or reverts the
- * membership change and self-heals on the next seat event.
+ * Seats are PURCHASED capacity, bought in advance: `subscriptions.seats`
+ * mirrors the Stripe quantity and only changes through checkout,
+ * /subscription-change and the subscription webhooks. Membership changes
+ * never touch Stripe. This module answers "is there a free seat?":
+ *
+ *   used      = 1 (the owner, who has no workspace_members row)
+ *               + creator/admin member rows (stale owner rows excluded)
+ *   pending   = pending creator/admin invitations — they RESERVE a seat,
+ *               so an admin can never invite more people than they bought
+ *   available = purchased − used − pending
+ *
+ * Viewers are free; the hidden VIEWER_CEILING is an abuse backstop.
  */
-import type { Db, Deps } from '../deps.js';
-import type { StripePrice } from '../ports/stripe.js';
-import {
-    buildSeatChangeEmailHtml,
-    seatChangeSubject,
-    type SeatChangeKind,
-} from '../emails/seatChangeEmail.js';
+import type { Db } from '../deps.js';
 
 /**
- * Hidden viewer ceiling — an abuse backstop, never shown in product
- * (decided 2026-09-03, Step 6 planning). At the ceiling the admin sees
- * "contact support"; support can raise it.
+ * Hidden viewer ceiling — never shown in product. At the ceiling the
+ * admin sees "contact support"; support can raise it.
  */
 export const VIEWER_CEILING = 50;
 
-/** Statuses whose Stripe subscription we keep in sync (matches PRO_STATUSES). */
-const SYNCABLE_STATUSES = new Set(['active', 'past_due', 'trialing']);
+/** Invite / promote refusal when every purchased seat is used or reserved. */
+export const NO_SEATS_AVAILABLE_ERROR =
+    'No creator seats available — add seats on the billing page';
 
-/** Structural logger — matches both pino and Fastify's req.log. */
-export interface SeatSyncLog {
-    info(obj: object, msg?: string): void;
-    warn(obj: object, msg?: string): void;
-    error(obj: object, msg?: string): void;
-}
+/** Accept-time refusal (the belt under the invite-time reservation). */
+export const ACCEPT_NO_SEATS_ERROR =
+    'This workspace has no available seats. Ask a workspace admin to add seats.';
 
-export interface SeatChangeContext {
-    kind: SeatChangeKind;
-    /** Email of the member whose change moved the count */
-    memberEmail: string;
-    /** Display name when known — email is the fallback label */
-    memberName?: string | null;
-    role: string;
-}
-
-/**
- * Billed seats = 1 (the owner, who has no workspace_members row) +
- * creator/admin member rows. Viewers are free; stale pre-Step-2 owner
- * rows are excluded so they can never double-count the owner.
- */
-export async function computeBilledSeats(db: Db, workspaceId: string): Promise<number> {
-    const { rows } = await db.query(
-        `SELECT COUNT(*)::int + 1 AS count
-         FROM workspace_members wm
-         JOIN workspaces w ON w.id = wm.workspace_id
-         WHERE wm.workspace_id = $1
-           AND wm.user_id <> w.owner_id
-           AND wm.role IN ('creator', 'admin')`,
-        [workspaceId],
-    );
-    return (rows[0] as { count: number } | undefined)?.count ?? 1;
+export interface SeatUsage {
+    /** subscriptions.seats; null when the workspace has no subscription row */
+    purchased: number | null;
+    /** Owner + creator/admin members */
+    used: number;
+    /** Pending creator/admin invitations (each reserves a seat) */
+    pending: number;
 }
 
 /**
- * Recompute-and-set. No-op unless the workspace has a Stripe-linked
- * subscription in a syncable status and the live quantity differs from
- * the computed count. On change: Stripe update (always_invoice — adds
- * charge now, removals credit the balance) → direct DB seats write (the
- * webhook stays authoritative on re-sync) → seat-change email to the
- * plan owner (fire-and-forget).
- *
- * NEVER throws — membership changes must not fail on billing.
+ * One query for the three numbers. `excludeInviteEmail` leaves that
+ * email's own pending invitation out of `pending` — the invite route
+ * deletes + reinserts the row, so a re-invite must not block on its own
+ * reservation.
  */
-export async function syncSeatQuantity(
-    deps: Pick<Deps, 'db' | 'stripe' | 'email'>,
+export async function getSeatUsage(
+    db: Db,
     workspaceId: string,
-    change: SeatChangeContext,
-    log: SeatSyncLog,
-): Promise<void> {
-    try {
-        const { rows } = await deps.db.query(
-            `SELECT s.status, s.billing_interval, s.stripe_subscription_id,
-                    w.name AS workspace_name,
-                    (SELECT u.email FROM auth.users u WHERE u.id = w.owner_id) AS owner_email
-             FROM workspaces w
-             LEFT JOIN subscriptions s ON s.workspace_id = w.id
-             WHERE w.id = $1 AND w.deleted_at IS NULL`,
-            [workspaceId],
-        );
-        const sub = rows[0] as
-            | {
-                  status: string | null;
-                  billing_interval: string | null;
-                  stripe_subscription_id: string | null;
-                  workspace_name: string;
-                  owner_email: string | null;
-              }
-            | undefined;
-        if (
-            !sub ||
-            sub.status === null ||
-            !SYNCABLE_STATUSES.has(sub.status) ||
-            !sub.stripe_subscription_id
-        ) {
-            return;
-        }
+    opts: { excludeInviteEmail?: string } = {},
+): Promise<SeatUsage> {
+    const { rows } = await db.query(
+        `SELECT
+            (SELECT s.seats FROM subscriptions s WHERE s.workspace_id = w.id) AS purchased,
+            (SELECT COUNT(*)::int FROM workspace_members wm
+             WHERE wm.workspace_id = w.id
+               AND wm.user_id <> w.owner_id
+               AND wm.role IN ('creator', 'admin')) + 1 AS used,
+            (SELECT COUNT(*)::int FROM workspace_invitations wi
+             WHERE wi.workspace_id = w.id
+               AND wi.status = 'pending'
+               AND wi.role IN ('creator', 'admin')
+               AND ($2::text IS NULL OR wi.email <> $2)) AS pending
+         FROM workspaces w
+         WHERE w.id = $1`,
+        [workspaceId, opts.excludeInviteEmail ?? null],
+    );
+    const row = rows[0] as
+        | { purchased: number | null; used: number; pending: number }
+        | undefined;
+    return {
+        purchased: row?.purchased ?? null,
+        used: row?.used ?? 1,
+        pending: row?.pending ?? 0,
+    };
+}
 
-        const computed = await computeBilledSeats(deps.db, workspaceId);
-        const stripeSub = await deps.stripe.getSubscription(sub.stripe_subscription_id, {
-            expandItemPrices: true,
-        });
-        const item = stripeSub.items?.data[0];
-        if (!item) {
-            log.warn(
-                { 'workspace.id': workspaceId },
-                'seat sync: Stripe subscription has no item',
-            );
-            return;
-        }
-        if (item.quantity === computed) return;
-        const increased = computed > (item.quantity ?? 0);
-
-        await deps.stripe.updateSubscription(sub.stripe_subscription_id, {
-            items: [{ id: item.id, quantity: computed }],
-            proration_behavior: 'always_invoice',
-        });
-
-        // Immediate DB sync so the client sees the change right away;
-        // the Stripe webhook remains authoritative and re-syncs later
-        await deps.db.query(
-            `UPDATE subscriptions
-             SET seats = $2, updated_at = now()
-             WHERE workspace_id = $1`,
-            [workspaceId, computed],
-        );
-        log.info(
-            { 'workspace.id': workspaceId, seats: computed, kind: change.kind },
-            'seat quantity auto-scaled',
-        );
-
-        if (!sub.owner_email) return;
-        const unitAmount =
-            typeof item.price === 'object' && item.price
-                ? ((item.price as StripePrice).unit_amount ?? null)
-                : null;
-        const interval = sub.billing_interval === 'yearly' ? 'year' : 'month';
-        const recurringTotal =
-            unitAmount !== null ? `$${((unitAmount * computed) / 100).toFixed(0)}/${interval}` : null;
-        const emailOpts = {
-            workspaceName: sub.workspace_name,
-            memberLabel: change.memberName || change.memberEmail,
-            role: change.role,
-            kind: change.kind,
-            seats: computed,
-            recurringTotal,
-            increased,
-        };
-        const result = await deps.email.send({
-            to: sub.owner_email,
-            subject: seatChangeSubject(emailOpts),
-            html: buildSeatChangeEmailHtml(emailOpts),
-        });
-        if (!result.success) {
-            log.warn(
-                { 'workspace.id': workspaceId, 'email.template': 'seat-change', err: result.error },
-                'seat-change email failed',
-            );
-        }
-    } catch (err) {
-        log.error({ err, 'workspace.id': workspaceId }, 'seat quantity sync failed');
-    }
+/** Free seats, clamped at 0 (over-capacity after a seat reduction is grandfathered, not negative). */
+export function seatsAvailable(usage: SeatUsage): number {
+    if (usage.purchased === null) return 0;
+    return Math.max(0, usage.purchased - usage.used - usage.pending);
 }

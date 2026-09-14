@@ -1,13 +1,16 @@
 /**
- * POST /workspace-member-update-role — Part 2 Batch 3; revamp Step 6:
- * crossing the viewer↔(creator|admin) boundary moves the billed seat
- * count — promotions are gated on an active subscription and both
- * directions sync the Stripe quantity to the COMPUTED count.
+ * POST /workspace-member-update-role — Part 2 Batch 3; seat
+ * pre-purchase (plans/seat-prepurchase-oneshot.md): promoting a viewer
+ * to creator/admin occupies a purchased seat, so it is gated on an
+ * active subscription AND a free seat (pending creator/admin invitations
+ * reserve seats); downgrades and admin↔creator changes are never gated.
+ * Nothing touches Stripe.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { buildApp, type App } from '../../src/app.js';
+import { NO_SEATS_AVAILABLE_ERROR } from '../../src/services/seatBilling.js';
 import { createFakeDeps, type FakeDeps } from '../fakes/index.js';
 import { TEST_JWT_SECRET, userToken } from '../helpers/tokens.js';
 import {
@@ -18,6 +21,7 @@ import {
     SEEDED_USER_ID,
     seedSubscription,
     seedWorkspace,
+    seedWorkspaceInvitation,
     seedWorkspaceMember,
 } from '../helpers/db.js';
 
@@ -68,33 +72,26 @@ describe.runIf(hasTestDb())('POST /workspace-member-update-role (e2e, real Postg
         return { app, deps };
     }
 
-    async function workspaceWithBoth(opts: { memberRole?: 'viewer' | 'creator' | 'admin'; subscribed?: boolean } = {}) {
-        const ws = await seedWorkspace(pool); // owner (implicit admin): SEEDED_USER_ID
+    /** Owner SEEDED_USER_ID + member SEEDED_USER_2_ID; seats default to 2 (one free for a promotion). */
+    async function workspaceWithBoth(
+        opts: { memberRole?: 'viewer' | 'creator' | 'admin'; subscribed?: boolean; seats?: number } = {},
+    ) {
+        const ws = await seedWorkspace(pool);
         createdWorkspaces.push(ws.id);
         await seedWorkspaceMember(pool, {
             workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: opts.memberRole ?? 'viewer',
         });
-        const stripeSubscriptionId = `sub_role_${randomUUID().slice(0, 8)}`;
         if (opts.subscribed !== false) {
-            await seedSubscription(pool, { workspaceId: ws.id, stripeSubscriptionId });
+            await seedSubscription(pool, { workspaceId: ws.id, seats: opts.seats ?? 2 });
         }
-        return { ...ws, stripeSubscriptionId };
+        return ws;
     }
 
-    function seedFakeSub(deps: FakeDeps, stripeSubscriptionId: string, quantity: number) {
-        deps.stripe.subscriptions.set(stripeSubscriptionId, {
-            id: stripeSubscriptionId,
-            status: 'active',
-            customer: 'cus_role_test',
-            items: {
-                data: [{
-                    id: 'si_role_1',
-                    quantity,
-                    current_period_end: 1800000000,
-                    price: { id: 'price_m', unit_amount: 1500, recurring: { interval: 'month' } },
-                }],
-            },
-        });
+    async function roleOf(workspaceId: string) {
+        const { rows } = await pool.query(
+            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+            [workspaceId, SEEDED_USER_2_ID]);
+        return rows as Array<{ role: string }>;
     }
 
     it('403 for a non-admin caller; role untouched', async () => {
@@ -103,11 +100,7 @@ describe.runIf(hasTestDb())('POST /workspace-member-update-role (e2e, real Postg
             { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'admin' },
             await userToken({ sub: SEEDED_USER_2_ID }));
         expect(res.statusCode).toBe(403);
-
-        const { rows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, SEEDED_USER_2_ID]);
-        expect(rows).toEqual([{ role: 'viewer' }]);
+        expect(await roleOf(ws.id)).toEqual([{ role: 'viewer' }]);
     });
 
     it("409 changing the owner's role", async () => {
@@ -127,65 +120,68 @@ describe.runIf(hasTestDb())('POST /workspace-member-update-role (e2e, real Postg
         expect(res.statusCode).toBe(404);
     });
 
-    it('viewer→creator promotion: 200, quantity synced UP to the computed count', async () => {
-        const ws = await workspaceWithBoth();
+    it('viewer→creator promotion with a free seat: 200, role written, Stripe untouched', async () => {
+        const ws = await workspaceWithBoth({ seats: 2 });
         const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId, 1);
 
         const res = await post(app,
             { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' },
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
         expect(res.json()).toEqual({ ok: true });
-
-        const { rows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, SEEDED_USER_2_ID]);
-        expect(rows).toEqual([{ role: 'creator' }]);
-        expect(deps.stripe.subscriptionUpdates).toEqual([{
-            id: ws.stripeSubscriptionId,
-            params: {
-                items: [{ id: 'si_role_1', quantity: 2 }],
-                proration_behavior: 'always_invoice',
-            },
-        }]);
-        expect(deps.email.sent).toHaveLength(1);
-        expect(deps.email.sent[0].to).toBe('user1@gmail.com');
+        expect(await roleOf(ws.id)).toEqual([{ role: 'creator' }]);
+        expect(deps.stripe.subscriptionUpdates).toEqual([]);
+        expect(deps.email.sent).toEqual([]);
     });
 
-    it('creator→viewer downgrade: quantity synced DOWN (removal credits the balance)', async () => {
-        const ws = await workspaceWithBoth({ memberRole: 'creator' });
+    it('viewer→creator promotion at capacity → 403 with the seat message; role untouched', async () => {
+        const ws = await workspaceWithBoth({ seats: 1 }); // owner fills the only seat
+        const res = await post(testApp().app,
+            { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: NO_SEATS_AVAILABLE_ERROR });
+        expect(await roleOf(ws.id)).toEqual([{ role: 'viewer' }]);
+    });
+
+    it('pending creator invitations reserve seats against promotions too', async () => {
+        const ws = await workspaceWithBoth({ seats: 2 });
+        await seedWorkspaceInvitation(pool, { workspaceId: ws.id, email: 'reserved@example.com', role: 'creator' });
+
+        const res = await post(testApp().app,
+            { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'admin' },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toEqual({ error: NO_SEATS_AVAILABLE_ERROR });
+        expect(await roleOf(ws.id)).toEqual([{ role: 'viewer' }]);
+    });
+
+    it('creator→viewer downgrade: no Stripe call, purchased seats unchanged', async () => {
+        const ws = await workspaceWithBoth({ memberRole: 'creator', seats: 2 });
         const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId, 2);
 
         const res = await post(app,
             { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'viewer' },
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
+        expect(await roleOf(ws.id)).toEqual([{ role: 'viewer' }]);
 
-        expect(deps.stripe.subscriptionUpdates).toEqual([{
-            id: ws.stripeSubscriptionId,
-            params: {
-                items: [{ id: 'si_role_1', quantity: 1 }],
-                proration_behavior: 'always_invoice',
-            },
-        }]);
+        expect(deps.stripe.subscriptionUpdates).toEqual([]);
         const { rows } = await pool.query(
             'SELECT seats FROM subscriptions WHERE workspace_id = $1', [ws.id]);
-        expect(rows).toEqual([{ seats: 1 }]);
+        expect(rows).toEqual([{ seats: 2 }]);
     });
 
-    it('admin→creator stays inside the billed boundary: no Stripe call', async () => {
-        const ws = await workspaceWithBoth({ memberRole: 'admin' });
+    it('admin→creator needs no seat (they already hold one): 200 even in an over-capacity workspace', async () => {
+        const ws = await workspaceWithBoth({ memberRole: 'admin', seats: 1 });
         const { app, deps } = testApp();
-        seedFakeSub(deps, ws.stripeSubscriptionId, 2);
 
         const res = await post(app,
             { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'creator' },
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
+        expect(await roleOf(ws.id)).toEqual([{ role: 'creator' }]);
         expect(deps.stripe.subscriptionUpdates).toEqual([]);
-        expect(deps.email.sent).toEqual([]);
     });
 
     it('403 promoting on a workspace without an active subscription; role untouched', async () => {
@@ -195,11 +191,7 @@ describe.runIf(hasTestDb())('POST /workspace-member-update-role (e2e, real Postg
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(403);
         expect(res.json()).toEqual({ error: 'Promoting members requires an active subscription' });
-
-        const { rows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, SEEDED_USER_2_ID]);
-        expect(rows).toEqual([{ role: 'viewer' }]);
+        expect(await roleOf(ws.id)).toEqual([{ role: 'viewer' }]);
     });
 
     it('creator→viewer downgrade on a lapsed workspace still works (shrinking is never gated)', async () => {
@@ -208,10 +200,6 @@ describe.runIf(hasTestDb())('POST /workspace-member-update-role (e2e, real Postg
             { workspaceId: ws.id, userId: SEEDED_USER_2_ID, role: 'viewer' },
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(200);
-
-        const { rows } = await pool.query(
-            'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-            [ws.id, SEEDED_USER_2_ID]);
-        expect(rows).toEqual([{ role: 'viewer' }]);
+        expect(await roleOf(ws.id)).toEqual([{ role: 'viewer' }]);
     });
 });

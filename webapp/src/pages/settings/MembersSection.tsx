@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { LuLoader, LuMail, LuX } from 'react-icons/lu';
 import { Button, Dropdown } from '@shared/components';
-import { invokeFunction } from '../../api/client';
+import { apiErrorMessage, invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { useToast } from '../../components/Toast';
 import { trackWorkspaceInviteFailed } from '../../analytics';
 import { captureError } from '../../lib/sentry';
 import { PRICE_MONTHLY, PRICE_YEARLY } from '../../billing/prices';
-import type { WorkspaceDetails, WorkspaceMember } from './types';
+import type { WorkspaceDetails, WorkspaceInvitation, WorkspaceMember } from './types';
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,9 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
                 workspaceId: details.id,
                 extra: { targetRole: role, targetUserId: member.user_id },
             });
-            addToast({ type: 'error', title: 'Failed to update role' });
+            // Promotions can be refused for lack of a free purchased seat —
+            // show the server's reason
+            addToast({ type: 'error', title: await apiErrorMessage(err, 'Failed to update role') });
         } finally {
             setUpdatingRole(false);
         }
@@ -117,13 +119,15 @@ function MemberRow({ member, isCurrentUser, isPlanOwner, isAdmin, details, onRol
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MembersSection({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationRescinded, onGoToBilling }: {
+export function MembersSection({ details, currentUserId, hasTeamAccess, onMemberRemoved, onMemberRoleChanged, onInvitationSent, onInvitationRescinded, onGoToBilling }: {
     details: WorkspaceDetails;
     currentUserId: string | null;
     /** Active subscription — the single plan includes collaboration (billing revamp Step 1) */
     hasTeamAccess: boolean;
     onMemberRemoved: (userId: string) => void;
     onMemberRoleChanged: (userId: string, role: 'viewer' | 'creator' | 'admin') => void;
+    /** A sent or resent invitation (replaces any prior one for the email) */
+    onInvitationSent: (invitation: WorkspaceInvitation) => void;
     onInvitationRescinded: (invitationId: string) => void;
     onGoToBilling?: () => void;
 }) {
@@ -138,13 +142,20 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
 
     const isAdmin = details.role === 'admin';
 
-    // Seats are invite-driven derived state (billing revamp Step 6):
-    // billed = creator/admin members (the owner is synthesized into the
-    // list as admin); viewers are free; each accepted seat invite bills.
-    const billedMembers = details.members.filter(m => m.role === 'creator' || m.role === 'admin');
-    const viewerMembers = details.members.filter(m => m.role === 'viewer');
-    const pendingSeats  = details.invitations.filter(i => i.role !== 'viewer').length;
-    const seatPrice     = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
+    // Seat pre-purchase (plans/seat-prepurchase-oneshot.md): purchased =
+    // subscription seats; used = creator/admin members (the owner is
+    // synthesized into the list as admin); pending creator/admin
+    // invitations reserve a seat; viewers are free.
+    const purchasedSeats = details.seats ?? 0;
+    const usedSeats      = details.members.filter(m => m.role === 'creator' || m.role === 'admin').length;
+    const reservedSeats  = details.invitations.filter(i => i.role !== 'viewer').length;
+    const availableSeats = Math.max(0, purchasedSeats - usedSeats - reservedSeats);
+    const noSeatLeft     = availableSeats === 0;
+    const viewerMembers  = details.members.filter(m => m.role === 'viewer');
+    const seatPrice      = subscription?.billingInterval === 'yearly' ? PRICE_YEARLY : PRICE_MONTHLY;
+    // With every seat taken, the creator option is disabled — fall back to viewer
+    const effectiveInviteRole: 'viewer' | 'creator' = noSeatLeft && inviteRole === 'creator' ? 'viewer' : inviteRole;
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
     const inputClass = "px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
 
@@ -171,27 +182,36 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inviteEmail.trim()) return;
+        const email = inviteEmail.trim().toLowerCase();
+        if (!email) return;
         setInviting(true);
         try {
-            const { error } = await invokeFunction('workspace-invite', {
+            const { data, error } = await invokeFunction('workspace-invite', {
                 workspaceId: details.id,
-                email: inviteEmail.trim().toLowerCase(),
-                role: inviteRole,
+                email,
+                role: effectiveInviteRole,
             });
             if (error) throw error;
             setInviteEmail('');
-            addToast({ type: 'success', title: `Invitation sent to ${inviteEmail.trim()}` });
-        } catch (err: any) {
-            captureError(err, { flow: 'workspace', phase: 'invite', workspaceId: details.id, extra: { role: inviteRole } });
+            onInvitationSent({
+                id: data.invitationId,
+                email,
+                role: effectiveInviteRole,
+                invited_by: currentUserId ?? '',
+                created_at: new Date().toISOString(),
+            });
+            addToast({ type: 'success', title: `Invitation sent to ${email}` });
+        } catch (err) {
+            const failure = err instanceof Error ? err : undefined;
+            captureError(err, { flow: 'workspace', phase: 'invite', workspaceId: details.id, extra: { role: effectiveInviteRole } });
             trackWorkspaceInviteFailed({
                 workspace_id: details.id,
-                role: inviteRole,
-                error: err?.message || 'Unknown error',
-                error_name: err?.name,
+                role: effectiveInviteRole,
+                error: failure?.message || 'Unknown error',
+                error_name: failure?.name,
                 is_offline: !navigator.onLine,
             });
-            addToast({ type: 'error', title: err?.message ?? 'Failed to send invitation' });
+            addToast({ type: 'error', title: await apiErrorMessage(err, 'Failed to send invitation') });
         } finally {
             setInviting(false);
         }
@@ -235,16 +255,23 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     const handleResend = async (email: string, role: 'viewer' | 'creator' | 'admin') => {
         setResendingId(email);
         try {
-            const { error } = await invokeFunction('workspace-invite', {
+            const { data, error } = await invokeFunction('workspace-invite', {
                 workspaceId: details.id,
                 email,
                 role,
             });
             if (error) throw error;
+            onInvitationSent({
+                id: data.invitationId,
+                email,
+                role,
+                invited_by: currentUserId ?? '',
+                created_at: new Date().toISOString(),
+            });
             addToast({ type: 'success', title: `Invitation resent to ${email}` });
         } catch (err) {
             captureError(err, { flow: 'workspace', phase: 'invite_resend', workspaceId: details.id, extra: { role } });
-            addToast({ type: 'error', title: 'Failed to resend invitation' });
+            addToast({ type: 'error', title: await apiErrorMessage(err, 'Failed to resend invitation') });
         } finally {
             setResendingId(null);
         }
@@ -260,30 +287,42 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                 <p className="text-sm text-text-muted mt-0.5">Invite teammates and manage their access.</p>
             </div>
 
-            {/* Seat summary — seats are invite-driven (billing revamp Step 6) */}
+            {/* Seat summary — purchased seats vs. seats in use / reserved */}
             <div className="border border-border rounded-[var(--radius-md)] p-5 flex flex-col gap-2">
-                <div className="flex items-baseline justify-between gap-4">
-                    <div>
-                        <span className="text-2xl font-bold text-text-highlighted">{billedMembers.length}</span>
-                        <span className="text-sm text-text-muted">
-                            {' '}{billedMembers.length === 1 ? 'seat' : 'seats'} ·
-                            {' '}${billedMembers.length * seatPrice}/mo
-                            {subscription?.billingInterval === 'yearly' ? ', billed yearly' : ''}
-                        </span>
-                    </div>
+                <div className="flex items-baseline justify-between gap-4 flex-wrap">
+                    <p className="text-sm text-text-muted">
+                        <span className="text-2xl font-bold text-text-highlighted">{usedSeats}</span>
+                        {' '}of {plural(purchasedSeats, 'seat')} used ·
+                        {' '}${purchasedSeats * seatPrice}/mo
+                        {subscription?.billingInterval === 'yearly' ? ', billed yearly' : ''}
+                    </p>
                     {viewerMembers.length > 0 && (
                         <span className="text-sm text-text-muted">
-                            {viewerMembers.length} viewer{viewerMembers.length !== 1 ? 's' : ''} · free
+                            {plural(viewerMembers.length, 'viewer')} · free
                         </span>
                     )}
                 </div>
                 <p className="text-xs text-text-muted">
-                    Seats adjust automatically as members join or leave.
-                    {pendingSeats > 0 && ` ${pendingSeats} pending invite${pendingSeats !== 1 ? 's' : ''} — each adds a seat when accepted.`}
+                    {reservedSeats > 0 && `${reservedSeats} reserved by pending ${reservedSeats === 1 ? 'invite' : 'invites'}. `}
+                    {noSeatLeft
+                        ? 'All purchased seats are taken.'
+                        : `${plural(availableSeats, 'seat')} available for new creators or admins.`}
+                    {isAdmin && (
+                        <>
+                            {' '}
+                            <button
+                                type="button"
+                                className="text-primary hover:underline cursor-pointer"
+                                onClick={onGoToBilling}
+                            >
+                                {noSeatLeft ? 'Add seats →' : 'Manage seats →'}
+                            </button>
+                        </>
+                    )}
                 </p>
             </div>
 
-            {/* Invite form — admin/owner only (billing grows on acceptance) */}
+            {/* Invite form — admin/owner only; creators need a free purchased seat */}
             {isAdmin ? (
                 <div className="border border-border rounded-[var(--radius-md)] p-5">
                     <h3 className="text-sm font-bold text-text-highlighted mb-3">Invite a teammate</h3>
@@ -298,10 +337,10 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                         />
                         <Dropdown<'creator' | 'viewer'>
                             options={[
-                                { value: 'creator', label: 'Creator' },
+                                { value: 'creator', label: 'Creator', disabled: noSeatLeft },
                                 { value: 'viewer', label: 'Viewer' },
                             ]}
-                            value={inviteRole}
+                            value={effectiveInviteRole}
                             onChange={setInviteRole}
                             ariaLabel="Invite role"
                             fullWidth={false}
@@ -315,9 +354,11 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                         </Button>
                     </form>
                     <p className="text-xs text-text-muted mt-2">
-                        {inviteRole === 'viewer'
-                            ? 'Viewers are free — library access only.'
-                            : `Each creator seat adds $${seatPrice}/mo, prorated from the day they join.`}
+                        {noSeatLeft
+                            ? 'No creator seats available — add seats to invite more creators.'
+                            : effectiveInviteRole === 'viewer'
+                                ? 'Viewers are free — library access only.'
+                                : `Uses 1 of your ${plural(purchasedSeats, 'purchased seat')} (${availableSeats} available).`}
                     </p>
                 </div>
             ) : (

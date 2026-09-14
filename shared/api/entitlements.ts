@@ -17,7 +17,11 @@ export interface WorkspaceEntitlements {
     canTranscribe: boolean;
     canBackgroundExport: boolean;
     can4k: boolean;
-    /** Enforcement lands in revamp Step 6 (seats & invitations). */
+    /**
+     * Pro workspaces only. Creator/admin invites additionally need a
+     * free purchased seat — a per-role check the invite route makes
+     * (plans/seat-prepurchase-oneshot.md); this flag is the plan gate.
+     */
     canInvite: boolean;
     /**
      * Active-project cap per user in this workspace; null = uncapped.

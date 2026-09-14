@@ -55,8 +55,7 @@ E2E_USER_EMAIL=you@example.com E2E_USER_PASSWORD=secret npm run test:e2e
 that has no accessible label, the fix is to label the *component* (an
 `aria-label`, a real `<label>`, or a stable id like `#project-name-input`) as
 part of the same change — not to reach for placeholder text, `nth()`, or DOM
-structure. Labeling conventions: ui-guidelines skill ("Labels & Testability")
-and `plans/testable-ui-labels.md`.
+structure. Labeling conventions: ui-guidelines skill ("Labels & Testability").
 
 **Arrange via API, act & assert via UI.** Don't click through setup a test
 isn't about — seed the state through the backend (like
@@ -104,17 +103,49 @@ default settings never drift from the app), then calls `project-create-v2` +
 Because `fullyParallel` is on, each worker runs its own `beforeAll` — parallel
 editor tests each seed their own isolated project. That's intended.
 
-## Next steps (not yet covered)
+## Billing tests (Stripe)
 
-- **Subscribe to a plan (Stripe).** The upgrade button opens Stripe Checkout in a
-  popup (`webapp/src/billing/StripeService.ts`). Outline:
-  1. `const popup = await page.waitForEvent('popup')` after clicking upgrade;
-  2. on the Stripe-hosted page, fill test card `4242 4242 4242 4242`, any future
-     expiry / CVC, and submit;
-  3. run `stripe listen --forward-to localhost:8080/stripe-webhooks` so the
-     webhook flips the workspace to Pro;
-  4. assert the billing page shows the Pro plan.
+`tests/billing.spec.ts` covers the seat pre-purchase model
+(`plans/seat-prepurchase-oneshot.md`): upgrading to Pro through the **real
+hosted Stripe Checkout** (test card 4242…), then buying seats and inviting
+people up to the purchased count.
 
-  Keep 1–2 tests going through the real hosted checkout (it's a third-party page
-  and can be flaky), and drive plan changes *after* the first subscription via
-  `stripe trigger` / webhook fixtures rather than re-clicking checkout each time.
+Prerequisites on top of the stack above:
+
+- **Stripe test-mode keys in `server/.env.local`** — `STRIPE_SECRET_KEY`
+  (`sk_test_…`), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_MONTHLY`. The fixture
+  (`fixtures/billing.ts`) reads the same file the server loads, so it can create
+  real test-mode customers/subscriptions and sign webhooks the server accepts.
+  Without them the billing tests skip.
+- **No `stripe listen` needed.** Stripe can't reach localhost, so the fixture
+  posts the `checkout.session.completed` event itself, signed exactly like
+  Stripe does. If you do have `stripe listen` running, the duplicate delivery is
+  harmless (the handler is an upsert).
+- The server must be running the current code — `npm run dev:server` does not
+  watch files, so restart it after pulling server changes.
+
+The two tests run as a **dedicated account** (`e2e-billing@example.com`,
+`fixtures/testUser.ts` → `BILLING_USER`, signed in by `tests/billing.setup.ts`
+into its own storage state) so the main e2e user's workspace — whose Pro/trial
+state the editor share test depends on — is never touched. They run serially in
+the `billing` Playwright project and reset that account's workspace to a
+subscription-free, solo state before and after each test (Stripe customer
+deleted, invitations rescinded, members removed, subscription row deleted via
+PostgREST with the service-role key — the one step no app route can do).
+
+The hosted checkout page is third-party UI: its field ids (`#cardNumber`,
+`#cardExpiry`, `#cardCvc`, …) have been stable for years but can change; if the
+upgrade test starts failing on the popup, that helper is the place to look.
+
+## Running against a second stack
+
+The config takes two overrides so a suite can target a separate server/webapp
+pair (for example while the usual ports are busy with a long-running session):
+
+```bash
+E2E_WEBAPP_PORT=3002 E2E_API_URL=http://localhost:8081 npm run test:e2e
+```
+
+Playwright starts the webapp on that port with `VITE_API_URL` pointed at the
+given server; the server itself you start by hand
+(`cd server && PORT=8081 PUBLIC_URL=http://localhost:8081 npx tsx --env-file=.env.local src/server.ts`).

@@ -64,14 +64,18 @@ export interface WorkspaceInvitationRow {
 
 /**
  * workspace_get's blob: details + members + pending invitations.
- * viewer_seats (seats * 10) dropped in revamp Step 6 — no viewer-seat
- * math is user-visible; the viewer ceiling is a hidden server backstop.
+ * `seats` is the PURCHASED seat count (plans/seat-prepurchase-oneshot.md):
+ * creator/admin members (the owner included) occupy seats, pending
+ * creator/admin invitations reserve them, viewers are free. No
+ * viewer-seat math is user-visible; the viewer ceiling is a hidden
+ * server backstop.
  */
 export interface WorkspaceDetails {
     id: string;
     name: string;
     owner_id: string;
     role: WorkspaceRole;
+    /** Purchased seats; null without a subscription */
     seats: number | null;
     members: WorkspaceMemberRow[];
     invitations: WorkspaceInvitationRow[];

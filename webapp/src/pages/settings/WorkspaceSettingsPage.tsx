@@ -9,7 +9,7 @@ import { trackWorkspaceSettingsPageLoaded } from '../../analytics';
 import { GeneralSection } from './GeneralSection';
 import { MembersSection } from './MembersSection';
 import { BillingSection } from './BillingSection';
-import type { WorkspaceDetails } from './types';
+import type { WorkspaceDetails, WorkspaceInvitation } from './types';
 
 type SectionId = 'members' | 'billing';
 
@@ -115,6 +115,27 @@ export function WorkspaceSettingsPage() {
         );
     };
 
+    // A sent/resent invitation replaces any prior one for that email (the
+    // server deletes + reinserts the row) — the seat card counts it as
+    // reserved immediately.
+    const handleInvitationSent = (invitation: WorkspaceInvitation) => {
+        setDetails(prev => prev
+            ? { ...prev, invitations: [...prev.invitations.filter(i => i.email !== invitation.email), invitation] }
+            : prev
+        );
+    };
+
+    // Purchased seats changed on the billing card (or checkout completed)
+    const handleSeatsChanged = (seats: number) => {
+        setDetails(prev => prev ? { ...prev, seats } : prev);
+    };
+
+    // Seat pre-purchase (plans/seat-prepurchase-oneshot.md): the owner is
+    // synthesized into members as admin, so creator/admin members = seats
+    // in use; pending creator/admin invitations reserve seats.
+    const usedSeats = Math.max(1, details?.members.filter(m => m.role === 'creator' || m.role === 'admin').length ?? 1);
+    const reservedSeats = details?.invitations.filter(i => i.role !== 'viewer').length ?? 0;
+
     return (
         <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-16">
             {/* Page header */}
@@ -144,6 +165,7 @@ export function WorkspaceSettingsPage() {
                             hasTeamAccess={hasTeamAccess}
                             onMemberRemoved={handleMemberRemoved}
                             onMemberRoleChanged={handleMemberRoleChanged}
+                            onInvitationSent={handleInvitationSent}
                             onInvitationRescinded={handleInvitationRescinded}
                             onGoToBilling={() => scrollTo('billing')}
                         />
@@ -152,7 +174,12 @@ export function WorkspaceSettingsPage() {
             )}
 
             <section id="settings-billing" className={SECTION_CARD}>
-                <BillingSection onGoToMembers={() => scrollTo('members')} />
+                <BillingSection
+                    onGoToMembers={() => scrollTo('members')}
+                    usedSeats={usedSeats}
+                    seatFloor={usedSeats + reservedSeats}
+                    onSeatsChanged={handleSeatsChanged}
+                />
             </section>
         </div>
     );
