@@ -1,5 +1,4 @@
-import { TbZoomIn } from 'react-icons/tb';
-import { RiLightbulbFlashLine } from 'react-icons/ri';
+import { LuLightbulb, LuZoomIn } from 'react-icons/lu';
 import { Button, CollapsibleCard, Dropdown, InfoTooltip, Slider, Toggle, Tooltip } from '@shared/components';
 import { useToast } from '../../../components/Toast';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -61,7 +60,7 @@ export const MotionSettings = () => {
             {/* ZOOM */}
             <CollapsibleCard
                 title="Zoom"
-                icon={<TbZoomIn className="icon-md" />}
+                icon={<LuZoomIn className="icon-md" />}
                 previewItems={[
                     ...(templateMode ? [{ type: 'text' as const, content: autoZoom ? 'Auto' : 'Manual' }] : []),
                     { type: 'text', content: `${zoom.maxZoom.toFixed(1)}×` },
@@ -142,7 +141,7 @@ export const MotionSettings = () => {
             {/* SPOTLIGHT */}
             <CollapsibleCard
                 title="Spotlight"
-                icon={<RiLightbulbFlashLine className="icon-md" />}
+                icon={<LuLightbulb className="icon-md" />}
                 headerAction={<SpotlightTooltip />}
                 previewItems={[
                     ...(templateMode ? [{ type: 'text' as const, content: autoSpotlight ? 'Auto' : 'Manual' }] : []),

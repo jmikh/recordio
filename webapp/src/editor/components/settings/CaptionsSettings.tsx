@@ -1,10 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MdEdit, MdVisibilityOff, MdVisibility } from 'react-icons/md';
-import { FiScissors } from 'react-icons/fi';
-import { RiPaletteLine } from 'react-icons/ri';
-import { TbSparkles, TbCopy, TbDownload } from 'react-icons/tb';
-import { LuCaptions } from 'react-icons/lu';
+import { LuCaptions, LuCopy, LuDownload, LuEye, LuEyeOff, LuPalette, LuPencil, LuScissors, LuSparkles } from 'react-icons/lu';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -443,7 +439,7 @@ export function CaptionsSettings() {
                 return (
                     <CollapsibleCard
                         title="A.I."
-                        icon={<TbSparkles className="icon-md" />}
+                        icon={<LuSparkles className="icon-md" />}
                         previewItems={aiPreviewItems}
                         isExpanded={showCollapsibleCaptionAI}
                         onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleCaptionAI', v)}
@@ -517,7 +513,7 @@ export function CaptionsSettings() {
                                 <Button
                                     variant="base"
                                     fullWidth
-                                    icon={TbCopy}
+                                    icon={LuCopy}
                                     onClick={() => {
                                         const text = getVisibleTranscriptSegments().map(s => s.text).join('\n');
                                         navigator.clipboard.writeText(text);
@@ -531,7 +527,7 @@ export function CaptionsSettings() {
                                 <Button
                                     variant="base"
                                     fullWidth
-                                    icon={TbDownload}
+                                    icon={LuDownload}
                                     onClick={handleDownloadSrt}
                                 >
                                     Download
@@ -611,7 +607,7 @@ export function CaptionsSettings() {
             {/* Style Settings Card - only show when captions exist */}
             {captionSegments && captionSegments.length > 0 && <CollapsibleCard
                 title="Style"
-                icon={<RiPaletteLine className="icon-md" />}
+                icon={<LuPalette className="icon-md" />}
                 previewItems={[
                     {
                         type: 'custom',
@@ -742,7 +738,7 @@ export function CaptionsSettings() {
                                 <Tooltip text="Edit word">
                                     <Button
                                         variant="ghost"
-                                        icon={MdEdit}
+                                        icon={LuPencil}
                                         onClick={() => setSelection({ ...selection, isEditing: true })}
                                     />
                                 </Tooltip>
@@ -759,7 +755,7 @@ export function CaptionsSettings() {
                                             <Tooltip text="Hide from caption">
                                                 <Button
                                                     variant="ghost"
-                                                    icon={MdVisibilityOff}
+                                                    icon={LuEyeOff}
                                                     onClick={handleHideSelected}
                                                 />
                                             </Tooltip>
@@ -768,7 +764,7 @@ export function CaptionsSettings() {
                                             <Tooltip text="Show">
                                                 <Button
                                                     variant="ghost"
-                                                    icon={MdVisibility}
+                                                    icon={LuEye}
                                                     onClick={handleShowSelected}
                                                 />
                                             </Tooltip>
@@ -780,7 +776,7 @@ export function CaptionsSettings() {
                             <Tooltip text="Cut from video">
                                 <Button
                                     variant="ghost"
-                                    icon={FiScissors}
+                                    icon={LuScissors}
                                     onClick={handleCutSelected}
                                 />
                             </Tooltip>

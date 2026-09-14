@@ -1,5 +1,5 @@
 import React from 'react';
-import { AiOutlineZoomIn } from 'react-icons/ai';
+import { LuZoomIn } from 'react-icons/lu';
 import {
     transitionSegment,
     holdSegment,
@@ -140,7 +140,7 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
                     }}
                 >
                     {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
-                        <AiOutlineZoomIn className={`${blockIconClass} icon-md`} />
+                        <LuZoomIn className={`${blockIconClass} icon-md`} />
                     )}
                 </div>
             )}

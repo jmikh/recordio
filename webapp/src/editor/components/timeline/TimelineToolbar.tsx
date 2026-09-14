@@ -6,11 +6,8 @@ import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { MdPlayArrow, MdPause, MdAdd, MdRemove, MdLayers, MdKeyboardArrowDown } from 'react-icons/md';
-import { FiScissors } from 'react-icons/fi';
-import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
-import { RiArrowRightUpFill } from 'react-icons/ri';
-import { LuEraser } from 'react-icons/lu';
+import { LuArrowUpRight, LuChevronDown, LuEraser, LuMinus, LuPause, LuPlay, LuPlus, LuScissors, LuType } from 'react-icons/lu';
+import { TbBlur, TbBorderOuter } from 'react-icons/tb';
 import { Slider, Button, Tooltip } from '@shared/components';
 import { useToast } from '../../../components/Toast';
 import { analyzeForAutoCut } from '../../autocut/autoCutAnalyzer';
@@ -27,10 +24,10 @@ export const MAX_PIXELS_PER_SEC = 200;
 
 
 const OVERLAY_OPTIONS: { type: OverlayItemType; label: string; icon: React.ReactNode }[] = [
-    { type: 'blur', label: 'Blur', icon: <MdBlurOn className="icon-md" /> },
-    { type: 'text', label: 'Text', icon: <MdOutlineTextFields className="icon-md" /> },
-    { type: 'arrow', label: 'Arrow', icon: <RiArrowRightUpFill className="icon-md" /> },
-    { type: 'border', label: 'Outline', icon: <MdBorderOuter className="icon-md" /> },
+    { type: 'blur', label: 'Blur', icon: <TbBlur className="icon-md" /> },
+    { type: 'text', label: 'Text', icon: <LuType className="icon-md" /> },
+    { type: 'arrow', label: 'Arrow', icon: <LuArrowUpRight className="icon-md" /> },
+    { type: 'border', label: 'Outline', icon: <TbBorderOuter className="icon-md" /> },
 ];
 
 export const TimelineToolbar: React.FC = () => {
@@ -302,7 +299,7 @@ export const TimelineToolbar: React.FC = () => {
                         onMouseLeave={() => setScissorsHovered(false)}
                         className={!canSplit ? 'opacity-40 cursor-not-allowed' : ''}
                     >
-                        <FiScissors className="icon-sm" />
+                        <LuScissors className="icon-sm" />
                     </Button>
                 </Tooltip>
 
@@ -329,7 +326,7 @@ export const TimelineToolbar: React.FC = () => {
                         className="interactive-ghost flex items-center gap-1.5 px-2 py-1 text-xs"
                     >
                         <span>Add Overlay</span>
-                        <MdKeyboardArrowDown className={`icon-sm transition-transform ${overlayMenuOpen ? 'rotate-180' : ''}`} />
+                        <LuChevronDown className={`icon-sm transition-transform ${overlayMenuOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {overlayMenuOpen && createPortal(
                         <div
@@ -362,7 +359,7 @@ export const TimelineToolbar: React.FC = () => {
                     onClick={onTogglePlay}
                     className="w-7 h-7 rounded-full border-2 border-primary text-primary hover:border-primary-highlighted hover:text-primary-highlighted hover:scale-110 transition-all flex items-center justify-center shrink-0"
                 >
-                    {isPlaying ? <MdPause className="icon-lg" /> : <MdPlayArrow className="icon-lg" />}
+                    {isPlaying ? <LuPause className="icon-lg" /> : <LuPlay className="icon-lg" />}
                 </button>
                 <div className="flex items-baseline gap-1.5">
                     <div
@@ -391,7 +388,7 @@ export const TimelineToolbar: React.FC = () => {
                 </Tooltip>
                 <Button
                     variant="ghost"
-                    icon={MdRemove}
+                    icon={LuMinus}
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
                 />
                 <div className="w-24">
@@ -406,7 +403,7 @@ export const TimelineToolbar: React.FC = () => {
                 </div>
                 <Button
                     variant="ghost"
-                    icon={MdAdd}
+                    icon={LuPlus}
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
                 />
             </div>

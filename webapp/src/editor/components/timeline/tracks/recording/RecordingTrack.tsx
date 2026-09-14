@@ -7,7 +7,7 @@ import { useUIStore } from '../../../../stores/useUIStore';
 import { getTimeMapper } from '../../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
-import { FiScissors } from 'react-icons/fi';
+import { LuScissors } from 'react-icons/lu';
 import { RecordingSegment } from './RecordingSegment';
 
 
@@ -108,7 +108,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                 className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 p-1.5 rounded-full bg-black/60 text-text-on-primary border border-transparent pointer-events-none transition-[opacity] duration-150 z-[var(--z-index-tooltip)] ${isScissorsHovered ? 'opacity-100' : 'opacity-0'}`}
                 style={{ left: `${playheadX}px` }}
             >
-                <FiScissors className="icon-sm" />
+                <LuScissors className="icon-sm" />
             </div>
 
         </div >

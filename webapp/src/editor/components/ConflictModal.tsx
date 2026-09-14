@@ -7,7 +7,7 @@ import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { navigate } from '../../lib/navigate';
 import { captureError } from '../../lib/sentry';
-import { TbCloudDown, TbCloudUp } from 'react-icons/tb';
+import { LuCloudDownload, LuCloudUpload } from 'react-icons/lu';
 
 /**
  * Forced-choice modal shown when a cloud sync write fails due to version conflict.
@@ -79,7 +79,7 @@ export function ConflictModal() {
                     disabled={loading !== null}
                     className="flex items-center gap-3 w-full px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50 text-left"
                 >
-                    <TbCloudDown className="icon-lg shrink-0 text-primary" />
+                    <LuCloudDownload className="icon-lg shrink-0 text-primary" />
                     <div>
                         <div className="text-sm">
                             {loading === 'load' ? 'Loading...' : 'Load cloud version'}
@@ -95,7 +95,7 @@ export function ConflictModal() {
                     disabled={loading !== null}
                     className="flex items-center gap-3 w-full px-4 py-3 bg-surface-raised hover:bg-state-hover text-text-highlighted rounded-[var(--radius-interactive)] border border-border transition-colors disabled:opacity-50 text-left"
                 >
-                    <TbCloudUp className="icon-lg shrink-0 text-text-muted" />
+                    <LuCloudUpload className="icon-lg shrink-0 text-text-muted" />
                     <div>
                         <div className="text-sm">
                             {loading === 'overwrite' ? 'Saving...' : 'Overwrite cloud'}

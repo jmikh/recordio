@@ -4,10 +4,8 @@ import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Button, Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { AutoShrinkTooltip } from '../shared/MediaTooltips';
-import { LuCircle, LuSquare } from 'react-icons/lu';
-import { MdAspectRatio } from 'react-icons/md';
-import { RiPaletteLine, RiFocus3Line } from 'react-icons/ri';
-import { TbShape, TbBorderOuter } from 'react-icons/tb';
+import { LuCircle, LuFocus, LuPalette, LuRatio, LuShapes, LuSquare } from 'react-icons/lu';
+import { TbBorderOuter } from 'react-icons/tb';
 import { FaceAnchorModal } from './FaceAnchorModal';
 import { applyCameraShape } from '@shared/utils/cameraShape';
 import { resizeCameraKeepingCorner } from './cameraCorner';
@@ -99,12 +97,12 @@ export const CameraSettings = () => {
                 {/* Shape Settings */}
                 <CollapsibleCard
                     title="Shape"
-                    icon={<TbShape className="icon-md" />}
+                    icon={<LuShapes className="icon-md" />}
                     previewItems={[
                         {
                             type: 'custom',
                             content: shape === 'rect'
-                                ? <MdAspectRatio className="icon-md text-text-muted" />
+                                ? <LuRatio className="icon-md text-text-muted" />
                                 : shape === 'square'
                                     ? <LuSquare className="icon-sm text-text-muted" />
                                     : <LuCircle className="icon-sm text-text-muted" />
@@ -132,7 +130,7 @@ export const CameraSettings = () => {
                                     onClick={() => setIsFaceAnchorOpen(true)}
                                     fullWidth
                                 >
-                                    <RiFocus3Line />
+                                    <LuFocus className="icon-md" />
                                     Center Face
                                 </Button>
                             </div>
@@ -178,7 +176,7 @@ export const CameraSettings = () => {
                 {/* Style Settings */}
                 <CollapsibleCard
                     title="Style"
-                    icon={<RiPaletteLine className="icon-md" />}
+                    icon={<LuPalette className="icon-md" />}
                     previewItems={templateMode
                         ? [{ type: 'text', content: autoShrink ? 'Shrink' : 'No shrink' }]
                         : [

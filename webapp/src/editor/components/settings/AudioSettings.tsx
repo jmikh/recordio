@@ -7,7 +7,7 @@ import { UserAssetService } from '../../../storage/userAssetService';
 import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
-import { TbMusic, TbUpload, TbPlayerPlay, TbPlayerPause, TbVolume } from 'react-icons/tb';
+import { LuMusic, LuPause, LuPlay, LuUpload, LuVolume2 } from 'react-icons/lu';
 import { trackUploadMusicClicked, trackUploadMusicFailed } from '../../../analytics';
 import { captureError } from '../../../lib/sentry';
 
@@ -228,7 +228,7 @@ export const AudioSettingsPanel = () => {
             {/* Audio Source Toggles */}
             <CollapsibleCard
                 title="Audio"
-                icon={<TbVolume className="icon-md" />}
+                icon={<LuVolume2 className="icon-md" />}
                 previewItems={audioTogglePreviewItems}
                 isExpanded={showCollapsibleAudioToggles}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleAudioToggles', v)}
@@ -306,7 +306,7 @@ export const AudioSettingsPanel = () => {
             {/* Background Music */}
             <CollapsibleCard
                 title="Music"
-                icon={<TbMusic className="icon-md" />}
+                icon={<LuMusic className="icon-md" />}
                 previewItems={musicPreviewItems}
                 isExpanded={showCollapsibleMusic}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMusic', v)}
@@ -401,12 +401,12 @@ export const AudioSettingsPanel = () => {
                                                     title={previewingUrl === preset.url ? 'Stop preview' : 'Preview'}
                                                 >
                                                     {previewingUrl === preset.url ? (
-                                                        <TbPlayerPause className="icon-sm" />
+                                                        <LuPause className="icon-sm" />
                                                     ) : (
-                                                        <TbPlayerPlay className="icon-sm" />
+                                                        <LuPlay className="icon-sm" />
                                                     )}
                                                 </button>
-                                                <TbMusic className="icon-sm flex-shrink-0 text-text-muted" />
+                                                <LuMusic className="icon-sm flex-shrink-0 text-text-muted" />
                                                 <span className="text-sm truncate">{preset.name}</span>
                                                 {isActive && (
                                                     <span className="chosen-dot ml-auto" />
@@ -430,7 +430,7 @@ export const AudioSettingsPanel = () => {
                                         onClick={() => canUploadMusic() && !isUploading && fileInputRef.current?.click()}
                                         title={!canUploadMusic() ? 'Library full (10/10) — delete a track to upload a new one' : isUploading ? 'Uploading...' : 'Upload music'}
                                     >
-                                        <TbUpload className="icon-sm" />
+                                        <LuUpload className="icon-sm" />
                                         {isUploading ? 'Uploading...' : 'Upload'}
                                     </button>
                                     <input
@@ -485,12 +485,12 @@ export const AudioSettingsPanel = () => {
                                                         title={previewingEntryId === entry.id ? 'Stop preview' : 'Preview'}
                                                     >
                                                         {previewingEntryId === entry.id ? (
-                                                            <TbPlayerPause className="icon-sm" />
+                                                            <LuPause className="icon-sm" />
                                                         ) : (
-                                                            <TbPlayerPlay className="icon-sm" />
+                                                            <LuPlay className="icon-sm" />
                                                         )}
                                                     </button>
-                                                    <TbMusic className="icon-sm flex-shrink-0 text-text-muted" />
+                                                    <LuMusic className="icon-sm flex-shrink-0 text-text-muted" />
                                                     <span className="text-sm truncate">{entry.name}</span>
                                                     {isActive && (
                                                         <span className="chosen-dot ml-auto mr-1" />

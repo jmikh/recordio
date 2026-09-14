@@ -1,6 +1,6 @@
 import { Modal, XButton } from '@shared/components';
 import { SUPPORT_EMAIL } from '@shared/types/bridge';
-import { MdOutlineBugReport } from 'react-icons/md';
+import { LuBug } from 'react-icons/lu';
 
 interface SupportModalProps {
     isOpen: boolean;
@@ -13,7 +13,7 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <MdOutlineBugReport className="icon-lg text-text-highlighted" />
+                        <LuBug className="icon-lg text-text-highlighted" />
                         <h2 className="heading-2">Report a Bug</h2>
                     </div>
                     <XButton onClick={onClose} />

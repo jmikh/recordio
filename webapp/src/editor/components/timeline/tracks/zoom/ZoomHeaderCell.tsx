@@ -1,6 +1,6 @@
 import React from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
-import { TbZoomIn } from 'react-icons/tb';
+import { LuZoomIn } from 'react-icons/lu';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 
 interface ZoomHeaderCellProps {
@@ -15,7 +15,7 @@ export const ZoomHeaderCell: React.FC<ZoomHeaderCellProps> = ({ height, isCollap
     return (
         <TimelineHeaderCell
             title="Zoom"
-            icon={<TbZoomIn className="icon-sm" />}
+            icon={<LuZoomIn className="icon-sm" />}
             height={height}
             isCollapsed={isCollapsed}
             applyEnabled={zoomEnabled}

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { XButton } from '@shared/components';
-import { FaCheck, FaCircleExclamation } from 'react-icons/fa6';
+import { LuCheck, LuCircleAlert } from 'react-icons/lu';
 
 // Toast types
 export type ToastType = 'info' | 'success' | 'error' | 'progress';
@@ -101,12 +101,12 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
             );
         }
         if (toast.type === 'success') {
-            return <FaCheck className="shrink-0 self-center w-5 h-5 text-success" />;
+            return <LuCheck className="icon-lg shrink-0 self-center text-success" />;
         }
         if (toast.type === 'info' || toast.type === 'error') {
             return (
-                <FaCircleExclamation
-                    className={`shrink-0 self-center w-5 h-5 ${toast.type === 'error' ? 'text-destructive' : 'text-text-main'}`}
+                <LuCircleAlert
+                    className={`icon-lg shrink-0 self-center ${toast.type === 'error' ? 'text-destructive' : 'text-text-main'}`}
                 />
             );
         }

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { PiWebcamBold } from 'react-icons/pi';
+import { LuCamera } from 'react-icons/lu';
 import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { useTimeMapper } from '../../../../hooks/useTimeMapper';
@@ -185,7 +185,7 @@ export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isColl
                                     }}
                                 >
                                     {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <PiWebcamBold className={`${ghostIconClass} icon-md`} />
+                                        <LuCamera className={`${ghostIconClass} icon-md`} />
                                     )}
                                 </div>
                             )}

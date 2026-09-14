@@ -1,5 +1,5 @@
 import { useState, useCallback, type MouseEvent } from 'react';
-import { LuLink, LuCheck } from 'react-icons/lu';
+import { LuCheck, LuLink } from 'react-icons/lu';
 
 interface CopyLinkButtonProps {
     url: string;

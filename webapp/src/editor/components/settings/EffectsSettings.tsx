@@ -7,8 +7,7 @@ import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '
 import { HotkeyTooltip } from '../shared/MediaTooltips';
 import { ColorButton } from './ColorButton';
 import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '@shared/types/settings';
-import { TbPlayerPlay } from 'react-icons/tb';
-import { MdOutlineKeyboardCommandKey, MdAdsClick } from 'react-icons/md';
+import { LuCommand, LuMousePointerClick, LuPlay } from 'react-icons/lu';
 import { previewClickSound } from '../../audio/clickSoundPlayer';
 import { PreviewEffectButton } from './PreviewEffectButton';
 
@@ -86,7 +85,7 @@ export const EffectsSettings = () => {
             {/* MOUSE SETTINGS */}
             <CollapsibleCard
                 title="Mouse"
-                icon={<MdAdsClick className="icon-md" />}
+                icon={<LuMousePointerClick className="icon-md" />}
                 previewItems={[
                     {
                         type: 'custom',
@@ -115,7 +114,7 @@ export const EffectsSettings = () => {
                             onClick={() => previewClickSound(mouseSettings.soundVolume ?? 0.5)}
                             title="Preview sound"
                         >
-                            <TbPlayerPlay className="icon-sm" />
+                            <LuPlay className="icon-sm" />
                         </button>
                     </Toggle>
 
@@ -191,7 +190,7 @@ export const EffectsSettings = () => {
             {/* KEYBOARD SETTINGS */}
             <CollapsibleCard
                 title="Keyboard"
-                icon={<MdOutlineKeyboardCommandKey className="icon-md" />}
+                icon={<LuCommand className="icon-md" />}
                 previewItems={[
                     { type: 'text', content: (keyboardSettings.showHotkeys ?? true) ? 'On' : 'Off' },
                     ...((keyboardSettings.showHotkeys ?? true) ? [

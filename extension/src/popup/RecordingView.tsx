@@ -12,11 +12,8 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
-import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
-import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { FiTrash2 } from 'react-icons/fi';
-import { IoPause, IoPlay } from 'react-icons/io5';
-import { MdBlurOn, MdChevronRight, MdDone } from 'react-icons/md';
+import { LuCamera, LuCameraOff, LuCheck, LuChevronRight, LuMic, LuMicOff, LuPause, LuPlay, LuTrash2 } from 'react-icons/lu';
+import { TbBlur } from 'react-icons/tb';
 import { MSG_TYPES, type RecordingState } from '../shared/messageTypes';
 import { formatTime, useElapsed } from '../shared/recordingTime';
 import { enterBlurMode } from './blurMode';
@@ -82,18 +79,18 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                 <div className="absolute top-2 right-2 flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-black/70">
                     <span className={recordingState.hasAudio ? 'text-white' : 'text-white/60'}>
                         {recordingState.hasAudio
-                            ? <BiMicrophone className="icon-md" />
-                            : <BiMicrophoneOff className="icon-md" />}
+                            ? <LuMic className="icon-md" />
+                            : <LuMicOff className="icon-md" />}
                     </span>
                     <span className={recordingState.hasCamera ? 'text-white' : 'text-white/60'}>
                         {recordingState.hasCamera
-                            ? <PiWebcamBold className="icon-md" />
-                            : <PiWebcamSlashBold className="icon-md" />}
+                            ? <LuCamera className="icon-md" />
+                            : <LuCameraOff className="icon-md" />}
                     </span>
                 </div>
                 <div className="absolute bottom-2 left-2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 text-white">
                     {recordingState.isPaused
-                        ? <IoPause className="icon-sm text-destructive animate-pulse" />
+                        ? <LuPause className="icon-sm text-destructive animate-pulse" />
                         : <div className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />}
                     <span className="text-base font-bold tabular-nums tracking-wide">
                         {formatTime(elapsed)}
@@ -108,9 +105,9 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                 onClick={enterBlurMode}
                 className="w-full justify-start gap-3"
             >
-                <MdBlurOn className="icon-md text-text-muted" />
+                <TbBlur className="icon-md text-text-muted" />
                 Blur content
-                <MdChevronRight className="icon-md text-text-muted ml-auto" />
+                <LuChevronRight className="icon-md text-text-muted ml-auto" />
             </Button>
 
             {/* Pause / Resume + Discard */}
@@ -122,8 +119,8 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                     className="flex-1 justify-center gap-1.5"
                 >
                     {recordingState.isPaused
-                        ? <><IoPlay className="icon-sm" /> Resume</>
-                        : <><IoPause className="icon-sm" /> Pause</>}
+                        ? <><LuPlay className="icon-sm" /> Resume</>
+                        : <><LuPause className="icon-sm" /> Pause</>}
                 </Button>
                 <Button
                     variant="base"
@@ -131,7 +128,7 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                     disabled={busy}
                     className="flex-1 justify-center gap-1.5"
                 >
-                    <FiTrash2 className="icon-sm" />
+                    <LuTrash2 className="icon-sm" />
                     Discard
                 </Button>
             </div>
@@ -143,7 +140,7 @@ export function RecordingView({ recordingState }: { recordingState: RecordingSta
                 disabled={busy}
                 className="w-full justify-center gap-1.5"
             >
-                <MdDone className="icon-sm" />
+                <LuCheck className="icon-sm" />
                 Finish
             </Button>
         </div>

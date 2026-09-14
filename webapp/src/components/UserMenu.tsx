@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuUser, LuLogOut, LuEllipsis } from 'react-icons/lu';
-import { MdLightMode, MdDarkMode, MdOutlineBugReport } from 'react-icons/md';
+import { LuBug, LuEllipsis, LuLogOut, LuMoon, LuSun, LuUser } from 'react-icons/lu';
 import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { useThemeStore } from '../theme/useThemeStore';
@@ -86,8 +85,8 @@ export function UserMenu({ onOpenSupportModal, openDirection = 'down', variant =
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
             >
                 {isDark
-                    ? <MdLightMode className="icon-sm text-text-muted" />
-                    : <MdDarkMode className="icon-sm text-text-muted" />
+                    ? <LuSun className="icon-sm text-text-muted" />
+                    : <LuMoon className="icon-sm text-text-muted" />
                 }
                 {isDark ? 'Light Mode' : 'Dark Mode'}
             </button>
@@ -97,7 +96,7 @@ export function UserMenu({ onOpenSupportModal, openDirection = 'down', variant =
                     onClick={() => { setIsOpen(false); onOpenSupportModal(); }}
                     className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-main hover:text-text-highlighted hover:bg-state-hover rounded-md transition-colors text-left"
                 >
-                    <MdOutlineBugReport className="icon-sm text-text-muted" />
+                    <LuBug className="icon-sm text-text-muted" />
                     Report a Bug
                 </button>
             )}

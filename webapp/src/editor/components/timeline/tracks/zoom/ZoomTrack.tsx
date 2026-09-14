@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { AiOutlineZoomIn } from 'react-icons/ai';
+import { LuZoomIn } from 'react-icons/lu';
 import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { useTimeMapper } from '../../../../hooks/useTimeMapper';
@@ -232,7 +232,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                                     }}
                                 >
                                     {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <AiOutlineZoomIn className={`${ghostIconClass} icon-md`} />
+                                        <LuZoomIn className={`${ghostIconClass} icon-md`} />
                                     )}
                                 </div>
                             )}

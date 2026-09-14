@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LuTrash2, LuFolderInput } from 'react-icons/lu';
+import { LuFolderInput, LuTrash2 } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { CloudProjectService, type ProjectListItem } from '../../storage/cloudProjectService';
 import { invokeFunction } from '../../api/client';

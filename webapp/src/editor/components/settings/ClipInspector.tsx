@@ -4,7 +4,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useToast } from '../../../components/Toast';
 import { Slider, Tooltip, CollapsibleCard, Checkbox, Button } from '@shared/components';
 import type { OutputWindow } from '@shared/types';
-import { PiVideoBold } from 'react-icons/pi';
+import { LuVideo } from 'react-icons/lu';
 
 export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win }) => {
     const updateOutputWindow = useProjectStore(s => s.updateOutputWindow);
@@ -61,7 +61,7 @@ export const ClipInspector: React.FC<{ window: OutputWindow }> = ({ window: win 
     }, [win.id, isLastWindow, removeOutputWindow]);
 
     return (
-        <CollapsibleCard title="Clip" icon={<PiVideoBold className="icon-md" />} notCollapsible>
+        <CollapsibleCard title="Clip" icon={<LuVideo className="icon-md" />} notCollapsible>
             <div className="flex flex-col gap-5">
                 <p className="text-label">Check the box to apply to all clips.</p>
 

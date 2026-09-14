@@ -5,8 +5,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, CollapsibleCard, MultiToggle, Toggle, InfoTooltip, Button, type DropdownOption } from '@shared/components';
 import type { EasingStyle } from '@shared/animators/easing';
 import type { CameraMoveSegment } from '@shared/types';
-import { PiWebcamBold } from 'react-icons/pi';
-import { RxEnterFullScreen } from 'react-icons/rx';
+import { LuCamera, LuMaximize } from 'react-icons/lu';
 import { EasingTooltipContent } from './EasingTooltipContent';
 import { CameraMoveTooltip } from '../shared/MediaTooltips';
 
@@ -92,7 +91,7 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
     const isHidden = !!segment.hidden;
 
     return (
-        <CollapsibleCard title="Camera Layout" icon={<PiWebcamBold className="icon-md" />} notCollapsible headerAction={<CameraMoveTooltip />}>
+        <CollapsibleCard title="Camera Layout" icon={<LuCamera className="icon-md" />} notCollapsible headerAction={<CameraMoveTooltip />}>
             <div className="flex flex-col gap-5">
                 <p className="text-label">Adjust the camera position, size, and shape for this segment.</p>
 
@@ -127,7 +126,7 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
                             fullWidth
                             className="text-text-muted hover:text-text"
                         >
-                            <RxEnterFullScreen className="icon-sm" />
+                            <LuMaximize className="icon-sm" />
                             <span>Fill Screen</span>
                         </Button>
                     </>

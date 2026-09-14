@@ -1,5 +1,5 @@
 import React from 'react';
-import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
+import { LuCamera, LuCameraOff } from 'react-icons/lu';
 import {
     transitionSegment,
     holdSegment,
@@ -117,8 +117,8 @@ export const CameraMoveBlock: React.FC<CameraMoveBlockProps> = ({
                 >
                     {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
                         isHidden
-                            ? <PiWebcamSlashBold className={`${blockIconClass} icon-md`} />
-                            : <PiWebcamBold className={`${blockIconClass} icon-md`} />
+                            ? <LuCameraOff className={`${blockIconClass} icon-md`} />
+                            : <LuCamera className={`${blockIconClass} icon-md`} />
                     )}
                 </div>
             )}

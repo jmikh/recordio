@@ -1,6 +1,5 @@
 import React from 'react';
-import { MdVolumeUp, MdVolumeOff } from 'react-icons/md';
-import { AiOutlineEye, AiOutlineEyeInvisible } from 'react-icons/ai';
+import { LuEye, LuEyeOff, LuVolume2, LuVolumeOff } from 'react-icons/lu';
 import { Button } from '@shared/components';
 
 interface TimelineHeaderCellProps {
@@ -73,7 +72,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                                 className={isMuted ? 'text-destructive' : ''}
                                 title={isMuted ? "Unmute" : "Mute"}
                             >
-                                {isMuted ? <MdVolumeOff className="icon-sm" /> : <MdVolumeUp className="icon-sm" />}
+                                {isMuted ? <LuVolumeOff className="icon-sm" /> : <LuVolume2 className="icon-sm" />}
                             </Button>
                         )}
                         {onToggleApply !== undefined && (
@@ -86,7 +85,7 @@ export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
                                 // Ghost already resolves to muted -> highlighted on hover,
                                 // so only the hidden state needs its own dimmer treatment.
                                 className={!applyEnabled ? 'text-text-disabled hover:text-text-muted' : ''}
-                                icon={applyEnabled ? AiOutlineEye : AiOutlineEyeInvisible}
+                                icon={applyEnabled ? LuEye : LuEyeOff}
                                 aria-label={applyEnabled ? 'Disable effect' : 'Enable effect'}
                                 title={applyEnabled ? 'Disable effect' : 'Enable effect'}
                             />

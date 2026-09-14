@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BiMicrophone } from 'react-icons/bi';
+import { LuMic } from 'react-icons/lu';
 
 interface AudioVisualizerProps {
     stream: MediaStream | null;
@@ -101,7 +101,7 @@ export function AudioVisualizer({ stream }: AudioVisualizerProps) {
                 }}
             />
             {/* Mic icon in center */}
-            <BiMicrophone size={28} className="relative z-10 text-text-main" />
+            <LuMic size={32} className="relative z-10 text-text-main" />
         </div>
     );
 }

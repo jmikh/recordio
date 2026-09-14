@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal, XButton, Button, MultiToggle, Toggle, type MultiToggleOption } from '@shared/components';
-import { HiOutlineBolt } from 'react-icons/hi2';
-import { TbLock } from 'react-icons/tb';
+import { LuLock, LuZap } from 'react-icons/lu';
 import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../../../components/Toast';
@@ -111,7 +110,7 @@ export function DownloadModal({
     const resolutionLabel = QUALITY_LABELS[quality];
     const localEstimate = estimateLocalTime(durationMs);
 
-    const lockIcon = entitlements.can4k ? undefined : <TbLock className="icon-sm" />;
+    const lockIcon = entitlements.can4k ? undefined : <LuLock className="icon-sm" />;
     const qualityOptions: MultiToggleOption<RenderQuality>[] = [
         { value: '1080p', label: '1080p', tooltip: 'Full HD' },
         { value: '2K', label: '1440p', icon: lockIcon, tooltip: entitlements.can4k ? 'QHD' : 'QHD — Pro' },
@@ -289,7 +288,7 @@ function CloudRenderView({
 
                 {(isQueued || isRendering) && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-muted">
-                        <HiOutlineBolt className="icon-lg text-primary shrink-0" />
+                        <LuZap className="icon-lg text-primary shrink-0" />
                         <span>You can close this dialog. We'll notify you when your file is ready.</span>
                     </div>
                 )}
@@ -414,7 +413,7 @@ function LocalRenderView({
                     )}
 
                     <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-main">
-                        <HiOutlineBolt className="icon-lg text-primary shrink-0" />
+                        <LuZap className="icon-lg text-primary shrink-0" />
                         <span>Do not switch tabs during export for best performance</span>
                     </div>
                 </div>

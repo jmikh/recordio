@@ -1,5 +1,5 @@
 import { Modal } from './Modal';
-import { HiOutlineBolt } from 'react-icons/hi2';
+import { LuZap } from 'react-icons/lu';
 import logoSvg from '../assets/logo.svg';
 
 interface ProgressModalProps {
@@ -53,7 +53,7 @@ export const ProgressModal = ({
 
                     <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-main">
                         <span className="text-primary flex-shrink-0 flex items-center justify-center">
-                            <HiOutlineBolt className="icon-lg" />
+                            <LuZap className="icon-lg" />
                         </span>
                         <span>Do not switch tab during export for best performance</span>
                     </div>

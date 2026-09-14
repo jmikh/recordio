@@ -17,9 +17,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button, Toggle, Dropdown, MultiToggle } from '@shared/components';
-import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
-import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { MdBlurOn, MdChevronRight } from 'react-icons/md';
+import { LuCamera, LuCameraOff, LuChevronRight, LuMic, LuMicOff } from 'react-icons/lu';
+import { TbBlur } from 'react-icons/tb';
 import { MSG_TYPES } from '../shared/messageTypes';
 import { useAudioLevel } from '../shared/useAudioLevel';
 import { enterBlurMode } from './blurMode';
@@ -293,7 +292,7 @@ export function PreRecordingView() {
             <div className={`rounded-[var(--radius-md)] border overflow-hidden transition-colors ${micEnabled ? 'border-primary/30 bg-surface' : 'border-border bg-surface'}`}>
                 <div className="flex items-center gap-3 px-3 py-2.5">
                     <span className={`${micEnabled ? 'text-primary' : 'text-text-muted'}`}>
-                        {micEnabled ? <BiMicrophone className="icon-md" /> : <BiMicrophoneOff className="icon-md" />}
+                        {micEnabled ? <LuMic className="icon-md" /> : <LuMicOff className="icon-md" />}
                     </span>
                     {!micEnabled && <span className="text-label w-20 shrink-0">Microphone</span>}
                     {micEnabled ? <AudioLevelBar level={audioLevel} /> : <div className="flex-1" />}
@@ -318,7 +317,7 @@ export function PreRecordingView() {
             <div className={`rounded-[var(--radius-md)] border overflow-hidden transition-colors ${camEnabled ? 'border-primary/30 bg-surface' : 'border-border bg-surface'}`}>
                 <div className="flex items-center gap-3 px-3 py-2.5">
                     <span className={`${camEnabled ? 'text-primary' : 'text-text-muted'}`}>
-                        {camEnabled ? <PiWebcamBold className="icon-md" /> : <PiWebcamSlashBold className="icon-md" />}
+                        {camEnabled ? <LuCamera className="icon-md" /> : <LuCameraOff className="icon-md" />}
                     </span>
                     <span className="text-label w-20 shrink-0">Camera</span>
                     <div className="flex-1" />
@@ -356,9 +355,9 @@ export function PreRecordingView() {
                 onClick={enterBlurMode}
                 className="w-full justify-start gap-3"
             >
-                <MdBlurOn className="icon-md text-text-muted" />
+                <TbBlur className="icon-md text-text-muted" />
                 Blur content
-                <MdChevronRight className="icon-md text-text-muted ml-auto" />
+                <LuChevronRight className="icon-md text-text-muted ml-auto" />
             </Button>
 
             {permissionError && (

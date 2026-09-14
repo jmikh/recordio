@@ -4,9 +4,8 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { CollapsibleCard, Button, Slider, MultiToggle, Tooltip } from '@shared/components';
 import { ColorButton } from './ColorButton';
-import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
-import { LuLayers3 } from 'react-icons/lu';
-import { RiArrowRightUpFill } from 'react-icons/ri';
+import { LuArrowUpRight, LuType } from 'react-icons/lu';
+import { TbBlur, TbBorderOuter } from 'react-icons/tb';
 import type { OverlaySegment, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '@shared/types/overlay';
 import type { OverlaySettings } from '@shared/types/settings';
 import type { Size } from '@shared/types';
@@ -19,10 +18,10 @@ const OVERLAY_TYPE_LABELS: Record<OverlayItemType, string> = {
 };
 
 const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
-    blur: <MdBlurOn className="icon-sm" />,
-    text: <MdOutlineTextFields className="icon-sm" />,
-    arrow: <RiArrowRightUpFill className="icon-sm" />,
-    border: <MdBorderOuter className="icon-sm" />,
+    blur: <TbBlur className="icon-sm" />,
+    text: <LuType className="icon-sm" />,
+    arrow: <LuArrowUpRight className="icon-sm" />,
+    border: <TbBorderOuter className="icon-sm" />,
 };
 
 // ============================================================================

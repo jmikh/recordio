@@ -1,5 +1,4 @@
-import { LuLayoutGrid, LuShare2, LuTrash2, LuPlus, LuSettings, LuUsers, LuUserPlus, LuUserCog } from 'react-icons/lu';
-import { MdOutlineBugReport } from 'react-icons/md';
+import { LuBug, LuLayoutGrid, LuPlus, LuSettings, LuShare2, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
 import { Button, StatusBadge, LogoLink, SidebarNav, SidebarNavItem, type StatusBadgeVariant } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
@@ -225,7 +224,7 @@ export function DashboardSidebar({
                     <UserMenu openDirection="up" variant="row" onOpenSupportModal={onOpenSupport} />
                 ) : (
                     <div className="flex items-center gap-1 px-1">
-                        <Button variant="ghost" icon={MdOutlineBugReport} onClick={onOpenSupport} title="Report a Bug" />
+                        <Button variant="ghost" icon={LuBug} onClick={onOpenSupport} title="Report a Bug" />
                         <ThemeToggle />
                         <div className="flex-1" />
                         <Button variant="ghost" onClick={onOpenAuthModal}>

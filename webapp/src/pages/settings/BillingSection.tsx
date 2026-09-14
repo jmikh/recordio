@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LuCheck, LuCreditCard, LuShieldCheck, LuExternalLink } from 'react-icons/lu';
+import { LuCheck, LuCreditCard, LuExternalLink, LuShieldCheck } from 'react-icons/lu';
 import { MARKETING_ORIGIN } from '@shared/urls';
 import { Button } from '@shared/components';
 import { AuthManager } from '../../auth/AuthManager';

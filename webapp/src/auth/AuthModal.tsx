@@ -95,7 +95,7 @@ export function AuthModal({
                     {loading ? (
                         <div className="h-5 w-5 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin"></div>
                     ) : (
-                        <FcGoogle size={20} className="group-hover:scale-110 transition-transform" />
+                        <FcGoogle className="icon-lg group-hover:scale-110 transition-transform" />
                     )}
                     <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
                 </button>

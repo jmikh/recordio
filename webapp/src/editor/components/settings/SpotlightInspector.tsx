@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Button } from '@shared/components';
 import type { SpotlightSegment } from '@shared/types';
-import { RiLightbulbFlashLine } from 'react-icons/ri';
+import { LuLightbulb } from 'react-icons/lu';
 import { EasingTooltipContent } from './EasingTooltipContent';
 import { SpotlightTooltip } from '../shared/MediaTooltips';
 import { EASING_OPTIONS } from './easingOptions';
@@ -41,7 +41,7 @@ export const SpotlightInspector: React.FC<{ segment: SpotlightSegment }> = ({ se
     }, [segment.id, deleteSpotlight, selectSpotlight]);
 
     return (
-        <CollapsibleCard title="Spotlight" icon={<RiLightbulbFlashLine className="icon-md" />} notCollapsible headerAction={<SpotlightTooltip />}>
+        <CollapsibleCard title="Spotlight" icon={<LuLightbulb className="icon-md" />} notCollapsible headerAction={<SpotlightTooltip />}>
             <div className="flex flex-col gap-5">
                 <Checkbox
                     checked={applyToAll}

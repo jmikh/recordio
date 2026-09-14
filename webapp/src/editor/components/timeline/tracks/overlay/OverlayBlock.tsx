@@ -1,7 +1,6 @@
 import React from 'react';
-import { LuLayers3 } from 'react-icons/lu';
-import { MdBlurOn, MdOutlineTextFields, MdBorderOuter } from 'react-icons/md';
-import { RiArrowRightUpFill } from 'react-icons/ri';
+import { LuArrowUpRight, LuType } from 'react-icons/lu';
+import { TbBlur, TbBorderOuter } from 'react-icons/tb';
 import type { OverlayItemType } from '@shared/types/overlay';
 import {
     holdSegment,
@@ -14,10 +13,10 @@ import {
 } from '../shared/TimelineBlockStyles';
 
 const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
-    blur: <MdBlurOn className="icon-md" />,
-    text: <MdOutlineTextFields className="icon-md" />,
-    arrow: <RiArrowRightUpFill className="icon-md" />,
-    border: <MdBorderOuter className="icon-md" />,
+    blur: <TbBlur className="icon-md" />,
+    text: <LuType className="icon-md" />,
+    arrow: <LuArrowUpRight className="icon-md" />,
+    border: <TbBorderOuter className="icon-md" />,
 };
 
 interface OverlayBlockProps {

@@ -1,6 +1,6 @@
 import { Modal, Button } from '@shared/components';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
-import { TbCloudOff } from 'react-icons/tb';
+import { LuCloudOff } from 'react-icons/lu';
 
 /**
  * Blocking modal shown when media upload fails after retries.
@@ -15,7 +15,7 @@ export function SyncFailedModal({ onRetry }: { onRetry: () => void }) {
     return (
         <Modal isOpen onClose={() => {}} maxWidth="max-w-[460px]">
             <div className="flex items-center gap-3 mb-4">
-                <TbCloudOff className="icon-lg text-destructive shrink-0" />
+                <LuCloudOff className="icon-lg text-destructive shrink-0" />
                 <h2 className="heading-2">
                     Failed to sync project
                 </h2>

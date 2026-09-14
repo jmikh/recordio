@@ -16,6 +16,7 @@ description: UI design system reference for this codebase — covers design toke
 - **Use shadow utilities** (`shadow-sm`, `shadow-float`) — not inline `boxShadow`; these are the only two shadow tokens
 - **Never use arbitrary font sizes** (`text-[10px]` etc.) — the scale is `text-2xs/xs/sm/base` plus `heading-1/2`; see Typography. If you come across an existing arbitrary size (`text-[13px]` and the like) in code you're touching, flag it and suggest replacing it with the nearest scale token
 - **Never use `font-medium`, `font-semibold`, `font-normal`, or any weight other than `font-bold`** — default weight is 500 globally; `font-bold` (700) is the only other weight
+- **Never import icons from a family other than `lu` / `tb`** — Lucide is the default and Tabler is the fallback; see Icon Families. Three legacy exceptions are listed there and there should be no fourth
 - **Every interactive/status element must be addressable by accessible semantics** — see Labels & Testability below
 
 ---
@@ -24,7 +25,7 @@ description: UI design system reference for this codebase — covers design toke
 
 E2e tests (`e2e/`) select elements by accessible semantics — role, label, visible text — never CSS classes. Anything a user can click, type into, or perceive as status must be addressable that way. Rollout plan + inventory: `plans/testable-ui-labels.md`.
 
-- **Icon-only buttons** (no visible text): always `aria-label` (`<Button variant="ghost" icon={FaUndo} aria-label="Undo" />` — `Button` passes `aria-*` through). `title` alone is a weak fallback.
+- **Icon-only buttons** (no visible text): always `aria-label` (`<Button variant="ghost" icon={LuUndo2} aria-label="Undo" />` — `Button` passes `aria-*` through). `title` alone is a weak fallback.
 - **Inputs**: a real `<label>`, or `aria-label`, or a stable semantic id (the `#project-name-input` pattern). Placeholder text is NOT a label — it changes with copy.
 - **Toasts / async status**: `role="status"` for info/success, `role="alert"` for errors — lets tests (and screen readers) await "any error appeared" generically.
 - **Modals**: `role="dialog"` + `aria-label` naming the dialog.
@@ -161,6 +162,53 @@ The token has no disabled variant: labels do not dim when their control is disab
 
 ---
 
+## Icon Families
+
+**Lucide (`react-icons/lu`) is the default — check it first, every time.** It covers 117 of the 121 icons this app uses, all on a 24px grid at 2px stroke with round caps, which is why Lucide glyphs sit beside each other without reading as a mismatch. Browse at `react-icons.github.io/react-icons/icons/lu/`.
+
+| Family | When to use it |
+|---|---|
+| `lu` — Lucide | Everything, unless Lucide genuinely lacks the glyph |
+| `tb` — Tabler | Fallback only. Same grid and stroke weight, so it composes with Lucide |
+| `fc` — Flat Color | Brand marks only |
+
+### Rules
+- **Search Lucide before reaching for Tabler.** Lucide's name is often not the obvious word — see the naming traps below before concluding it doesn't exist
+- **Never import from a third family.** If neither `lu` nor `tb` has it, reuse an existing glyph or reconsider the affordance — don't add a library. The app was consolidated from 16 families down to these; every one you add starts that sprawl again
+- **Take matched sets from one family.** On/off, play/pause/stop and similar pairs must come from the same family or the mismatch reads as a rendering bug
+- **Never mix stroke and filled glyphs in one cluster.** A solid icon beside stroke icons in the same toolbar is the most visible inconsistency there is
+- **Don't introduce a second glyph for an idea the app already draws.** Search the codebase for the concept first — most duplicates got in this way
+
+### The only sanctioned non-Lucide imports
+| Icon | Why |
+|---|---|
+| `TbBorderOuter` | Lucide has no border/outline glyph |
+| `TbBlur` | Lucide has no blur glyph |
+| `FcGoogle` | Multicolour brand mark — deliberately outside the system |
+
+Adding a fourth means Lucide was searched and genuinely came up empty. Note it here when you do.
+
+### Lucide naming traps
+Lucide names things differently from Material/Tabler/Remix, so the obvious search term misses. The ones this codebase hit:
+
+| What you want | Lucide name |
+|---|---|
+| Stop (transport) | `LuSquare` — there is no `LuStop`. `LuCircleStop` exists but pairs with `LuCirclePlay`, not `LuPlay` |
+| Lightning bolt | `LuZap` — `LuBolt` is a hex nut |
+| Background | `LuWallpaper` |
+| Desktop / screen | `LuMonitor` |
+| Globe / world | `LuGlobe` |
+| Click | `LuMousePointerClick` |
+| Toolbar / top chrome | `LuPanelTop` |
+| Colour blend / filter | `LuBlend` |
+| Aspect ratio | `LuRatio` |
+| Resize / scale | `LuScaling` |
+| Captions | `LuCaptions` |
+
+**Webcam is the known gap:** `LuWebcam` exists but Lucide has no webcam-off. The camera toggle therefore uses the `LuCamera` / `LuCameraOff` pair — don't split it across families.
+
+---
+
 ## Icon Sizing
 
 All icons use standardized CSS classes instead of inline `size` props. Defined in `@layer components` in `shared/theme/index.css`.
@@ -173,7 +221,7 @@ All icons use standardized CSS classes instead of inline `size` props. Defined i
 
 ### Rules
 - **Never use inline `size={N}` on react-icons** — always use `className="icon-sm"` / `icon-md` / `icon-lg`
-- **Button `icon` prop**: Pass a component type (not element) to auto-size: `<Button variant="ghost" icon={FaUndo} aria-label="Undo" />`. Icon-only buttons (no children) get `icon-md`; buttons with text alongside get `icon-sm`. There is no `icon` variant — icon-only buttons use `ghost`.
+- **Button `icon` prop**: Pass a component type (not element) to auto-size: `<Button variant="ghost" icon={LuUndo2} aria-label="Undo" />`. Icon-only buttons (no children) get `icon-md`; buttons with text alongside get `icon-sm`. There is no `icon` variant — icon-only buttons use `ghost`.
 - **Hero/decorative icons** (32px+) are the only exception — use inline `size` for one-off large display icons
 - Icons from `react-icons` accept `className`; CSS `width`/`height` override SVG attribute dimensions
 

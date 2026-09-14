@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { LuUndo2, LuRedo2 } from 'react-icons/lu';
+import { LuCloudUpload, LuDownload, LuRedo2, LuShare2, LuUndo2 } from 'react-icons/lu';
 
 import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -17,7 +17,6 @@ import { DownloadModal } from '../settings/DownloadModal';
 import { SetAsDefaultsButton } from './SetAsDefaultsButton';
 import { ProjectNameField } from './ProjectNameField';
 
-import { TbCloudUpload, TbDownload, TbShare2 } from 'react-icons/tb';
 import { Button, Tooltip } from '@shared/components';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
@@ -36,7 +35,7 @@ function SyncIndicator() {
     return (
         <Tooltip text={tooltipText}>
             <div className="flex items-center">
-                <TbCloudUpload className="icon-md text-primary animate-pulse" />
+                <LuCloudUpload className="icon-md text-primary animate-pulse" />
             </div>
         </Tooltip>
     );
@@ -156,7 +155,7 @@ export const Header = () => {
                                     </>
                                 ) : (
                                     <>
-                                        <TbDownload className="icon-sm" />
+                                        <LuDownload className="icon-sm" />
                                         Download
                                     </>
                                 )}
@@ -174,7 +173,7 @@ export const Header = () => {
 
                     <Button
                         variant="primary"
-                        icon={TbShare2}
+                        icon={LuShare2}
                         disabled={entitlements.canShare && !shareReady}
                         onClick={() => (entitlements.canShare ? setIsShareModalOpen(true) : setIsProModalOpen(true))}
                     >

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LuLoader, LuCircleCheck, LuCircleX } from 'react-icons/lu';
+import { LuCircleCheck, LuCircleX, LuLoader } from 'react-icons/lu';
 import { Button, LogoLink } from '@shared/components';
 import { invokeFunction } from '../api/client';
 import { useUserStore } from '../auth/useUserStore';
@@ -85,7 +85,7 @@ export function AcceptInvitePage() {
                         <h1 className="heading-2 mb-2">You've been invited</h1>
                         <p className="text-sm text-text-muted mb-6">Sign in to accept your invitation.</p>
                         {showAuthModal ? (
-                            <LuLoader className="text-primary animate-spin" size={24} />
+                            <LuLoader className="icon-lg text-primary animate-spin" />
                         ) : (
                             <Button variant="primary" onClick={() => setShowAuthModal(true)}>Sign in</Button>
                         )}

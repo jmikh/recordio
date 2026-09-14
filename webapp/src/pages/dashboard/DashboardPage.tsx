@@ -539,7 +539,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                             </div>
                         ) : trashProjects.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                <LuTrash2 className="w-10 h-10 text-text-muted/50" />
+                                <LuTrash2 size={40} className="text-text-muted/50" />
                                 <p className="text-sm text-text-muted">Trash is empty</p>
                             </div>
                         ) : (

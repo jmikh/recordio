@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MdKeyboardArrowDown } from 'react-icons/md';
+import { LuChevronDown } from 'react-icons/lu';
 
 export interface DropdownOption<T> {
     value: T;
@@ -173,7 +173,7 @@ export function Dropdown<T>({
                 </div>
                 <div className="flex items-center gap-1.5">
                     {!hideSuffixInTrigger && currentOption?.suffix && <span className="flex-shrink-0">{currentOption.suffix}</span>}
-                    <MdKeyboardArrowDown
+                    <LuChevronDown
                         className={`icon-lg transition-transform ${isOpen ? 'rotate-180' : ''}`}
                     />
                     {suffix}

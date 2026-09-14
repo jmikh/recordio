@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, Dropdown, CollapsibleCard, InfoTooltip, Checkbox, Button } from '@shared/components';
 import type { ZoomSegment } from '@shared/types';
-import { TbZoomIn } from 'react-icons/tb';
+import { LuZoomIn } from 'react-icons/lu';
 import { EasingTooltipContent } from './EasingTooltipContent';
 import { EASING_OPTIONS } from './easingOptions';
 
@@ -36,7 +36,7 @@ export const ZoomInspector: React.FC<{ segment: ZoomSegment }> = ({ segment }) =
     }, [segment.id, deleteZoomSegment, selectZoom]);
 
     return (
-        <CollapsibleCard title="Zoom" icon={<TbZoomIn className="icon-md" />} notCollapsible>
+        <CollapsibleCard title="Zoom" icon={<LuZoomIn className="icon-md" />} notCollapsible>
             <div className="flex flex-col gap-5">
                 <Checkbox
                     checked={applyToAll}

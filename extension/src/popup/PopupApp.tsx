@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { MdErrorOutline } from 'react-icons/md';
+import { LuCircleAlert } from 'react-icons/lu';
 import { Button, LogoLink } from '@shared/components';
 import { MSG_TYPES, STORAGE_KEYS, type RecordingState } from '../shared/messageTypes';
 import { getEditorOrigin } from '@shared/types/bridge';
@@ -93,7 +93,7 @@ export function PopupApp() {
                 {recordingError ? (
                     <div className="flex flex-col gap-3 p-3">
                         <div className="flex items-start gap-2.5">
-                            <MdErrorOutline className="icon-md text-destructive shrink-0 mt-0.5" />
+                            <LuCircleAlert className="icon-md text-destructive shrink-0 mt-0.5" />
                             <div className="flex flex-col gap-1">
                                 <p className="text-sm text-text-main">Recording failed to save</p>
                                 <p className="text-xs text-text-muted">{recordingError}</p>

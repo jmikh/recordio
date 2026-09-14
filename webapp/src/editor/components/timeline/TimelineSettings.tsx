@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdKeyboardArrowUp } from 'react-icons/md';
+import { LuChevronUp } from 'react-icons/lu';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { Checkbox, Toggle } from '@shared/components';
@@ -189,7 +189,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
                     <span className="text-2xs tabular-nums leading-none">
                         {visibleCount}/{totalCount}
                     </span>
-                    <MdKeyboardArrowUp
+                    <LuChevronUp
                         className={`icon-sm transition-transform duration-150 ${isOpen ? 'rotate-0' : 'rotate-180'}`}
                     />
                 </div>

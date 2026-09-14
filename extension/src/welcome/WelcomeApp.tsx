@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@shared/components';
-import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
-import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { MdCheckCircle } from 'react-icons/md';
+import { LuCamera, LuCameraOff, LuCircleCheck, LuMic, LuMicOff } from 'react-icons/lu';
 import logoIcon from '@shared/assets/logo.svg';
 import pinImage from '../assets/extension-pin.png';
 import recordStartImage from '../assets/record-start.png';
@@ -80,14 +78,14 @@ export function WelcomeApp() {
                                 label="Microphone"
                                 state={micState}
                                 requesting={requestingMic}
-                                icon={micState === 'granted' ? <BiMicrophone className="icon-lg" /> : <BiMicrophoneOff className="icon-lg" />}
+                                icon={micState === 'granted' ? <LuMic className="icon-lg" /> : <LuMicOff className="icon-lg" />}
                                 onRequest={requestMic}
                             />
                             <PermissionRow
                                 label="Camera"
                                 state={camState}
                                 requesting={requestingCam}
-                                icon={camState === 'granted' ? <PiWebcamBold className="icon-lg" /> : <PiWebcamSlashBold className="icon-lg" />}
+                                icon={camState === 'granted' ? <LuCamera className="icon-lg" /> : <LuCameraOff className="icon-lg" />}
                                 onRequest={requestCam}
                             />
                         </div>
@@ -153,7 +151,7 @@ function PermissionRow({ label, state, requesting, icon, onRequest }: {
             <span className="text-xs text-text-main flex-1">{label}</span>
             {state === 'granted' ? (
                 <span className="flex items-center gap-1 text-xs text-success">
-                    <MdCheckCircle className="icon-sm" />
+                    <LuCircleCheck className="icon-sm" />
                     Allowed
                 </span>
             ) : state === 'denied' ? (

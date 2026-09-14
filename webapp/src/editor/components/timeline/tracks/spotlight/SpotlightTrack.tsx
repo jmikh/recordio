@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { RiLightbulbFlashLine } from 'react-icons/ri';
+import { LuLightbulb } from 'react-icons/lu';
 import { useProjectStore, useProjectTimeline } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { useTimeMapper } from '../../../../hooks/useTimeMapper';
@@ -207,7 +207,7 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                                     }}
                                 >
                                     {ghostHoldWidth >= MIN_ICON_WIDTH_PX && (
-                                        <RiLightbulbFlashLine className={`${ghostIconClass} icon-md`} />
+                                        <LuLightbulb className={`${ghostIconClass} icon-md`} />
                                     )}
                                 </div>
                             );

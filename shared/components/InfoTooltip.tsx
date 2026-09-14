@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, type ReactNode } from 'react';
-import { MdInfoOutline } from 'react-icons/md';
+import { LuInfo } from 'react-icons/lu';
 import { createPortal } from 'react-dom';
 
 export type TooltipPlacement = 'bottom-center' | 'top-right' | 'right';
@@ -75,7 +75,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
                 onMouseLeave={() => setIsHovered(false)}
             >
                 {trigger ?? (
-                    <MdInfoOutline
+                    <LuInfo
                         className="icon-sm text-text-muted hover:text-text-highlighted transition-colors"
                     />
                 )}

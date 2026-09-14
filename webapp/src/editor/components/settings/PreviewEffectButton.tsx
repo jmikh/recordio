@@ -1,4 +1,4 @@
-import { TbPlayerPlay, TbPlayerStop } from 'react-icons/tb';
+import { LuPlay, LuSquare } from 'react-icons/lu';
 import { Button, Tooltip } from '@shared/components';
 import type { DemoKind } from '../../../core/effectDemos';
 import { useDefaultsPreviewStore } from '../../stores/useDefaultsPreviewStore';
@@ -20,7 +20,7 @@ export function PreviewEffectButton({ kind, label, disabled }: { kind: DemoKind;
         <Tooltip text={isPlaying ? 'Stop preview' : label}>
             <Button
                 variant="ghost"
-                icon={isPlaying ? TbPlayerStop : TbPlayerPlay}
+                icon={isPlaying ? LuSquare : LuPlay}
                 aria-label={isPlaying ? 'Stop preview' : label}
                 disabled={disabled && !isPlaying}
                 onClick={() => (isPlaying ? stop() : play(kind))}

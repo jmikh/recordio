@@ -1,5 +1,5 @@
 import React from 'react';
-import { MdLightMode, MdDarkMode } from 'react-icons/md';
+import { LuMoon, LuSun } from 'react-icons/lu';
 import { useThemeStore } from './useThemeStore';
 
 const ANIMATION_DURATION = '200ms';
@@ -55,8 +55,8 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
                 `}
             >
                 {isDark
-                    ? <MdDarkMode className="icon-sm text-primary" />
-                    : <MdLightMode className="icon-sm text-surface" />
+                    ? <LuMoon className="icon-sm text-primary" />
+                    : <LuSun className="icon-sm text-surface" />
                 }
             </div>
         </button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Button, Dropdown, Tooltip, type DropdownOption } from '@shared/components';
-import { TbLink, TbLock, TbUsers, TbWorld } from 'react-icons/tb';
+import { LuGlobe, LuLink, LuLock, LuUsers } from 'react-icons/lu';
 import type { AccessRole, SharePolicy, WorkspaceMemberRow } from '@shared/api';
 import { invokeFunction } from '../api/client';
 import { useProjectMetaStore } from './useProjectMetaStore';
@@ -13,9 +13,9 @@ import { videoUrl } from '../lib/videoUrls';
 import { trackPublishClicked, trackPublishFailed } from '../analytics';
 
 const POLICY_OPTIONS: DropdownOption<SharePolicy>[] = [
-    { value: 'private', label: 'Private (only me)', icon: <TbLock className="icon-sm" /> },
-    { value: 'workspace', label: 'Everyone in workspace', icon: <TbUsers className="icon-sm" /> },
-    { value: 'public', label: 'Anyone with the link', icon: <TbWorld className="icon-sm" /> },
+    { value: 'private', label: 'Private (only me)', icon: <LuLock className="icon-sm" /> },
+    { value: 'workspace', label: 'Everyone in workspace', icon: <LuUsers className="icon-sm" /> },
+    { value: 'public', label: 'Anyone with the link', icon: <LuGlobe className="icon-sm" /> },
 ];
 
 const ACCESS_OPTIONS: DropdownOption<AccessRole>[] = [
@@ -226,10 +226,10 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                     <div className="flex items-center gap-3 py-1.5">
                         <div className="w-8 h-8 rounded-full bg-state-inactive flex items-center justify-center text-text-muted shrink-0">
                             {meta.sharePolicy === 'public'
-                                ? <TbWorld className="icon-md" />
+                                ? <LuGlobe className="icon-md" />
                                 : meta.sharePolicy === 'workspace'
-                                    ? <TbUsers className="icon-md" />
-                                    : <TbLock className="icon-md" />}
+                                    ? <LuUsers className="icon-md" />
+                                    : <LuLock className="icon-md" />}
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                             <Dropdown
@@ -247,7 +247,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                     {meta.sharePolicy !== 'private' && (
                         <div className="flex items-center gap-3 py-1.5">
                             <div className="w-8 h-8 rounded-full bg-state-inactive flex items-center justify-center text-text-muted shrink-0">
-                                <TbUsers className="icon-md" />
+                                <LuUsers className="icon-md" />
                             </div>
                             <p className="flex-1 min-w-0 text-sm text-text-main truncate">Everyone in workspace</p>
                             <Dropdown
@@ -301,7 +301,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                     )}
                 </div>
 
-                <Button variant="primary" fullWidth icon={TbLink} onClick={() => void handleCopyLink()}>
+                <Button variant="primary" fullWidth icon={LuLink} onClick={() => void handleCopyLink()}>
                     Copy link
                 </Button>
             </div>

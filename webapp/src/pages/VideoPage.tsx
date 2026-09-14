@@ -4,7 +4,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import { LogoLink } from '@shared/components/LogoLink';
 import { Button } from '@shared/components';
 import { ThemeToggle } from '../theme/ThemeToggle';
-import { TbCopy, TbLock } from 'react-icons/tb';
+import { LuCopy, LuLock } from 'react-icons/lu';
 import { CHROME_EXTENSION_URL, MARKETING_ORIGIN } from '@shared/types/bridge';
 import { invokeFunction } from '../api/client';
 import { AuthModal } from '../auth/AuthModal';
@@ -110,7 +110,7 @@ export function VideoPage() {
         return (
             <div className="min-h-screen bg-surface flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">
-                    <TbLock size={32} className="text-text-muted" />
+                    <LuLock size={32} className="text-text-muted" />
                     <h1 className="heading-2">Sign in to view this video</h1>
                     <p className="text-sm text-text-muted">
                         This video is only available to people it has been shared with.
@@ -214,7 +214,7 @@ export function VideoPage() {
                     <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4">
                         <div className="border border-border rounded-xl p-5 bg-surface">
                             <Button fullWidth onClick={copyLink}>
-                                <TbCopy className="icon-sm" />
+                                <LuCopy className="icon-sm" />
                                 {linkCopied ? 'Copied!' : 'Copy link'}
                             </Button>
                         </div>

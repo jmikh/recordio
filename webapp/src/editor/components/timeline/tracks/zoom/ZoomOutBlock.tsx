@@ -1,5 +1,5 @@
 import React from 'react';
-import { AiOutlineZoomOut } from 'react-icons/ai';
+import { LuZoomOut } from 'react-icons/lu';
 import { zoomOutBlock, MIN_ICON_WIDTH_PX } from '../shared/TimelineBlockStyles';
 
 interface ZoomOutBlockProps {
@@ -31,7 +31,7 @@ export const ZoomOutBlock: React.FC<ZoomOutBlockProps> = ({ left, width, trackHe
             }}
         >
             {width >= MIN_ICON_WIDTH_PX && (
-                <AiOutlineZoomOut className="icon-md text-main opacity-50" />
+                <LuZoomOut className="icon-md text-main opacity-50" />
             )}
         </div>
     );

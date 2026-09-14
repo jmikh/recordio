@@ -1,6 +1,5 @@
 import React from 'react';
-import { LuUndo2 } from 'react-icons/lu';
-import { BiVideoRecording } from 'react-icons/bi';
+import { LuUndo2, LuVideo } from 'react-icons/lu';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { Button } from '@shared/components';
@@ -23,7 +22,7 @@ export const RecordingHeaderCell: React.FC<RecordingHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Recording"
-            icon={<BiVideoRecording className="icon-sm" />}
+            icon={<LuVideo className="icon-sm" />}
             height={height}
             infoElement={
                 needsReset ? (

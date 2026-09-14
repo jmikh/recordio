@@ -7,11 +7,9 @@ import { useAssetLibraryStore } from '../../stores/useAssetLibraryStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { UserAssetService } from '../../../storage/userAssetService';
 import { ColorSettings } from './ColorSettings';
-import { IoIosColorFilter } from "react-icons/io";
-import { CiImageOn } from "react-icons/ci";
+import { LuBlend, LuImage, LuWallpaper } from 'react-icons/lu';
 import { XButton, Slider, CollapsibleCard, Dropdown, type DropdownOption } from '@shared/components';
 import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
-import { TbBackground } from 'react-icons/tb';
 import { useToast } from '../../../components/Toast';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
@@ -276,7 +274,7 @@ export const BackgroundSettings = () => {
     return (
         <CollapsibleCard
             title="Background"
-            icon={<TbBackground className="icon-md" />}
+            icon={<LuWallpaper className="icon-md" />}
             notCollapsible
         >
             <div className="flex flex-col gap-4 text-sm select-none">
@@ -322,7 +320,7 @@ export const BackgroundSettings = () => {
                             title="Color / Gradient"
                         >
                             <div className="p-1.5 rounded-full bg-black/20 text-white backdrop-blur-[1px]">
-                                <IoIosColorFilter className="icon-lg" />
+                                <LuBlend className="icon-lg" />
                             </div>
                         </div>
 
@@ -341,7 +339,7 @@ export const BackgroundSettings = () => {
                             title={!canUpload ? 'Library full (10/10) — delete an image to upload a new one' : isUploading ? 'Uploading...' : 'Upload Image'}
                         >
                             <div className="flex items-center justify-center p-1.5 text-text-highlighted rounded-full bg-transparent">
-                                <CiImageOn className="icon-lg" />
+                                <LuImage className="icon-lg" />
                             </div>
                             <input
                                 type="file"

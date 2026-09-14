@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LuMail, LuLoader, LuX } from 'react-icons/lu';
+import { LuLoader, LuMail, LuX } from 'react-icons/lu';
 import { Button, Dropdown } from '@shared/components';
 import { invokeFunction } from '../../api/client';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';

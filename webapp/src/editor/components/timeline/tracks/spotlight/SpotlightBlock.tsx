@@ -1,5 +1,5 @@
 import React from 'react';
-import { RiLightbulbFlashLine } from 'react-icons/ri';
+import { LuLightbulb } from 'react-icons/lu';
 import {
     transitionSegment,
     holdSegment,
@@ -133,7 +133,7 @@ export const SpotlightBlock: React.FC<SpotlightBlockProps> = ({
                     }}
                 >
                     {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
-                        <RiLightbulbFlashLine className={`${blockIconClass} icon-md`} />
+                        <LuLightbulb className={`${blockIconClass} icon-md`} />
                     )}
                 </div>
             )}

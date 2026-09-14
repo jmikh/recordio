@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@shared/components';
-import { BiMicrophone, BiMicrophoneOff } from 'react-icons/bi';
-import { PiWebcamBold, PiWebcamSlashBold } from 'react-icons/pi';
-import { FiSquare } from 'react-icons/fi';
-import { IoPause, IoPlay } from 'react-icons/io5';
-import { MdCancel } from 'react-icons/md';
+import { LuCamera, LuCameraOff, LuCircleX, LuMic, LuMicOff, LuPause, LuPlay, LuSquare } from 'react-icons/lu';
 import logoDark from '@shared/assets/fulllogo-dark.png';
 import logoLight from '@shared/assets/fulllogo-light.png';
 import type { RecordingState } from '../shared/messageTypes';
@@ -46,10 +42,10 @@ export function RecordingPhase({ hasAudio, hasCamera, recordingState, onPauseRes
                     </span>
                     <div className="flex items-center gap-2 ml-2">
                         <span className={hasAudio ? 'text-text-main' : 'text-text-disabled'}>
-                            {hasAudio ? <BiMicrophone className="icon-lg" /> : <BiMicrophoneOff className="icon-lg" />}
+                            {hasAudio ? <LuMic className="icon-lg" /> : <LuMicOff className="icon-lg" />}
                         </span>
                         <span className={hasCamera ? 'text-text-main' : 'text-text-disabled'}>
-                            {hasCamera ? <PiWebcamBold className="icon-lg" /> : <PiWebcamSlashBold className="icon-lg" />}
+                            {hasCamera ? <LuCamera className="icon-lg" /> : <LuCameraOff className="icon-lg" />}
                         </span>
                     </div>
                 </div>
@@ -63,8 +59,8 @@ export function RecordingPhase({ hasAudio, hasCamera, recordingState, onPauseRes
                         className="w-28 justify-center gap-1.5"
                     >
                         {isPaused
-                            ? <><IoPlay className="icon-sm" /> Resume</>
-                            : <><IoPause className="icon-sm" /> Pause</>}
+                            ? <><LuPlay className="icon-sm" /> Resume</>
+                            : <><LuPause className="icon-sm" /> Pause</>}
                     </Button>
                     <Button
                         variant="primary"
@@ -72,7 +68,7 @@ export function RecordingPhase({ hasAudio, hasCamera, recordingState, onPauseRes
                         disabled={busy}
                         className="w-28 justify-center gap-1.5"
                     >
-                        <FiSquare className="icon-sm" />
+                        <LuSquare className="icon-sm" />
                         Finish
                     </Button>
                 </div>
@@ -84,7 +80,7 @@ export function RecordingPhase({ hasAudio, hasCamera, recordingState, onPauseRes
                     disabled={busy}
                     className="w-full justify-center text-text-muted hover:text-destructive"
                 >
-                    <MdCancel className="icon-sm" />
+                    <LuCircleX className="icon-sm" />
                     Cancel Recording
                 </Button>
             </div>

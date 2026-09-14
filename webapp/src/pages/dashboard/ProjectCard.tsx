@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuRotateCcw, LuEllipsis, LuPencil, LuTrash } from 'react-icons/lu';
-import { TbShare2 } from 'react-icons/tb';
-import { MdOutlineAutoDelete } from 'react-icons/md';
+import { LuClockAlert, LuEllipsis, LuPencil, LuRotateCcw, LuShare2, LuTrash2 } from 'react-icons/lu';
 import { CardCheckbox } from './CardCheckbox';
 import { CopyLinkButton } from '@shared/components';
 import { timeAgo } from './timeAgo';
@@ -177,7 +175,7 @@ export const ProjectCard = ({
                     onClick={openMenu}
                     className="absolute top-2 right-2 z-10 hidden group-hover:flex items-center justify-center w-7 h-7 rounded-md bg-surface-raised/90 backdrop-blur-sm text-text-muted hover:text-text-main hover:bg-surface-raised transition-colors cursor-pointer"
                 >
-                    <LuEllipsis className="w-4 h-4" />
+                    <LuEllipsis className="icon-md" />
                 </button>
             )}
 
@@ -204,7 +202,7 @@ export const ProjectCard = ({
                         onClick={(e) => { e.stopPropagation(); onRestore(); }}
                         className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
                     >
-                        <LuRotateCcw className="w-4 h-4 text-white" />
+                        <LuRotateCcw className="icon-md text-white" />
                         <span className="text-white text-sm">Restore</span>
                     </button>
                 )}
@@ -266,7 +264,7 @@ export const ProjectCard = ({
                     )}
                     {isTrashed && purgedays !== null && (
                         <span className="flex items-center gap-1 text-xs text-destructive/70 ml-auto">
-                            <MdOutlineAutoDelete className="w-3.5 h-3.5" />
+                            <LuClockAlert className="icon-sm" />
                             {purgedays} {purgedays === 1 ? 'day' : 'days'}
                         </span>
                     )}
@@ -286,7 +284,7 @@ export const ProjectCard = ({
                             onClick={(e) => { e.stopPropagation(); onShare(project.id); closeMenu(); }}
                             className="w-full text-left px-3 py-2 text-sm text-text-main hover:bg-state-hover rounded-md flex items-center gap-2 cursor-pointer"
                         >
-                            <TbShare2 className="w-3.5 h-3.5" />
+                            <LuShare2 className="icon-sm" />
                             Share
                         </button>
                     )}
@@ -296,7 +294,7 @@ export const ProjectCard = ({
                             onClick={(e) => { e.stopPropagation(); handleRename(); }}
                             className="w-full text-left px-3 py-2 text-sm text-text-main hover:bg-state-hover rounded-md flex items-center gap-2 cursor-pointer"
                         >
-                            <LuPencil className="w-3.5 h-3.5" />
+                            <LuPencil className="icon-sm" />
                             Rename
                         </button>
                     )}
@@ -306,7 +304,7 @@ export const ProjectCard = ({
                             onClick={(e) => { e.stopPropagation(); onDelete(project.id); closeMenu(); }}
                             className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-state-hover rounded-md flex items-center gap-2 cursor-pointer"
                         >
-                            <LuTrash className="w-3.5 h-3.5" />
+                            <LuTrash2 className="icon-sm" />
                             Delete
                         </button>
                     )}
