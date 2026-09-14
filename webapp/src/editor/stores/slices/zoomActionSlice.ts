@@ -12,7 +12,8 @@ export interface ZoomSegmentSlice {
     addZoomSegment: (action: ZoomSegment) => void;
     deleteZoomSegment: (id: ID) => void;
     clearZoomSegments: () => void;
-    resetZooms: () => void;
+    /** Regenerates the auto zooms. Returns how many were created (0 = no usable focus areas). */
+    resetZooms: () => number;
     toggleZoomEnabled: () => void;
     /**
      * Motion settings / inspector "apply to all": one undo step that merges
@@ -103,6 +104,7 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
     },
 
     resetZooms: () => {
+        let generatedCount = 0;
 
         set(state => {
             const project = state.project;
@@ -135,6 +137,8 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                 focusAreas
             );
 
+            generatedCount = zoomSegments.length;
+
             return {
                 project: {
                     ...project,
@@ -145,6 +149,8 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                 }
             };
         });
+
+        return generatedCount;
     },
 
     applyZoomSettingsToAll: (updates) => {

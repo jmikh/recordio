@@ -1,12 +1,19 @@
 import { LuLayoutGrid, LuShare2, LuTrash2, LuPlus, LuSettings, LuUsers, LuUserPlus, LuUserCog } from 'react-icons/lu';
 import { MdOutlineBugReport } from 'react-icons/md';
-import { Button, ProBadge, LogoLink, SidebarNav, SidebarNavItem } from '@shared/components';
+import { Button, StatusBadge, LogoLink, SidebarNav, SidebarNavItem, type StatusBadgeVariant } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
 import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
 import type { WorkspaceEntitlementsState } from '@shared/api/entitlements';
+
+/** How each plan tier reads in the workspace card. */
+const PLAN_BADGE: Record<WorkspaceEntitlementsState, { label: string; variant: StatusBadgeVariant }> = {
+    free: { label: 'Free', variant: 'default' },
+    trial: { label: 'Trial', variant: 'secondary' },
+    pro: { label: 'Pro', variant: 'primary' },
+};
 
 export type DashboardView = 'all' | 'workspace' | 'published' | 'trash' | 'settings' | 'personal';
 
@@ -101,7 +108,7 @@ export function DashboardSidebar({
                     />
                 </div>
                 <div className="flex items-center gap-2 px-4 pb-2.5 pt-0.5">
-                    <ProBadge variant={planState} />
+                    <StatusBadge variant={PLAN_BADGE[planState].variant} uppercase>{PLAN_BADGE[planState].label}</StatusBadge>
                     {memberCount != null && (
                         <span className="text-xs text-text-muted">
                             {memberCount} member{memberCount !== 1 ? 's' : ''}

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
 
 interface SliderProps {
     value: number;
@@ -13,6 +13,8 @@ interface SliderProps {
     decimals?: number;
     units?: string;
     label?: string;
+    /** Optional element rendered right after the label (e.g. an InfoTooltip icon) */
+    labelSuffix?: ReactNode;
     valueTransform?: (value: number) => number; // Transform storage value to display value
 }
 
@@ -36,6 +38,7 @@ export const Slider: React.FC<SliderProps> = ({
     decimals = 0,
     units = '',
     label,
+    labelSuffix,
     valueTransform = (v: number) => v // Identity function by default
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -120,9 +123,12 @@ export const Slider: React.FC<SliderProps> = ({
             {(label || showTooltip) && (
                 <div className="flex justify-between items-center mb-1.5">
                     {label && (
-                        <label className="text-label">
-                            {label}
-                        </label>
+                        <div className="flex items-center gap-1.5">
+                            <label className="text-label">
+                                {label}
+                            </label>
+                            {labelSuffix}
+                        </div>
                     )}
                     {showTooltip && (
                         <span className="text-label">

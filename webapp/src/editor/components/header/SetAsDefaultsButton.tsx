@@ -11,9 +11,11 @@ import { trackPersonalDefaultsSaved } from '../../../analytics';
 /**
  * "Use as my default settings" — promotes the open project's settings to
  * the user's personal defaults for NEW projects
- * (plans/user-default-project-settings §3.9). Recording-specific fields
- * (crop, face anchor, transcription source) are stripped by
- * UserDefaultsService.save; existing projects are untouched. Hidden when
+ * (plans/user-default-project-settings §3.9). Only the settings the
+ * Personal Settings page can edit are kept — UserDefaultsService.save runs
+ * keepOnlyEditableDefaults, so aspect ratio, audio, crop, face anchor and
+ * the rest stay at Recordio's defaults rather than getting stuck in a blob
+ * with no UI to change them. Existing projects are untouched. Hidden when
  * signed out — defaults live on the user's profile.
  */
 export function SetAsDefaultsButton() {
@@ -65,12 +67,10 @@ export function SetAsDefaultsButton() {
                 <h2 className="heading-2 mb-2">Use as default settings?</h2>
                 <p className="text-sm text-text-main mb-2">
                     New projects will start with this project’s look — background, screen,
-                    camera, effects, captions style, audio and motion settings.
+                    camera, effects, captions and motion.
                 </p>
                 <p className="text-label mb-6">
-                    This replaces your current personal defaults. Recording-specific items
-                    (crop, face anchor, caption text) aren’t included, and existing projects
-                    don’t change.
+                    Replaces your current defaults. Existing projects don’t change.
                 </p>
                 <div className="flex justify-end gap-2">
                     <Button variant="base" onClick={() => setIsOpen(false)} disabled={saving}>

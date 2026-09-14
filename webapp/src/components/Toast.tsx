@@ -87,12 +87,12 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
         };
     }, [toast.type, toast.duration, startExit]);
 
-    // Status icon to the left of the title
+    // Status icon on the left, vertically centered on the whole toast (self-center)
     const getStatusIcon = () => {
         if (toast.type === 'progress') {
             return (
                 <div
-                    className="w-5 h-5 shrink-0 rounded-full border-2 border-border"
+                    className="w-5 h-5 shrink-0 self-center rounded-full border-2 border-border"
                     style={{
                         borderTopColor: 'var(--primary)',
                         animation: 'toast-spin 0.8s linear infinite',
@@ -101,27 +101,27 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
             );
         }
         if (toast.type === 'success') {
-            return <FaCheck className="shrink-0 w-5 h-5 text-success" />;
+            return <FaCheck className="shrink-0 self-center w-5 h-5 text-success" />;
         }
         if (toast.type === 'info' || toast.type === 'error') {
             return (
                 <FaCircleExclamation
-                    className={`shrink-0 w-5 h-5 ${toast.type === 'error' ? 'text-destructive' : 'text-text-main'}`}
+                    className={`shrink-0 self-center w-5 h-5 ${toast.type === 'error' ? 'text-destructive' : 'text-text-main'}`}
                 />
             );
         }
         return null;
     };
 
+    // The anchor itself does the navigating; this only dismisses the toast behind it.
     const handleActionClick = () => {
-        window.open(toast.action!.href, '_blank', 'noopener');
         startExit('clicked');
     };
 
     return (
         <div
             role={toast.type === 'error' ? 'alert' : 'status'}
-            className="flex items-center gap-3 min-w-80 max-w-[420px] bg-surface-raised border border-border-selected rounded-xl shadow-float pointer-events-auto"
+            className="flex items-start gap-3 min-w-80 max-w-[420px] bg-surface-raised border border-border-selected rounded-xl shadow-float pointer-events-auto"
             style={{
                 padding: '14px 16px',
                 animation: isExiting ? undefined : 'toast-slide-in 0.3s ease-out',
@@ -132,15 +132,30 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
         >
             {getStatusIcon()}
             <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-text-main leading-snug">{toast.title}</div>
-                {toast.message && <div className="text-xs text-text-muted mt-0.5 leading-snug">{toast.message}</div>}
-                {toast.action && (
-                    <button
-                        className="mt-1.5 text-xs font-bold text-primary bg-transparent border-none p-0 cursor-pointer hover:underline transition-colors"
-                        onClick={handleActionClick}
-                    >
-                        {toast.action.label}
-                    </button>
+                {/* Close shares the title row so the message below spans the full width */}
+                <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0 text-sm font-bold text-text-main leading-snug">{toast.title}</div>
+                    <XButton className="shrink-0" onClick={toast.onCancel ?? (() => startExit('dismissed'))} />
+                </div>
+                {(toast.message || toast.action) && (
+                    <div className="text-xs text-text-muted mt-0.5 leading-snug">
+                        {toast.message}
+                        {/* Action reads as an inline hyperlink continuing the message, not a separate line */}
+                        {toast.action && (
+                            <>
+                                {toast.message && ' '}
+                                <a
+                                    href={toast.action.href}
+                                    target="_blank"
+                                    rel="noopener"
+                                    className="text-primary underline"
+                                    onClick={handleActionClick}
+                                >
+                                    {toast.action.label}
+                                </a>
+                            </>
+                        )}
+                    </div>
                 )}
                 {toast.type === 'progress' && toast.progress !== undefined && (
                     <div className="mt-2.5 h-1 bg-surface rounded-sm overflow-hidden">
@@ -154,7 +169,6 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
                     </div>
                 )}
             </div>
-            <XButton onClick={toast.onCancel ?? (() => startExit('dismissed'))} />
         </div>
     );
 };

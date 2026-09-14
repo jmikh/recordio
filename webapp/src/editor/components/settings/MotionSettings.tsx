@@ -1,6 +1,7 @@
 import { TbZoomIn } from 'react-icons/tb';
 import { RiLightbulbFlashLine } from 'react-icons/ri';
 import { Button, CollapsibleCard, Dropdown, InfoTooltip, Slider, Toggle, Tooltip } from '@shared/components';
+import { useToast } from '../../../components/Toast';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
@@ -37,6 +38,16 @@ export const MotionSettings = () => {
     const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
     const hasHoveredCards = useProjectStore(s => (s.userEvents.hoveredCards || []).length > 0);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+    const { addToast } = useToast();
+
+    /** Regenerate, then report what came out of it — a run with no usable focus areas looks identical otherwise. */
+    const handleRegenerateZooms = () => {
+        const count = resetZooms();
+        addToast(count > 0
+            ? { type: 'success', title: `${count} auto zoom${count === 1 ? '' : 's'} generated` }
+            : { type: 'info', title: 'No auto zooms generated', message: 'Could not detect long enough focus areas for auto zoom.' }
+        );
+    };
 
     const showCollapsibleZoom = useUIStore(s => s.showCollapsibleZoom);
     const showCollapsibleSpotlight = useUIStore(s => s.showCollapsibleSpotlight);
@@ -81,10 +92,10 @@ export const MotionSettings = () => {
                         showTooltip
                         units="×"
                         decimals={1}
+                        labelSuffix={!templateMode && (
+                            <InfoTooltip description="Max zoom applies when zooms are regenerated." />
+                        )}
                     />
-                    {!templateMode && (
-                        <p className="text-label -mt-2">Max zoom applies when zooms are regenerated.</p>
-                    )}
                     <Slider
                         label="Transition"
                         min={250}
@@ -111,7 +122,7 @@ export const MotionSettings = () => {
                     {!templateMode && (
                         <div className="flex flex-col gap-2 pt-1">
                             {hasTrackableContent && (
-                                <Button variant="primary" fullWidth onClick={() => resetZooms()}>
+                                <Button variant="primary" fullWidth onClick={handleRegenerateZooms}>
                                     <span>Regenerate Auto Zooms</span>
                                 </Button>
                             )}

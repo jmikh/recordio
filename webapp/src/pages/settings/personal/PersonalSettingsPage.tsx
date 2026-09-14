@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LuLoader } from 'react-icons/lu';
-import { Button, Modal } from '@shared/components';
+import { Button, Modal, StatusBadge, type StatusBadgeVariant } from '@shared/components';
 import type { ProjectSettings } from '@shared/types';
 import type { StoredProjectDefaults } from '@shared/api';
 import { useProjectStore } from '../../../editor/stores/useProjectStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { UserDefaultsService } from '../../../storage/userDefaultsService';
-import { resolveProjectDefaults, stripRecordingSpecificSettings } from '../../../core/projectDefaults';
+import { resolveProjectDefaults, keepOnlyEditableDefaults } from '../../../core/projectDefaults';
 import { useToast } from '../../../components/Toast';
 import { captureError } from '../../../lib/sentry';
 import {
@@ -24,7 +24,7 @@ type LoadState = 'loading' | 'ready' | 'error';
 const CARD = 'bg-surface border border-border rounded-[var(--radius-lg)]';
 
 /** Comparable form of a settings tree — the same shape that gets stored. */
-const serialize = (settings: ProjectSettings) => JSON.stringify(stripRecordingSpecificSettings(settings));
+const serialize = (settings: ProjectSettings) => JSON.stringify(keepOnlyEditableDefaults(settings));
 
 /**
  * Personal settings — the user's default project settings
@@ -75,7 +75,7 @@ export function PersonalSettingsPage() {
         return () => {
             useDefaultsPreviewStore.getState().stop();
             unloadDefaultsTemplate();
-            // blob URLs hydrated for custom backgrounds/music while editing
+            // blob URLs hydrated for custom backgrounds while editing
             useMediaUrlStore.getState().revokeAll();
             usePersonalDefaultsStore.getState().setDirty(false);
         };
@@ -133,11 +133,11 @@ export function PersonalSettingsPage() {
     };
 
     const ready = loadState === 'ready';
-    const status = isDirty
-        ? { label: 'Unsaved changes', className: 'bg-secondary/20 text-text-highlighted' }
+    const status: { label: string; variant: StatusBadgeVariant } = isDirty
+        ? { label: 'Unsaved changes', variant: 'secondary' }
         : hasStored
-            ? { label: 'Custom defaults', className: 'bg-primary/10 text-primary' }
-            : { label: 'Using Recordio defaults', className: 'bg-state-inactive text-text-muted' };
+            ? { label: 'Custom defaults', variant: 'primary' }
+            : { label: 'Using Recordio defaults', variant: 'default' };
 
     return (
         <div className="flex flex-col flex-1 min-h-0 gap-4">
@@ -146,14 +146,7 @@ export function PersonalSettingsPage() {
                 <div>
                     <div className="flex items-center gap-3">
                         <h1 className="heading-2">Personal settings</h1>
-                        {ready && (
-                            <span
-                                className={`text-badge rounded-[var(--radius-sm)] px-2 py-1 ${status.className}`}
-                                role="status"
-                            >
-                                {status.label}
-                            </span>
-                        )}
+                        {ready && <StatusBadge variant={status.variant}>{status.label}</StatusBadge>}
                     </div>
                     <p className="text-sm text-text-muted mt-1">
                         Defaults for every new project you create. Existing projects aren’t affected.

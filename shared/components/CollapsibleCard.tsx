@@ -89,7 +89,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                 className={`
                     w-full flex items-center flex-wrap
                     min-h-[2.75rem]
-                    px-4 py-2 ${notCollapsible ? '' : 'pr-8'}
+                    px-4 py-2 ${notCollapsible ? '' : (headerAction ? 'pr-14' : 'pr-8')}
                     text-left
                     transition-colors
                     ${notCollapsible ? 'cursor-default' : 'cursor-pointer'}
@@ -169,9 +169,9 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
                     </svg>
                 )}
 
-                {/* Header action (right-aligned, e.g. info icon) */}
+                {/* Header action (right-aligned, e.g. info icon) — sits left of the chevron when collapsible */}
                 {headerAction && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <div className={`absolute top-1/2 -translate-y-1/2 ${notCollapsible ? 'right-4' : 'right-10'}`}>
                         {headerAction}
                     </div>
                 )}

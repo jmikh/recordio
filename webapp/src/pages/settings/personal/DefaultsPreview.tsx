@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { StatusBadge } from '@shared/components';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import { useProjectStore } from '../../../editor/stores/useProjectStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
@@ -86,9 +87,7 @@ export function DefaultsPreview() {
                 {/* Always in the layout; only its content comes and goes */}
                 <div className="shrink-0 flex items-center justify-center" style={{ height: BADGE_ROW_PX }}>
                     {playing && (
-                        <span className="text-badge rounded-[var(--radius-sm)] px-2 py-1 bg-primary/10 text-primary" role="status">
-                            Playing {DEMO_LABEL[playing]}
-                        </span>
+                        <StatusBadge variant="primary">Playing {DEMO_LABEL[playing]}</StatusBadge>
                     )}
                 </div>
                 <div

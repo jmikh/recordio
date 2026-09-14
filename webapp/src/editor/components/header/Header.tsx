@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useProjectStore, useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
+import { useState, useCallback } from 'react';
+import { useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { LuUndo2, LuRedo2 } from 'react-icons/lu';
 
@@ -15,20 +15,14 @@ import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';
 import { DownloadModal } from '../settings/DownloadModal';
 import { SetAsDefaultsButton } from './SetAsDefaultsButton';
+import { ProjectNameField } from './ProjectNameField';
 
 import { TbCloudUpload, TbDownload, TbShare2 } from 'react-icons/tb';
-import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
-import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
+import { Button, Tooltip } from '@shared/components';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { useToast } from '../../../components/Toast';
 import { ShareModal } from '../../../share/ShareModal';
 import { useProjectMetaStore } from '../../../share/useProjectMetaStore';
-
-const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
-    value: preset,
-    label: preset.label,
-    suffix: preset.orientation ? <span className="text-text-muted text-xs">{preset.orientation}</span> : undefined,
-}));
 
 function SyncIndicator() {
     const pendingMediaUploads = useSyncStatusStore(s => s.pendingMediaUploads);
@@ -88,33 +82,6 @@ export const Header = () => {
     // Share modal (share-access model) — settings + copy link live there
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const shareReady = useProjectMetaStore(s => s.meta !== null);
-    const updateProjectName = useProjectStore(s => s.updateProjectName);
-    const [localName, setLocalName] = useState(projectName);
-    const localNameRef = useRef(localName);
-    localNameRef.current = localName;
-
-    // Sync local state when store name changes externally (e.g. project load)
-    useEffect(() => { setLocalName(projectName); }, [projectName]);
-
-    const outputSize = useProjectStore(s => s.project.settings.outputSize);
-    const updateSettings = useProjectStore(s => s.updateSettings);
-    const resetZooms = useProjectStore(s => s.resetZooms);
-    const resetSpotlights = useProjectStore(s => s.resetSpotlights);
-    const currentPreset = findPreset(outputSize);
-
-    const handleAspectRatioChange = (preset: AspectRatioPreset) => {
-        updateSettings({ outputSize: { width: preset.width, height: preset.height } });
-        resetZooms();
-        resetSpotlights();
-
-        const store = useProjectStore.getState().project.timeline;
-        const hasZooms = store.zoomSegments.length > 0;
-        const hasSpotlights = store.spotlightSegments.length > 0;
-        if (hasZooms || hasSpotlights) {
-            const parts = [hasZooms && 'zooms', hasSpotlights && 'spotlights'].filter(Boolean);
-            addToast({ type: 'info', title: 'Recalculated', message: `Auto ${parts.join(' & ')} updated for new aspect ratio` });
-        }
-    };
     const undo = useProjectHistory(state => state.undo);
     const redo = useProjectHistory(state => state.redo);
     const pastStates = useProjectHistory(state => state.pastStates);
@@ -140,9 +107,6 @@ export const Header = () => {
                             disabled={futureStates.length === 0}
                             title="Redo (Cmd+Shift+Z)"
                         />
-                        {true && <span className="text-2xs text-text-muted ml-1 tabular-nums">
-                            {pastStates.length}/{pastStates.length + futureStates.length}
-                        </span>}
                     </div>
 
                     {/* Personal defaults (plans/user-default-project-settings) */}
@@ -165,34 +129,10 @@ export const Header = () => {
                     )}
                 </div>
 
-                {/* Project Name + Aspect Ratio + Share Link (Centered) */}
+                {/* Project Name (Centered) */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                     <SyncIndicator />
-                    <input
-                        id="project-name-input"
-                        type="text"
-                        value={localName}
-                        onChange={(e) => setLocalName(e.target.value)}
-                        onBlur={() => {
-                            if (localNameRef.current !== projectName) {
-                                updateProjectName(localNameRef.current);
-                            }
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                        }}
-                        maxLength={40}
-                        className="h-9 bg-state-inactive text-text-main text-sm text-center border border-border focus:text-text-highlighted hover:bg-state-hover hover:border-border-highlighted focus:bg-state-hover focus:border-border-highlighted rounded-[var(--radius-interactive)] px-2 transition-colors placeholder-text-main w-[240px] focus-ring"
-                        placeholder="Untitled Project"
-                    />
-                    <Dropdown
-                        options={aspectRatioOptions}
-                        value={currentPreset}
-                        onChange={handleAspectRatioChange}
-                        fullWidth={false}
-                        buttonClassName="px-2 text-xs"
-                        hideSuffixInTrigger
-                    />
+                    <ProjectNameField />
                 </div>
 
                 <div className="flex items-center gap-3">

@@ -5,13 +5,11 @@
  * The defaults template project renders a still of a *sample* recording so
  * the user can see their defaults applied. The two images live on the CDN
  * (`cdn/samples/` in this repo is the folder mirrored there; files are
- * immutable — bump the `-vN` suffix instead of overwriting). In dev the
- * Vite server serves `cdn/samples/` at `/samples/` (see webapp/vite.config.ts)
- * so the placeholders work before they are uploaded.
+ * immutable — bump the `-vN` suffix instead of overwriting).
  */
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
-const SAMPLE_MEDIA_BASE = import.meta.env.DEV ? '/samples' : `${CDN_ORIGIN}/samples`;
+const SAMPLE_MEDIA_BASE = `${CDN_ORIGIN}/samples`;
 
 export const SAMPLE_SCREEN_URL = `${SAMPLE_MEDIA_BASE}/defaults-preview-screen-v1.avif`;
 export const SAMPLE_CAMERA_URL = `${SAMPLE_MEDIA_BASE}/defaults-preview-camera-v1.avif`;

@@ -5,9 +5,9 @@
  * A user's defaults are stored whole as { schemaVersion, settings } on
  * user_profiles.project_defaults (read/written through
  * webapp/src/storage/userDefaultsService.ts). This module turns that blob
- * into a ProjectSettings a new project can be built from, and strips the
- * parts of a project's settings that describe one recording rather than
- * a preference before they are stored.
+ * into a ProjectSettings a new project can be built from, and reduces a
+ * project's settings to the parts that are actually preferences before
+ * they are stored.
  *
  * NULL / missing stored defaults resolve to the shipped factory
  * (createDefaultSettings) — nothing is ever seeded for a user.
@@ -25,42 +25,136 @@ import {
 import { migrateProject } from './migrateProject';
 
 /**
- * Removes the fields that belong to one specific recording:
- * - screen.crop (crop rectangle of that video), screen.outputCrop (dead field)
- * - camera.faceCenter (face-tracking anchor picked on that camera video)
- * - captions.transcriptionSource (which engine transcribed that audio)
- * - autoCutApplied (analytics flag for that project)
+ * Every setting the Personal Settings page can actually edit — the editor's
+ * six panels rendered in templateMode by
+ * webapp/src/pages/settings/personal/DefaultsSettingsPanel.tsx.
  *
- * Keeps background.storagePath / audio.music.storagePath — they point at
- * the user's asset library (user_assets), which is user-scoped and
- * cross-project, so a custom background or track can be a default.
+ * This is a whitelist on purpose. A user's defaults are written from two
+ * places: the page itself, and "Use as my default settings" in the editor
+ * header, which promotes a whole project's settings. Anything the page has
+ * no control for would then be stuck in the blob with no way to change it
+ * or even see it — an aspect ratio, a muted mic, a music track. So a stored
+ * blob carries these paths and nothing else; everything absent here always
+ * resolves to the shipped factory.
+ *
+ * Adding a control to one of those panels means adding its path here.
+ * Forgetting to fails in the safe direction: the setting just isn't
+ * remembered as a default.
  */
-export function stripRecordingSpecificSettings(settings: ProjectSettings): ProjectSettings {
-    const out: ProjectSettings = structuredClone(settings);
-    delete out.screen.crop;
-    delete out.screen.outputCrop;
-    delete out.captions.transcriptionSource;
-    if (out.camera) delete out.camera.faceCenter;
-    out.autoCutApplied = false;
-    // The `enabled` flags are the timeline track toggles (per recording); a
-    // default never disables a track. Auto-generation is its own flag.
-    out.zoom.enabled = true;
-    out.spotlight.enabled = true;
-    if (out.cameraMove) out.cameraMove.enabled = true;
-    if (out.overlay) out.overlay.enabled = true;
-    return out;
+export const EDITABLE_DEFAULT_PATHS = [
+    // Background tab — every control writes into `background`
+    'background',
+
+    // Screen tab. No crop (that rectangle belongs to one recording), no
+    // `mute` (the timeline's per-recording track toggle).
+    'screen.mode',
+    'screen.toolbar',
+    'screen.deviceFrameId',
+    'screen.borderColor',
+    'screen.borderRadiusPx',
+    'screen.borderWidthPx',
+    'screen.hasShadow',
+    'screen.hasGlow',
+    'screen.padding',
+
+    // Camera tab. Shape/size come from the shape picker and the size
+    // slider; no cropZoom or mirror (both hidden in templateMode), no
+    // faceCenter (an anchor picked on one camera video).
+    'camera.shape',
+    'camera.widthPx',
+    'camera.heightPx',
+    'camera.xPx',
+    'camera.yPx',
+    'camera.borderRadiusPx',
+    'camera.borderColor',
+    'camera.borderWidthPx',
+    'camera.hasShadow',
+    'camera.hasGlow',
+    'camera.hasFeather',
+    'camera.featherAmount',
+    'camera.autoShrink',
+    'camera.shrinkScale',
+
+    // Effects tab. mouseDragEnabled has no control anywhere and is forced
+    // off by migrateProject.
+    'mouse.mouseClickEnabled',
+    'mouse.effectType',
+    'mouse.color',
+    'mouse.size',
+    'mouse.soundEnabled',
+    'mouse.soundVolume',
+    'keyboard',
+
+    // Captions tab — style only. The engine that transcribed one
+    // recording (`transcriptionSource`) is not a preference.
+    'captions.enabled',
+    'captions.captionSize',
+    'captions.width',
+    'captions.textColor',
+    'captions.backgroundColor',
+    'captions.wordHighlight',
+
+    // Motion tab. The `enabled` flags are timeline track toggles (per
+    // recording) and stay at the factory's on; the spotlight hold
+    // durations are only reachable from the timeline inspector.
+    'zoom.autoGenerate',
+    'zoom.maxZoom',
+    'zoom.transitionDurationMs',
+    'zoom.easing',
+    'spotlight.autoGenerate',
+    'spotlight.enlargeScale',
+    'spotlight.dimOpacity',
+    'spotlight.transitionDurationMs',
+    'spotlight.easing',
+] as const;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Copies `a.b.c` from `src` onto `dest` when src has it. Leaves dest alone otherwise. */
+function copyPath(src: unknown, dest: Record<string, unknown>, path: string): void {
+    const keys = path.split('.');
+    let value: unknown = src;
+    for (const key of keys) {
+        if (!isPlainObject(value)) return;
+        value = value[key];
+    }
+    if (value === undefined) return;
+
+    let target = dest;
+    for (const key of keys.slice(0, -1)) {
+        const next = target[key];
+        if (!isPlainObject(next)) return;
+        target = next;
+    }
+    target[keys[keys.length - 1]] = structuredClone(value);
+}
+
+/**
+ * A settings tree reduced to what a default may carry: the factory, with
+ * EDITABLE_DEFAULT_PATHS copied over from `settings`. Everything else —
+ * aspect ratio, frame rate, the whole audio tree, screen mute, camera
+ * mirror/crop-zoom, crop, face anchor, transcription source, track
+ * toggles, autoCutApplied, the camera-layout and overlay block defaults —
+ * comes back at its shipped value.
+ *
+ * Note `background` and the other listed subtrees are replaced whole, not
+ * merged: a custom background is `{ type: 'custom', storagePath, imageUrl:
+ * undefined }` and must not inherit the factory's preset image.
+ */
+export function keepOnlyEditableDefaults(settings: ProjectSettings): ProjectSettings {
+    const out = createDefaultSettings() as unknown as Record<string, unknown>;
+    for (const path of EDITABLE_DEFAULT_PATHS) copyPath(settings, out, path);
+    return out as unknown as ProjectSettings;
 }
 
 /** The blob to send to /user-project-defaults-set. */
 export function toStoredProjectDefaults(settings: ProjectSettings): StoredProjectDefaults {
     return {
         schemaVersion: CURRENT_SCHEMA_VERSION,
-        settings: stripRecordingSpecificSettings(settings),
+        settings: keepOnlyEditableDefaults(settings),
     };
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -92,8 +186,11 @@ export function mergeSettingsOntoDefaults<T extends object>(base: T, override: u
  *
  * The stored settings ride the ordinary project migrations by being
  * wrapped in a synthetic project and run through migrateProject — there
- * is no second migration system. Then they are merged onto the factory,
- * stripped again (defensive) and the camera is clamped into the frame.
+ * is no second migration system. Then they are merged onto the factory
+ * (completing subtrees an older blob wrote partially), reduced to the
+ * editable paths — so a blob written before this rule still can't force a
+ * stuck aspect ratio or music track on new projects — and the camera is
+ * clamped into the frame.
  */
 export function resolveProjectDefaults(stored: StoredProjectDefaults | null | undefined): ProjectSettings {
     const factory = createDefaultSettings();
@@ -109,7 +206,7 @@ export function resolveProjectDefaults(stored: StoredProjectDefaults | null | un
     }) as { settings: unknown };
 
     const merged = mergeSettingsOntoDefaults(factory, migrated.settings);
-    const resolved = stripRecordingSpecificSettings(merged);
+    const resolved = keepOnlyEditableDefaults(merged);
     if (resolved.camera) {
         resolved.camera = clampCameraToOutput(resolved.camera, resolved.outputSize);
     }

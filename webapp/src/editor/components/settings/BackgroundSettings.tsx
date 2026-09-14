@@ -9,7 +9,8 @@ import { UserAssetService } from '../../../storage/userAssetService';
 import { ColorSettings } from './ColorSettings';
 import { IoIosColorFilter } from "react-icons/io";
 import { CiImageOn } from "react-icons/ci";
-import { XButton, Slider, CollapsibleCard } from '@shared/components';
+import { XButton, Slider, CollapsibleCard, Dropdown, type DropdownOption } from '@shared/components';
+import { ASPECT_RATIO_PRESETS, findPreset, type AspectRatioPreset } from '@shared/utils/aspectRatio';
 import { TbBackground } from 'react-icons/tb';
 import { useToast } from '../../../components/Toast';
 import type { PreviewItem } from '@shared/components';
@@ -18,6 +19,12 @@ import { trackUploadBackgroundClicked, trackUploadBackgroundFailed } from '../..
 import { captureError } from '../../../lib/sentry';
 
 
+
+const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRESETS.map(preset => ({
+    value: preset,
+    label: preset.label,
+    suffix: preset.orientation ? <span className="text-label">{preset.orientation}</span> : undefined,
+}));
 
 const CDN = `${CDN_ORIGIN}/backgrounds`;
 
@@ -44,6 +51,10 @@ export const BackgroundSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const selectBackground = useProjectStore(s => s.selectBackground);
     const clearBackground = useProjectStore(s => s.clearBackground);
+    const resetZooms = useProjectStore(s => s.resetZooms);
+    const resetSpotlights = useProjectStore(s => s.resetSpotlights);
+    // Personal defaults don't carry an aspect ratio — it's per project
+    const templateMode = useProjectStore(s => s.templateMode);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Collapsible visibility state
@@ -114,6 +125,20 @@ export const BackgroundSettings = () => {
                 gradientDirection: direction
             }
         });
+    };
+
+    const handleAspectRatioChange = (preset: AspectRatioPreset) => {
+        updateSettings({ outputSize: { width: preset.width, height: preset.height } });
+        resetZooms();
+        resetSpotlights();
+
+        const timeline = useProjectStore.getState().project.timeline;
+        const hasZooms = timeline.zoomSegments.length > 0;
+        const hasSpotlights = timeline.spotlightSegments.length > 0;
+        if (hasZooms || hasSpotlights) {
+            const parts = [hasZooms && 'zooms', hasSpotlights && 'spotlights'].filter(Boolean);
+            addToast({ type: 'info', title: 'Recalculated', message: `Auto ${parts.join(' & ')} updated for new aspect ratio` });
+        }
     };
 
     const handlePresetSelect = (url: string) => {
@@ -255,6 +280,17 @@ export const BackgroundSettings = () => {
             notCollapsible
         >
             <div className="flex flex-col gap-4 text-sm select-none">
+                {/* Canvas shape — lives with the background that fills it */}
+                {!templateMode && (
+                    <Dropdown
+                        label="Aspect ratio"
+                        options={aspectRatioOptions}
+                        value={findPreset(settings.outputSize)}
+                        onChange={handleAspectRatioChange}
+                        hideSuffixInTrigger
+                    />
+                )}
+
                 <div className="flex flex-wrap gap-4 items-end justify-center w-full">
                     {/* 1. Color Card */}
                     <div className="flex flex-col items-center gap-2">

@@ -10,7 +10,7 @@ import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useUserStore } from '../../../auth/useUserStore';
 import { useEntitlements } from '../../../billing/useEntitlements';
-import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, ProBadge, InfoTooltip, type PreviewItem } from '@shared/components';
+import { Slider, CollapsibleCard, Toggle, Tooltip, Button, MultiToggle, InfoTooltip, type PreviewItem } from '@shared/components';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { TranscriptionService } from '../../transcription/TranscriptionService';
 import { CloudTranscriptionService } from '../../transcription/CloudTranscriptionService';

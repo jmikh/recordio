@@ -10,6 +10,7 @@ description: UI design system reference for this codebase — covers design toke
 - **Never use hardcoded Tailwind palette colors** (`red-400`, `gray-700`, `blue-500`, etc.) — always use semantic tokens
 - **Never use raw `<button>` elements** — always use `<Button>` from `@shared/components`
 - **Never hand-roll select/dropdown/picker menus** — always use `<Dropdown>` from `@shared/components`; it supports `disabled` (whole control) and per-option `disabled`, so read-only or partially-restricted states don't justify a custom control either
+- **Never hand-roll a status pill** — always use `<StatusBadge>` from `@shared/components` for anything reporting state (plan tier, save state, live activity); `text-badge` on a bare `<span>` is only for static tags and counters
 - **Check `shared/components/` before building anything custom** — most common UI needs are already covered
 - **No `style={{}}` for layout/theming** — Tailwind classes only; inline styles are acceptable only for dynamically computed values (positions, widths from state, user color pickers)
 - **Use shadow utilities** (`shadow-sm`, `shadow-float`) — not inline `boxShadow`; these are the only two shadow tokens
@@ -51,7 +52,7 @@ All in `shared/components/` (barrel-exported from `@shared/components`). Read th
 | `Tooltip` / `InfoTooltip` | Portal-rendered tooltips |
 | `Checkbox` | Styled checkbox with label |
 | `Slider` | Input range controls |
-| `ProBadge` | Pro/Free tier badge |
+| `StatusBadge` | Status pill reporting a changing state — plan tier, save state, live activity. Variants: `default` (neutral), `primary` (active/affirmative), `secondary` (wants attention). `uppercase` prop for caps (CSS-only, accessible name unchanged). Always `role="status"` |
 | `SidebarNav` / `SidebarNavItem` | Sidebar navigation lists (dashboard sidebar, editor settings nav): full-bleed left, right margin, sliding accent bar; hover previews the selected look |
 
 ---
@@ -134,7 +135,7 @@ Use these instead of hand-rolling the combos:
 | `heading-1` | `text-2xl font-bold text-text-highlighted` | Hero modal/page titles (auth, upgrade) |
 | `heading-2` | `text-lg font-bold text-text-highlighted` | All page titles, modal titles, section headings |
 | `text-eyebrow` | `text-2xs font-bold uppercase tracking-widest text-text-muted` | Tiny uppercase group label above a section (sidebar groups, settings list headers). Never hand-roll `uppercase tracking-widest` |
-| `text-badge` | `text-2xs font-bold leading-none` | Pill/chip/counter typography; bg, padding, and radius stay local |
+| `text-badge` | `text-2xs font-bold leading-none` | Pill/chip/counter typography; bg, padding, and radius stay local. For a *status* pill use `StatusBadge` rather than this directly |
 | `text-label` | `text-xs text-text-muted` | Text that names or annotates something rather than being content — see below |
 
 Color overrides compose: `text-eyebrow text-primary` works (utilities beat `@layer components`).
@@ -190,14 +191,13 @@ Defined in `@layer components` in `shared/theme/index.css`.
 | `interactive-destructive` | Destructive action (red bg) |
 | `interactive-selected` | Secondary border + glow for selected state |
 | `chosen-dot` | Small primary-colored glowing dot |
-| `focus-ring` | `focus-visible` ring using primary color |
 | `scrollbar-hide` | Hides scrollbar cross-browser |
 | `scrollbar-thin` | Thin styled scrollbar |
 | `text-label` | Names/annotates a control, track or card (see Typography) |
 | `heading-1` | Hero modal/page title (see Typography) |
 | `heading-2` | Page/modal/section title (see Typography) |
 | `text-eyebrow` | Uppercase group label (see Typography) |
-| `text-badge` | Pill/chip text (see Typography) |
+| `text-badge` | Pill/chip text (see Typography); status pills go through `StatusBadge` |
 
 > These are consumed by `Button` — don't apply `interactive-*` directly on raw elements.
 

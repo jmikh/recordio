@@ -168,7 +168,7 @@ export function Dropdown<T>({
                 className={`interactive-base flex items-center justify-between ${fullWidth ? 'w-full' : ''} ${buttonClassName}`}
             >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {label && <span className="text-text-muted flex-shrink-0">{label}</span>}
+                    {label && <span className="text-label flex-shrink-0">{label}</span>}
                     <span className="truncate">{displayLabel}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
