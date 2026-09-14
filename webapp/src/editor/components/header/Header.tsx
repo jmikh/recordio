@@ -14,6 +14,7 @@ import { useEntitlements } from '../../../billing/useEntitlements';
 import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { useCloudRender } from '../settings/useCloudRender';
 import { DownloadModal } from '../settings/DownloadModal';
+import { SetAsDefaultsButton } from './SetAsDefaultsButton';
 
 import { TbCloudUpload, TbDownload, TbShare2 } from 'react-icons/tb';
 import { Dropdown, Button, Tooltip, type DropdownOption } from '@shared/components';
@@ -143,6 +144,10 @@ export const Header = () => {
                             {pastStates.length}/{pastStates.length + futureStates.length}
                         </span>}
                     </div>
+
+                    {/* Personal defaults (plans/user-default-project-settings) */}
+                    <div className="h-4 w-[1px] bg-border"></div>
+                    <SetAsDefaultsButton />
 
                     {import.meta.env.MODE !== 'production' && (
                         <>

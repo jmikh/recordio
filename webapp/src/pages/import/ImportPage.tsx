@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { useExtensionBridge } from './useExtensionBridge';
 import { CloudProjectService } from '../../storage/cloudProjectService';
@@ -13,6 +13,18 @@ import { navigate } from '../../lib/navigate';
 import { editorPath } from '../../lib/videoUrls';
 import { invokeFunction } from '../../api/client';
 import { CapRecoveryPanel } from './CapRecoveryPanel';
+import { UserDefaultsService } from '../../storage/userDefaultsService';
+import { resolveProjectDefaults } from '../../core/projectDefaults';
+import type { ProjectSettings } from '@shared/types';
+import type { StoredProjectDefaults } from '@shared/api';
+
+/**
+ * How long the import waits for the user's personal default settings
+ * before building the project from the shipped defaults instead
+ * (plans/user-default-project-settings §3.4). The fetch starts on page
+ * load, so this only bites on a slow API — and never fails the import.
+ */
+const DEFAULTS_WAIT_MS = 3000;
 
 type ImportStatus =
     | 'init'
@@ -141,6 +153,27 @@ export function ImportPage() {
 
     // When auth completes after modal, retry upload
     const userId = useUserStore(s => s.userId);
+
+    // Personal default settings: kick off the read as soon as we know who
+    // the user is, so it's normally resolved before the blobs finish
+    // streaming. Consumed (with a timeout) by resolveDefaultsForImport().
+    const defaultsPromise = useRef<Promise<StoredProjectDefaults | null> | null>(null);
+    useEffect(() => {
+        if (userId && !defaultsPromise.current) {
+            defaultsPromise.current = UserDefaultsService.fetchOrNull();
+        }
+    }, [userId]);
+
+    /** Resolved settings for the new project + whether they came from the user's saved defaults. */
+    async function resolveDefaultsForImport(): Promise<{ settings: ProjectSettings; personal: boolean }> {
+        const pending = defaultsPromise.current ?? UserDefaultsService.fetchOrNull();
+        defaultsPromise.current = pending;
+        const stored = await Promise.race([
+            pending,
+            new Promise<null>(resolve => setTimeout(() => resolve(null), DEFAULTS_WAIT_MS)),
+        ]);
+        return { settings: resolveProjectDefaults(stored), personal: stored !== null };
+    }
     useEffect(() => {
         if (showAuthModal && userId && state.status === 'success' && state.recording && state.screenVideo) {
             setShowAuthModal(false);
@@ -190,12 +223,14 @@ export function ImportPage() {
             // 1. Create project on server, get storage paths, cache blobs locally.
             //    Blobs are cached BEFORE the upload starts, so editor playback works
             //    immediately and a refresh mid-upload can resume from cache.
+            const defaults = await resolveDefaultsForImport();
             const { project, name, slug, bucket, uploads } = await CloudProjectService.importRecordingLocalV2(
                 state.recording,
                 state.screenVideo,
                 workspaceId,
                 state.cameraVideo || undefined,
                 state.micAudio || undefined,
+                { defaultSettings: defaults.settings },
             );
 
             // 2. Kick off the cloud upload as fire-and-forget. The editor will
@@ -214,7 +249,7 @@ export function ImportPage() {
             setUploadProgress(100);
             setStatus('success');
             confirmHandoff(project.id);
-            trackProjectCreatedSuccess(project);
+            trackProjectCreatedSuccess(project, defaults.personal);
             navigate(editorPath(slug));
         } catch (error: any) {
             // The at-cap refusal is expected product behavior, not a failure —
@@ -257,7 +292,10 @@ export function ImportPage() {
         }
     }
 
-    function trackProjectCreatedSuccess(project: { id: string; timeline: { zoomSegments: unknown[]; spotlightSegments: unknown[] } }) {
+    function trackProjectCreatedSuccess(
+        project: { id: string; timeline: { zoomSegments: unknown[]; spotlightSegments: unknown[] } },
+        usedPersonalDefaults: boolean,
+    ) {
         try {
             const recording = state.recording!;
             const events = recording.userEvents;
@@ -286,6 +324,7 @@ export function ImportPage() {
                 has_typing_events: events.typingEvents.length > 0,
                 has_drag_events: events.drags.length > 0,
                 has_hovered_cards: events.hoveredCards.length > 0,
+                used_personal_defaults: usedPersonalDefaults,
                 auto_zoom_count: project.timeline.zoomSegments.length,
                 auto_spotlight_count: project.timeline.spotlightSegments.length,
                 screen_frame_rate: recording.screenSource.frameRate ?? null,
@@ -323,6 +362,7 @@ export function ImportPage() {
                 has_typing_events: (events?.typingEvents.length ?? 0) > 0,
                 has_drag_events: (events?.drags.length ?? 0) > 0,
                 has_hovered_cards: (events?.hoveredCards.length ?? 0) > 0,
+                used_personal_defaults: false,
                 auto_zoom_count: 0,
                 auto_spotlight_count: 0,
                 screen_frame_rate: recording?.screenSource.frameRate ?? null,

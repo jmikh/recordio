@@ -71,6 +71,10 @@ import type {
     TrialExtendResponse,
     UserProfile,
     UserReviewSetResponse,
+    StoredProjectDefaults,
+    UserProjectDefaultsSetRequest,
+    UserProjectDefaultsSetResponse,
+    UserProjectDefaultsClearResponse,
 } from './session';
 
 export * from './admin';
@@ -107,6 +111,9 @@ export interface ApiRoutes {
     'workspace-member-update-role': { request: WorkspaceMemberUpdateRoleRequest; response: WorkspaceMemberUpdateRoleResponse };
     'user-profile-get': { request: EmptyRequest; response: UserProfile | null };
     'user-review-set': { request: EmptyRequest; response: UserReviewSetResponse };
+    'user-project-defaults-get': { request: EmptyRequest; response: StoredProjectDefaults | null };
+    'user-project-defaults-set': { request: UserProjectDefaultsSetRequest; response: UserProjectDefaultsSetResponse };
+    'user-project-defaults-clear': { request: EmptyRequest; response: UserProjectDefaultsClearResponse };
     'workspace-get-default': { request: EmptyRequest; response: DefaultWorkspace };
     'subscription-get': { request: SubscriptionGetRequest; response: SubscriptionGetResponse };
     'trial-extend': { request: TrialExtendRequest; response: TrialExtendResponse };

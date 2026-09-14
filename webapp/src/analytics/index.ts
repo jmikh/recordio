@@ -205,6 +205,8 @@ export interface ProjectCreatedParams {
     has_typing_events: boolean;
     has_drag_events: boolean;
     has_hovered_cards: boolean;
+    /** The user's personal default settings were applied (plans/user-default-project-settings) */
+    used_personal_defaults: boolean;
     auto_zoom_count: number;
     auto_spotlight_count: number;
     screen_frame_rate: number | null;
@@ -478,3 +480,19 @@ export function trackProjectCreationFailed(params: BaseFailureParams & {
     trackEvent('project_creation_failed', params);
 }
 
+
+// ── Personal default project settings (plans/user-default-project-settings) ──
+
+export function trackPersonalSettingsPageLoaded() {
+    trackEvent('personal_settings_page_loaded');
+}
+
+/** The user replaced their personal defaults — from the Personal Settings page or the editor header. */
+export function trackPersonalDefaultsSaved(params: { source: 'page' | 'editor' }) {
+    trackEvent('personal_defaults_saved', params);
+}
+
+/** Back to the shipped defaults (column cleared). */
+export function trackPersonalDefaultsReset() {
+    trackEvent('personal_defaults_reset');
+}

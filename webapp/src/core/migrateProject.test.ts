@@ -260,6 +260,35 @@ describe('v4 → v5: storagePath', () => {
 });
 
 // ==========================================
+// v6 → v7: drag effect retired, autoGenerate flags
+// ==========================================
+
+describe('v6 → v7: drag effect off, autoGenerate flags', () => {
+    it('forces mouseDragEnabled off and backfills autoGenerate on zoom/spotlight', () => {
+        const proj = makeV1Project({
+            schemaVersion: 6,
+            settings: {
+                mouse: { mouseClickEnabled: true, mouseDragEnabled: true },
+                zoom: { enabled: false, maxZoom: 2 },
+                spotlight: { enabled: true, dimOpacity: 0.5 },
+            },
+        });
+        const result = migrateProject(proj);
+        expect(result.settings.mouse).toEqual({ mouseClickEnabled: true, mouseDragEnabled: false });
+        expect(result.settings.zoom).toEqual({ enabled: false, maxZoom: 2, autoGenerate: true });
+        expect(result.settings.spotlight).toEqual({ enabled: true, dimOpacity: 0.5, autoGenerate: true });
+    });
+
+    it('keeps an explicit autoGenerate and tolerates missing groups', () => {
+        const proj = makeV1Project({ schemaVersion: 6, settings: { zoom: { enabled: true, autoGenerate: false } } });
+        const result = migrateProject(proj);
+        expect(result.settings.zoom.autoGenerate).toBe(false);
+        expect(result.settings.mouse).toBeUndefined();
+        expect(result.settings.spotlight).toBeUndefined();
+    });
+});
+
+// ==========================================
 // Common behaviors
 // ==========================================
 

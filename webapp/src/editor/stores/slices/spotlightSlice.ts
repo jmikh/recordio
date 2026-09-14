@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, SpotlightSegment } from '@shared/types';
+import type { ID, SpotlightSegment, SpotlightSettings } from '@shared/types';
 import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { calculateAutoSpotlights } from '../../spotlight/autoSpotlight';
@@ -14,6 +14,14 @@ export interface SpotlightSlice {
     clearSpotlights: () => void;
     resetSpotlights: () => void;
     toggleSpotlightEnabled: () => void;
+    /**
+     * Motion settings / inspector "apply to all": one undo step that merges
+     * the look into settings.spotlight (new spotlights inherit it) and stamps
+     * it on every existing segment (enlargeScale → segment.scale).
+     */
+    applySpotlightSettingsToAll: (
+        updates: Partial<Pick<SpotlightSettings, 'dimOpacity' | 'enlargeScale' | 'transitionDurationMs' | 'easing'>>,
+    ) => void;
 }
 
 export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], SpotlightSlice> = (set, _get, store) => ({
@@ -140,6 +148,26 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                         spotlightSegments
                     }
                 }
+            };
+        });
+    },
+
+    applySpotlightSettingsToAll: (updates) => {
+        set(state => {
+            const { enlargeScale, ...rest } = updates;
+            const perSegment: Partial<SpotlightSegment> = { ...rest, ...(enlargeScale !== undefined ? { scale: enlargeScale } : {}) };
+            return {
+                project: {
+                    ...state.project,
+                    settings: {
+                        ...state.project.settings,
+                        spotlight: { ...state.project.settings.spotlight, ...updates },
+                    },
+                    timeline: {
+                        ...state.project.timeline,
+                        spotlightSegments: state.project.timeline.spotlightSegments.map(s => ({ ...s, ...perSegment })),
+                    },
+                },
             };
         });
     },

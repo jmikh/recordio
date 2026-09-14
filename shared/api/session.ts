@@ -6,6 +6,7 @@
 import { Type, type Static } from '@sinclair/typebox';
 import type { WorkspaceEntitlements } from './entitlements';
 import type { WorkspaceRole } from './workspaces';
+import type { ProjectSettings } from '../types/settings';
 
 /** Empty request body (user-profile-get, workspace-get-default). */
 export type EmptyRequest = Record<string, never>;
@@ -99,4 +100,40 @@ export type TrialExtendRequest = Static<typeof TrialExtendRequestSchema>;
 
 export interface TrialExtendResponse {
     entitlements: WorkspaceEntitlements;
+}
+
+// ── POST /user-project-defaults-get / -set / -clear ─────────────
+
+/**
+ * The caller's personal default project settings
+ * (plans/user-default-project-settings), stored whole on
+ * user_profiles.project_defaults. `settings` is the ProjectSettings
+ * sub-tree applied to every NEW project; `schemaVersion` is the project
+ * schema version it was written under, so migrateProject can upgrade
+ * it like any project. The get response is null when the user never
+ * saved defaults — the webapp then uses the shipped factory defaults.
+ */
+export interface StoredProjectDefaults {
+    schemaVersion: number;
+    settings: ProjectSettings;
+}
+
+/**
+ * Body of /user-project-defaults-set — whole-blob replace. The settings
+ * tree is deliberately not validated server-side (project-create-v2
+ * posture); additionalProperties keeps every key through Ajv.
+ */
+export const UserProjectDefaultsSetRequestSchema = Type.Object({
+    schemaVersion: Type.Integer({ minimum: 1 }),
+    settings: Type.Object({}, { additionalProperties: true }),
+});
+export type UserProjectDefaultsSetRequest = Static<typeof UserProjectDefaultsSetRequestSchema>;
+
+export interface UserProjectDefaultsSetResponse {
+    saved: true;
+}
+
+/** Empty body; idempotent — sets the column back to NULL. */
+export interface UserProjectDefaultsClearResponse {
+    cleared: true;
 }

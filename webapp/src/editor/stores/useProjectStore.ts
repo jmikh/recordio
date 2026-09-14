@@ -1,8 +1,9 @@
 import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
-import type { Project, ID, UserEvents } from '@shared/types';
-import { ProjectImpl } from '../../core/Project';
+import type { Project, ID, UserEvents, ProjectSettings } from '@shared/types';
+import { ProjectImpl, EMPTY_USER_EVENTS } from '../../core/Project';
+import { buildDefaultsTemplateProject } from '../../core/defaultsTemplate';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { CloudStorage } from '../../storage/cloudStorage';
 import { captureError } from '../../lib/sentry';
@@ -31,11 +32,22 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSli
     /** Recording events — loaded once, never mutated, excluded from undo/redo history. */
     userEvents: UserEvents;
     isSaving: boolean;
+    /**
+     * The store holds the Personal Settings "defaults template" — a synthetic
+     * project built from the user's default settings — instead of a real
+     * project (plans/user-default-project-settings §3.5). Auto-save is off
+     * and the settings panels hide recording-specific controls.
+     */
+    templateMode: boolean;
 
 
     // Actions
     loadProject: (project: Project, name: string) => Promise<void>;
     saveProject: () => Promise<void>;
+    /** Load the defaults template (flushes any pending real-project save first). */
+    loadDefaultsTemplate: (settings: ProjectSettings) => void;
+    /** Back to the placeholder project; leaves template mode. */
+    unloadDefaultsTemplate: () => void;
 
     // Background/Music Actions
     /** Select a library asset as the project's custom background */
@@ -72,6 +84,7 @@ export const useProjectStore = create<ProjectState>()(
                 projectName: 'Untitled Project',
                 userEvents: { mouseClicks: [], mousePositions: [], keyboardEvents: [], drags: [], scrolls: [], typingEvents: [], urlChanges: [], hoveredCards: [] },
                 isSaving: false,
+                templateMode: false,
                 mutedSources: {},
 
                 // Export State
@@ -146,6 +159,7 @@ export const useProjectStore = create<ProjectState>()(
                     if (!(projectWithoutEvents.settings as any).zoom) {
                         (projectWithoutEvents.settings as any).zoom = {
                             enabled: true,
+                            autoGenerate: true,
                             maxZoom: 2,
                             transitionDurationMs: 750,
                             easing: 'ease-in-out',
@@ -154,6 +168,7 @@ export const useProjectStore = create<ProjectState>()(
                     if (!(projectWithoutEvents.settings as any).spotlight) {
                         (projectWithoutEvents.settings as any).spotlight = {
                             enabled: true,
+                            autoGenerate: true,
                             dimOpacity: 0.5,
                             enlargeScale: 1.25,
                             transitionDurationMs: 750,
@@ -165,7 +180,7 @@ export const useProjectStore = create<ProjectState>()(
                     if (!(projectWithoutEvents.settings as any).mouse) {
                         (projectWithoutEvents.settings as any).mouse = {
                             mouseClickEnabled: true,
-                            mouseDragEnabled: true,
+                            mouseDragEnabled: false,
                             effectType: 'ring',
                             color: '#8b5cf6',
                             size: 1.0,
@@ -239,10 +254,12 @@ export const useProjectStore = create<ProjectState>()(
                         const timeMapper = new TimeMapper(timeline.outputWindows);
 
                         timeline.focusAreas = getAllFocusAreas(userEvents, screenSource.size, screenSource.durationMs);
-                        timeline.zoomSegments = hasUserEvents
+                        // Auto-generation is opt-out per effect (Motion settings / personal
+                        // defaults); the tracks stay enabled either way.
+                        timeline.zoomSegments = hasUserEvents && (settings.zoom.autoGenerate ?? true)
                             ? calculateAutoZooms(settings.zoom, viewMapper, timeMapper, timeline.focusAreas)
                             : [];
-                        timeline.spotlightSegments = hasUserEvents
+                        timeline.spotlightSegments = hasUserEvents && (settings.spotlight.autoGenerate ?? true)
                             ? calculateAutoSpotlights(
                                 viewMapper,
                                 timeMapper,
@@ -258,6 +275,30 @@ export const useProjectStore = create<ProjectState>()(
                     set({ project: projectWithoutEvents as Project, projectName: name, userEvents });
 
                     // Clear History so we can't undo into valid empty state or previous project
+                    useProjectStore.temporal.getState().clear();
+                },
+
+                loadDefaultsTemplate: (settings) => {
+                    // A real project may still have a debounced save pending —
+                    // write it now, before its events leave the store.
+                    flushPendingSave();
+                    const { userEvents, ...template } = buildDefaultsTemplateProject(settings);
+                    set({
+                        project: template as Project,
+                        projectName: 'Sample recording',
+                        userEvents,
+                        templateMode: true,
+                    });
+                    useProjectStore.temporal.getState().clear();
+                },
+
+                unloadDefaultsTemplate: () => {
+                    set({
+                        project: ProjectImpl.create(),
+                        projectName: 'Untitled Project',
+                        userEvents: EMPTY_USER_EVENTS,
+                        templateMode: false,
+                    });
                     useProjectStore.temporal.getState().clear();
                 },
 
@@ -362,17 +403,42 @@ export const useProjectStore = create<ProjectState>()(
 // --- Auto-Save Subscription ---
 // Debounces project changes and saves directly to cloud.
 // CloudProjectService.saveProject skips no-op writes via SHA-256 hash check.
-let saveTimeout: any = null;
+// Never runs for the Personal Settings defaults template or the placeholder
+// project (plans/user-default-project-settings §3.5).
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingSave: (() => void) | null = null;
+
+/** Run a debounced save now (used before the store is repurposed for the defaults template). */
+function flushPendingSave() {
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+    }
+    const run = pendingSave;
+    pendingSave = null;
+    run?.();
+}
+
 useProjectStore.subscribe(
     (state) => state.project,
     (project) => {
+        if (useProjectStore.getState().templateMode || !project.id) return;
         if (saveTimeout) clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
+        pendingSave = () => {
             const { userId } = useUserStore.getState();
             if (!userId) return;
-            const userEvents = useProjectStore.getState().userEvents;
-            const fullProject = { ...project, userEvents };
+            const current = useProjectStore.getState();
+            // The store may have moved on (another project, the defaults
+            // template) — never pair this project with someone else's events
+            if (current.templateMode || current.project.id !== project.id) return;
+            const fullProject = { ...project, userEvents: current.userEvents };
             CloudProjectService.saveProject(fullProject, userId).catch(() => { /* saveProject already reports to Sentry */ });
+        };
+        saveTimeout = setTimeout(() => {
+            saveTimeout = null;
+            const run = pendingSave;
+            pendingSave = null;
+            run?.();
         }, 2000);
     }
 );

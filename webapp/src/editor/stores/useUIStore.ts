@@ -24,7 +24,7 @@ export const SettingsPanel = {
 } as const;
 export type SettingsPanel = typeof SettingsPanel[keyof typeof SettingsPanel];
 
-export type SettingsPanelTab = 'screen' | 'effects' | 'background' | 'camera' | 'captions' | 'audio';
+export type SettingsPanelTab = 'screen' | 'effects' | 'motion' | 'background' | 'camera' | 'captions' | 'audio';
 
 export interface UIState {
     canvasMode: CanvasMode;
@@ -90,6 +90,9 @@ export interface UIState {
     // -- Effects Settings
     showCollapsibleEffects: boolean;
     showCollapsibleMouse: boolean;
+    // -- Motion Settings
+    showCollapsibleZoom: boolean;
+    showCollapsibleSpotlight: boolean;
     // -- Background Settings
     showCollapsibleBackground: boolean;
     // -- Screen Settings
@@ -354,6 +357,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     // -- Effects Settings
     showCollapsibleEffects: true,
     showCollapsibleMouse: true,
+    showCollapsibleZoom: true,
+    showCollapsibleSpotlight: true,
     // -- Background Settings
     showCollapsibleBackground: true,
     // -- Screen Settings
@@ -453,6 +458,8 @@ export const useUIStore = create<UIState>((set, get) => ({
             // Collapsible Card Visibility
             showCollapsibleEffects: false,
             showCollapsibleMouse: false,
+            showCollapsibleZoom: true,
+            showCollapsibleSpotlight: true,
             showCollapsibleBackground: true,
             showCollapsibleSize: false,
             showCollapsibleToolbar: false,

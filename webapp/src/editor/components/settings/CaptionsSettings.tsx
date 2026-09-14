@@ -76,6 +76,8 @@ export function CaptionsSettings() {
     const captionSegments = project.timeline.captionSegments;
     const settings = project.settings.captions || { enabled: true, captionSize: 1.0, kFontSizePx: 50, kPaddingXPx: 32, kPaddingYPx: 16, kCornerRadiusPx: 12, width: 75, wordHighlight: true, textColor: '#ffffff', backgroundColor: '#000000cc' };
     const hasMicrophone = !!project.microphoneSource;
+    // Personal Settings defaults template: transcription is per recording; only the style is a default
+    const templateMode = useProjectStore(state => state.templateMode);
 
     // Close selection on click outside (words call stopPropagation so this won't fire for them)
     useEffect(() => {
@@ -416,8 +418,8 @@ export function CaptionsSettings() {
 
     return (
         <div className="space-y-4">
-            {/* A.I. Transcription Card */}
-            {(() => {
+            {/* A.I. Transcription Card — not on the defaults page */}
+            {!templateMode && (() => {
                 const source = settings.transcriptionSource;
 
                 // Disable when the same engine was already used
@@ -600,6 +602,12 @@ export function CaptionsSettings() {
             </CollapsibleCard>
             </div>}
 
+            {templateMode && (
+                <p className="text-label px-1">
+                    Captions are generated per recording in the editor. These style defaults apply when you do.
+                </p>
+            )}
+
             {/* Style Settings Card - only show when captions exist */}
             {captionSegments && captionSegments.length > 0 && <CollapsibleCard
                 title="Style"
@@ -628,7 +636,8 @@ export function CaptionsSettings() {
                     />
 
                     {(() => {
-                        const isOpenAI = settings.transcriptionSource?.engine === 'openai';
+                        // defaults page: the style applies to whatever engine a recording uses later
+                        const isOpenAI = templateMode || settings.transcriptionSource?.engine === 'openai';
                         return (
                             <Toggle
                                 label="Word Highlight"

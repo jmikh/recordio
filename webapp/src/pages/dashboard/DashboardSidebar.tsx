@@ -1,4 +1,4 @@
-import { LuLayoutGrid, LuShare2, LuTrash2, LuPlus, LuSettings, LuUsers, LuUserPlus } from 'react-icons/lu';
+import { LuLayoutGrid, LuShare2, LuTrash2, LuPlus, LuSettings, LuUsers, LuUserPlus, LuUserCog } from 'react-icons/lu';
 import { MdOutlineBugReport } from 'react-icons/md';
 import { Button, ProBadge, LogoLink, SidebarNav, SidebarNavItem } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
@@ -8,7 +8,7 @@ import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
 import type { WorkspaceEntitlementsState } from '@shared/api/entitlements';
 
-export type DashboardView = 'all' | 'workspace' | 'published' | 'trash' | 'settings';
+export type DashboardView = 'all' | 'workspace' | 'published' | 'trash' | 'settings' | 'personal';
 
 interface DashboardSidebarProps {
     activeView: DashboardView;
@@ -155,22 +155,30 @@ export function DashboardSidebar({
                     </SidebarNav>
                 </div>
 
-                {/* Manage — settings entry, admins only (matches the old dropdown gate) */}
-                {currentRole === 'admin' && (
-                    <div className="mt-4">
-                        <span className="text-eyebrow px-4 mb-1 block">
-                            Manage
-                        </span>
-                        <SidebarNav className="mt-1">
+                {/* Manage — workspace settings for admins only (matches the old
+                    dropdown gate); personal settings for everyone
+                    (plans/user-default-project-settings) */}
+                <div className="mt-4">
+                    <span className="text-eyebrow px-4 mb-1 block">
+                        Manage
+                    </span>
+                    <SidebarNav className="mt-1">
+                        {currentRole === 'admin' && (
                             <SidebarNavItem
                                 label="Workspace Settings"
                                 active={activeView === 'settings'}
                                 onClick={() => onViewChange('settings')}
                                 icon={LuSettings}
                             />
-                        </SidebarNav>
-                    </div>
-                )}
+                        )}
+                        <SidebarNavItem
+                            label="Personal Settings"
+                            active={activeView === 'personal'}
+                            onClick={() => onViewChange('personal')}
+                            icon={LuUserCog}
+                        />
+                    </SidebarNav>
+                </div>
 
                 {/* Free plan usage — cap and count come from the server (Step 4) */}
                 {projectCap != null && (

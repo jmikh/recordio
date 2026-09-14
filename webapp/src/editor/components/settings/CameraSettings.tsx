@@ -9,6 +9,9 @@ import { MdAspectRatio } from 'react-icons/md';
 import { RiPaletteLine, RiFocus3Line } from 'react-icons/ri';
 import { TbShape, TbBorderOuter } from 'react-icons/tb';
 import { FaceAnchorModal } from './FaceAnchorModal';
+import { applyCameraShape } from '@shared/utils/cameraShape';
+import { resizeCameraKeepingCorner } from './cameraCorner';
+import { PreviewEffectButton } from './PreviewEffectButton';
 import { useState } from 'react';
 
 export const CameraSettings = () => {
@@ -26,6 +29,10 @@ export const CameraSettings = () => {
 
     const cameraConfig = project.settings.camera;
     const cameraSource = project.cameraSource;
+    // Personal Settings defaults template (plans/user-default-project-settings):
+    // no face anchor (per recording), no crop zoom / mirror; size via a slider
+    // (no canvas drag) and a Preview button for auto-shrink
+    const templateMode = useProjectStore(s => s.templateMode);
 
     if (!cameraConfig) {
         return (
@@ -36,32 +43,11 @@ export const CameraSettings = () => {
     }
 
     const handleShapeChange = (newShape: 'rect' | 'square' | 'circle') => {
-        let newSettings = { ...cameraConfig, shape: newShape };
-
-        // Bake borderRadiusPx based on shape — painter renders purely on radius
-        if (newShape === 'circle') {
-            const size = Math.min(newSettings.widthPx, newSettings.heightPx);
-            newSettings.borderRadiusPx = size / 2;
-        } else {
-            newSettings.borderRadiusPx = 10;
-        }
-
-        if (newShape === 'rect') {
-            if (cameraSource && cameraSource.size.height > 0) {
-                const ratio = cameraSource.size.width / cameraSource.size.height;
-                newSettings.widthPx = newSettings.heightPx * ratio;
-            }
-        } else if (newShape === 'square' || newShape === 'circle') {
-            const size = Math.min(newSettings.widthPx, newSettings.heightPx);
-            newSettings.widthPx = size;
-            newSettings.heightPx = size;
-        }
-
-        const outputSize = project.settings.outputSize;
-        newSettings.xPx = Math.max(0, Math.min(newSettings.xPx, outputSize.width - newSettings.widthPx));
-        newSettings.yPx = Math.max(0, Math.min(newSettings.yPx, outputSize.height - newSettings.heightPx));
-
-        updateSettings({ camera: newSettings });
+        // Radius is baked per shape and the size refit to the source aspect —
+        // shared with the defaults-apply path (shared/utils/cameraShape.ts)
+        updateSettings({
+            camera: applyCameraShape(cameraConfig, newShape, cameraSource?.size, project.settings.outputSize),
+        });
     };
 
     const {
@@ -139,30 +125,53 @@ export const CameraSettings = () => {
                             onChange={(val) => handleShapeChange(val as any)}
                         />
 
-                        {/* Face Tracking Button */}
-                        <div className="flex flex-col gap-1">
-                            <Button
-                                onClick={() => setIsFaceAnchorOpen(true)}
-                                fullWidth
-                            >
-                                <RiFocus3Line />
-                                Center Face
-                            </Button>
-                        </div>
-                        
-                        {/* Crop Zoom - zooms within the camera video feed */}
-                        <Slider
-                            label="Crop Zoom"
-                            min={1}
-                            max={3}
-                            value={cropZoom}
-                            onPointerDown={startInteraction}
-                            onPointerUp={endInteraction}
-                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, cropZoom: val } }))}
-                            showTooltip
-                            units="x"
-                            decimals={1}
-                        />
+                        {/* Face Tracking Button — per recording, not a default */}
+                        {!templateMode && (
+                            <div className="flex flex-col gap-1">
+                                <Button
+                                    onClick={() => setIsFaceAnchorOpen(true)}
+                                    fullWidth
+                                >
+                                    <RiFocus3Line />
+                                    Center Face
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Defaults page: the still preview can't be dragged — a size slider that keeps the corner */}
+                        {templateMode && (
+                            <Slider
+                                label="Size"
+                                min={0.15}
+                                max={0.6}
+                                value={cameraConfig.heightPx / project.settings.outputSize.height}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(fraction) => batchAction(() => updateSettings({
+                                    camera: resizeCameraKeepingCorner(cameraConfig, fraction, cameraSource?.size, project.settings.outputSize),
+                                }))}
+                                showTooltip
+                                units="%"
+                                decimals={0}
+                                valueTransform={(v) => v * 100}
+                            />
+                        )}
+
+                        {/* Crop Zoom - zooms within the camera video feed (per recording, not a default) */}
+                        {!templateMode && (
+                            <Slider
+                                label="Crop Zoom"
+                                min={1}
+                                max={3}
+                                value={cropZoom}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, cropZoom: val } }))}
+                                showTooltip
+                                units="x"
+                                decimals={1}
+                            />
+                        )}
                     </div>
                 </CollapsibleCard>
 
@@ -170,29 +179,36 @@ export const CameraSettings = () => {
                 <CollapsibleCard
                     title="Style"
                     icon={<RiPaletteLine className="icon-md" />}
-                    previewItems={[
-                        ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
-                        ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),
-                        { type: 'text', content: `${cropZoom.toFixed(1)}x` }
-                    ]}
+                    previewItems={templateMode
+                        ? [{ type: 'text', content: autoShrink ? 'Shrink' : 'No shrink' }]
+                        : [
+                            ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
+                            ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),
+                            { type: 'text', content: `${cropZoom.toFixed(1)}x` }
+                        ]}
                     isExpanded={showCollapsibleShape}
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleShape', v)}
                 >
                     <div className="flex flex-col gap-4">
-                        {/* Mirrored Toggle */}
-                        <Toggle
-                            label="Mirror"
-                            value={mirrored}
-                            onChange={(val) => updateSettings({ camera: { ...cameraConfig, mirrored: val } })}
-                        />
+                        {/* Mirrored Toggle (per recording, not a default) */}
+                        {!templateMode && (
+                            <Toggle
+                                label="Mirror"
+                                value={mirrored}
+                                onChange={(val) => updateSettings({ camera: { ...cameraConfig, mirrored: val } })}
+                            />
+                        )}
 
-                        {/* Auto Shrink */}
+                        {/* Auto Shrink (+ Preview on the defaults page) */}
                         <Toggle
                             label="Auto Shrink"
                             value={autoShrink}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, autoShrink: val } })}
                         >
                             <AutoShrinkTooltip />
+                            {templateMode && (
+                                <PreviewEffectButton kind="shrink" label="Preview auto shrink" disabled={!autoShrink} />
+                            )}
                         </Toggle>
 
                         {/* Shrunk Size Slider - Only shown when auto-shrink is enabled */}
@@ -298,10 +314,12 @@ export const CameraSettings = () => {
                 </CollapsibleCard>
             </div>
 
-            <FaceAnchorModal 
-                isOpen={isFaceAnchorOpen} 
-                onClose={() => setIsFaceAnchorOpen(false)} 
-            />
+            {!templateMode && (
+                <FaceAnchorModal
+                    isOpen={isFaceAnchorOpen}
+                    onClose={() => setIsFaceAnchorOpen(false)}
+                />
+            )}
         </div>
     );
 };

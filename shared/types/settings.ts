@@ -115,6 +115,11 @@ export interface BackgroundSettings {
 export interface ZoomSettings {
     /** Whether zoom effects are active. When false, zooms are visually disabled and have no effect. */
     enabled: boolean;
+    /**
+     * Generate zooms from clicks when a recording is first opened. Default true.
+     * Off = no auto zooms; the track stays enabled and manual zooms still work.
+     */
+    autoGenerate?: boolean;
     maxZoom: number;
     /** Duration of zoom transition animations in milliseconds */
     transitionDurationMs: number;
@@ -129,6 +134,11 @@ export interface ZoomSettings {
 export interface SpotlightSettings {
     /** Whether spotlight effects are active. When false, spotlights are visually disabled and have no effect. */
     enabled: boolean;
+    /**
+     * Generate spotlights from hovered cards when a recording is first opened. Default true.
+     * Off = no auto spotlights; the track stays enabled and manual spotlights still work.
+     */
+    autoGenerate?: boolean;
     /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
     dimOpacity: number;
     /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */

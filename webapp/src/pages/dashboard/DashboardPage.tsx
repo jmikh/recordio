@@ -8,6 +8,8 @@ import { ProjectCard } from './ProjectCard';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
 import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
 import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
+import { PersonalSettingsPage } from '../settings/personal/PersonalSettingsPage';
+import { usePersonalDefaultsStore } from '../settings/personal/usePersonalDefaultsStore';
 import { XButton, Modal, Button } from '@shared/components';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 
@@ -28,19 +30,45 @@ import { captureError } from '../../lib/sentry';
 import { navigate } from '../../lib/navigate';
 import { editorPath, viewPath } from '../../lib/videoUrls';
 
-/** `showSettings` renders the workspace settings page in the content area (same sidebar). */
-export function DashboardPage({ showSettings = false }: { showSettings?: boolean }) {
+/**
+ * `settingsPage` renders a settings page in the content area (same sidebar):
+ * 'workspace' = workspace settings, 'personal' = the user's default project
+ * settings (plans/user-default-project-settings).
+ */
+export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | 'personal' }) {
+    const showSettings = settingsPage !== undefined;
     const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeView, setActiveView] = useState<DashboardView>('all');
 
-    const handleViewChange = (view: DashboardView) => {
+    const goToView = (view: DashboardView) => {
         if (view === 'settings') {
             navigate('/workspace/settings');
             return;
         }
+        if (view === 'personal') {
+            navigate('/settings/personal');
+            return;
+        }
         setActiveView(view);
         if (showSettings) navigate('/');
+    };
+
+    // Leaving the personal settings page with unsaved defaults asks first
+    const [pendingView, setPendingView] = useState<DashboardView | null>(null);
+    const handleViewChange = (view: DashboardView) => {
+        if (settingsPage === 'personal' && view !== 'personal' && usePersonalDefaultsStore.getState().isDirty) {
+            setPendingView(view);
+            return;
+        }
+        goToView(view);
+    };
+    const discardAndGo = () => {
+        const view = pendingView;
+        setPendingView(null);
+        if (!view) return;
+        usePersonalDefaultsStore.getState().setDirty(false);
+        goToView(view);
     };
 
     const { userId } = useUserStore();
@@ -386,7 +414,7 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
                 <DashboardSidebar
-                    activeView={showSettings ? 'settings' : activeView}
+                    activeView={settingsPage === 'personal' ? 'personal' : showSettings ? 'settings' : activeView}
                     onViewChange={handleViewChange}
                     projectCount={yourProjects.length}
                     workspaceCount={workspaceProjects.length}
@@ -411,7 +439,27 @@ export function DashboardPage({ showSettings = false }: { showSettings?: boolean
 
                 {/* Main Content */}
                 <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                    {showSettings ? (
+                    {settingsPage === 'personal' ? (
+                        // bounded height: the editor-like card scrolls its own settings column
+                        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden p-6">
+                            <PersonalSettingsPage />
+                            <Modal
+                                isOpen={pendingView !== null}
+                                onClose={() => setPendingView(null)}
+                                maxWidth="max-w-[420px]"
+                                ariaLabel="Discard unsaved defaults"
+                            >
+                                <h2 className="heading-2 mb-2">Discard unsaved defaults?</h2>
+                                <p className="text-sm text-text-main mb-6">
+                                    Your changes to the default settings haven’t been saved.
+                                </p>
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="base" onClick={() => setPendingView(null)}>Keep editing</Button>
+                                    <Button variant="destructive" onClick={discardAndGo}>Discard</Button>
+                                </div>
+                            </Modal>
+                        </main>
+                    ) : showSettings ? (
                         <main className="flex-1 overflow-y-auto p-8">
                             <WorkspaceSettingsPage />
                         </main>

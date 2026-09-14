@@ -10,6 +10,7 @@ import type { MouseClickEffectType, MouseSettings, KeyboardSettings } from '@sha
 import { TbPlayerPlay } from 'react-icons/tb';
 import { MdOutlineKeyboardCommandKey, MdAdsClick } from 'react-icons/md';
 import { previewClickSound } from '../../audio/clickSoundPlayer';
+import { PreviewEffectButton } from './PreviewEffectButton';
 
 // Click effect toggle options
 const CLICK_EFFECT_OPTIONS: { value: MouseClickEffectType; label: string; icon?: React.ReactNode }[] = [
@@ -43,7 +44,7 @@ export const EffectsSettings = () => {
     const updateSettings = useProjectStore(s => s.updateSettings);
     const mouseSettings = useProjectStore(s => s.project.settings.mouse) ?? {
         mouseClickEnabled: true,
-        mouseDragEnabled: true,
+        mouseDragEnabled: false,
         effectType: 'ring' as MouseClickEffectType,
         color: '#667eea',
         size: 1.0,
@@ -63,7 +64,8 @@ export const EffectsSettings = () => {
         kCornerRadiusPx: 16,
     };
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
+    // Personal Settings defaults template: no timeline, so effects get a Preview button
+    const templateMode = useProjectStore(s => s.templateMode);
 
     // Collapsible visibility state
     const showCollapsibleEffects = useUIStore(s => s.showCollapsibleEffects);
@@ -136,22 +138,19 @@ export const EffectsSettings = () => {
                         </div>
                     )}
 
-                    {/* Click Effect Toggle */}
+                    {/* Click Effect Toggle (+ Preview on the defaults page) */}
                     <Toggle
                         label="Click Effect"
                         value={mouseSettings.mouseClickEnabled}
                         onChange={(val) => handleMouseChange({ mouseClickEnabled: val })}
-                    />
+                    >
+                        {templateMode && (
+                            <PreviewEffectButton kind="click" label="Preview click effect" disabled={!mouseSettings.mouseClickEnabled} />
+                        )}
+                    </Toggle>
 
-                    {/* Drag Effect Toggle */}
-                    <Toggle
-                        label="Drag Effect"
-                        value={mouseSettings.mouseDragEnabled}
-                        onChange={(val) => handleMouseChange({ mouseDragEnabled: val })}
-                    />
-
-                    {/* Shared Effect Sub-Settings (visible when either click or drag is enabled) */}
-                    {(mouseSettings.mouseClickEnabled || mouseSettings.mouseDragEnabled) && (
+                    {/* Effect Sub-Settings (visible when the click effect is enabled) */}
+                    {mouseSettings.mouseClickEnabled && (
                         <div className="flex flex-col gap-4 pl-1">
                             {/* Effect Type */}
                             <MultiToggle
@@ -208,6 +207,9 @@ export const EffectsSettings = () => {
                         <div className="flex items-center gap-1.5">
                             <label className="text-label">Hotkeys Enabled</label>
                             <HotkeyTooltip />
+                            {templateMode && (
+                                <PreviewEffectButton kind="keyboard" label="Preview keyboard hotkeys" disabled={!(keyboardSettings.showHotkeys ?? true)} />
+                            )}
                         </div>
                         <Toggle
                             value={keyboardSettings.showHotkeys ?? true}

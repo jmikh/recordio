@@ -81,7 +81,13 @@ export function App() {
         // Settings renders inside the dashboard layout; legacy tab paths
         // (/workspace/settings/members|billing) deep-link to a section.
         if (path.startsWith('/workspace/settings')) {
-            return <DashboardPage showSettings />;
+            return <DashboardPage settingsPage="workspace" />;
+        }
+
+        // Personal (per-user) settings — defaults for new projects
+        // (plans/user-default-project-settings); same dashboard layout.
+        if (path.startsWith('/settings/personal')) {
+            return <DashboardPage settingsPage="personal" />;
         }
 
         if (path === '/import' || path.startsWith('/import')) {

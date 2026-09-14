@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
-import type { ID, ZoomSegment } from '@shared/types';
+import type { ID, ZoomSegment, ZoomSettings } from '@shared/types';
 import { recomputeOutputTimes } from '@shared/mappers/timeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
 import { calculateAutoZooms, getAllFocusAreas } from '../../zoom';
@@ -14,6 +14,12 @@ export interface ZoomSegmentSlice {
     clearZoomSegments: () => void;
     resetZooms: () => void;
     toggleZoomEnabled: () => void;
+    /**
+     * Motion settings / inspector "apply to all": one undo step that merges
+     * the look into settings.zoom (new zooms inherit it) and stamps it on
+     * every existing zoom segment.
+     */
+    applyZoomSettingsToAll: (updates: Partial<Pick<ZoomSettings, 'transitionDurationMs' | 'easing'>>) => void;
 }
 
 export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], ZoomSegmentSlice> = (set, _get, store) => ({
@@ -139,6 +145,22 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                 }
             };
         });
+    },
+
+    applyZoomSettingsToAll: (updates) => {
+        set(state => ({
+            project: {
+                ...state.project,
+                settings: {
+                    ...state.project.settings,
+                    zoom: { ...state.project.settings.zoom, ...updates },
+                },
+                timeline: {
+                    ...state.project.timeline,
+                    zoomSegments: state.project.timeline.zoomSegments.map(z => ({ ...z, ...updates })),
+                },
+            },
+        }));
     },
 
     toggleZoomEnabled: () => {

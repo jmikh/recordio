@@ -7,7 +7,8 @@
 │     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(), │
 │     "default_workspace_id" UUID,                         │
 │     "reviewed_at" TIMESTAMP WITH TIME ZONE,              │
-│     "welcome_email_sent_at" TIMESTAMP WITH TIME ZONE     │
+│     "welcome_email_sent_at" TIMESTAMP WITH TIME ZONE,    │
+│     "project_defaults" JSONB                             │
 │ );                                                       │
 └──────────────────────────────────────────────────────────┘
 │    rls_info     │

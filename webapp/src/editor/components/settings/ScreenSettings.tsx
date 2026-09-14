@@ -17,6 +17,8 @@ export const ScreenSettings = () => {
     const setCanvasMode = useUIStore(s => s.setCanvasMode);
     const canvasMode = useUIStore(s => s.canvasMode);
     const isEditingCrop = canvasMode === CanvasMode.CropEdit;
+    // Personal Settings defaults template: crop is per recording (plans/user-default-project-settings)
+    const templateMode = useProjectStore(s => s.templateMode);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
 
     // Collapsible visibility state
@@ -288,14 +290,16 @@ export const ScreenSettings = () => {
                         decimals={0}
                     />
 
-                    {/* Crop Screen Button */}
-                    <button
-                        onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
-                        className={`interactive-base flex items-center justify-center gap-2 w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
-                    >
-                        {isEditingCrop ? <LuCheck /> : <IoCropSharp className="w-4 h-4" />}
-                        {isEditingCrop ? 'Done' : 'Crop Screen'}
-                    </button>
+                    {/* Crop Screen Button — not a default (per recording) */}
+                    {!templateMode && (
+                        <button
+                            onClick={() => setCanvasMode(isEditingCrop ? CanvasMode.Preview : CanvasMode.CropEdit)}
+                            className={`interactive-base flex items-center justify-center gap-2 w-full ${isEditingCrop ? 'interactive-selected' : ''}`}
+                        >
+                            {isEditingCrop ? <LuCheck /> : <IoCropSharp className="w-4 h-4" />}
+                            {isEditingCrop ? 'Done' : 'Crop Screen'}
+                        </button>
+                    )}
 
                 </div>
             </CollapsibleCard>

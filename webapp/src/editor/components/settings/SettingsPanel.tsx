@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ScreenSettings } from './ScreenSettings';
 import { EffectsSettings } from './EffectsSettings';
+import { MotionSettings } from './MotionSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
@@ -20,9 +21,8 @@ import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
 import { OverlayInspector } from './OverlayInspector';
-import { TbDeviceDesktop, TbBackground, TbArticle, TbMusic, TbClick } from 'react-icons/tb';
-import { PiWebcamBold } from 'react-icons/pi';
 import { LuChevronRight } from 'react-icons/lu';
+import { SETTINGS_NAV_ITEMS } from './settingsNavItems';
 
 
 
@@ -83,29 +83,10 @@ export const SettingsPanel = () => {
     };
 
     const navItems = useMemo(() => {
-        const items: { id: SettingsPanelTab; label: string; icon: React.ComponentType<{ className?: string }>; disabled?: boolean; disabledTooltip?: string }[] = [
-
-            { id: 'background', label: 'Background', icon: TbBackground },
-            { id: 'screen', label: 'Screen', icon: TbDeviceDesktop },
-            { id: 'effects', label: 'Effects', icon: TbClick },
-            {
-                id: 'camera',
-                label: 'Camera',
-                icon: PiWebcamBold,
-                disabled: !hasCameraSource,
-                disabledTooltip: 'No camera detected'
-            },
-            {
-                id: 'captions',
-                label: 'Captions',
-                icon: TbArticle,
-            },
-            {
-                id: 'audio',
-                label: 'Audio',
-                icon: TbMusic,
-            },
-        ];
+        const items: { id: SettingsPanelTab; label: string; icon: React.ComponentType<{ className?: string }>; disabled?: boolean; disabledTooltip?: string }[] =
+            SETTINGS_NAV_ITEMS.map(item => item.id === 'camera'
+                ? { ...item, disabled: !hasCameraSource, disabledTooltip: 'No camera detected' }
+                : item);
         return items;
     }, [hasCameraSource, hasMicrophone]);
 
@@ -213,6 +194,7 @@ export const SettingsPanel = () => {
                             {activeTab === 'screen' && <ScreenSettings />}
                             {activeTab === 'camera' && <CameraSettings />}
                             {activeTab === 'effects' && <EffectsSettings />}
+                            {activeTab === 'motion' && <MotionSettings />}
                             {activeTab === 'captions' && <CaptionsSettings />}
                             {activeTab === 'audio' && <AudioSettingsPanel />}
                         </>

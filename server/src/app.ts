@@ -48,6 +48,9 @@ import { workspaceMemberRemoveRoutes } from './routes/workspaces/workspaceMember
 import { workspaceMemberUpdateRoleRoutes } from './routes/workspaces/workspaceMemberUpdateRole.js';
 import { userProfileGetRoutes } from './routes/userProfileGet.js';
 import { userReviewSetRoutes } from './routes/userReviewSet.js';
+import { userProjectDefaultsGetRoutes } from './routes/userProjectDefaultsGet.js';
+import { userProjectDefaultsSetRoutes } from './routes/userProjectDefaultsSet.js';
+import { userProjectDefaultsClearRoutes } from './routes/userProjectDefaultsClear.js';
 import { workspaceGetDefaultRoutes } from './routes/workspaces/workspaceGetDefault.js';
 import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
 import { trialExtendRoutes } from './routes/billing/trialExtend.js';
@@ -215,6 +218,11 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(workspaceMemberUpdateRoleRoutes);
     app.register(userProfileGetRoutes);
     app.register(userReviewSetRoutes);
+
+    // Personal default project settings (plans/user-default-project-settings)
+    app.register(userProjectDefaultsGetRoutes);
+    app.register(userProjectDefaultsSetRoutes);
+    app.register(userProjectDefaultsClearRoutes);
     app.register(workspaceGetDefaultRoutes);
     app.register(subscriptionGetRoutes);
 

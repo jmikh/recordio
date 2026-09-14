@@ -101,6 +101,16 @@ export function migrateProject(raw: any): any {
         raw.autoEffectsGenerated = true;
     }
 
+    // v6 → v7: the drag effect is retired from the UI, so force it off — a
+    // project saved with it on would keep drawing drags nobody can disable.
+    // Auto-generation gets its own flag (zoom/spotlight.autoGenerate); the
+    // existing `enabled` flags stay the timeline track toggles.
+    if (version < 7) {
+        if (raw.settings?.mouse) raw.settings.mouse.mouseDragEnabled = false;
+        if (raw.settings?.zoom && raw.settings.zoom.autoGenerate === undefined) raw.settings.zoom.autoGenerate = true;
+        if (raw.settings?.spotlight && raw.settings.spotlight.autoGenerate === undefined) raw.settings.spotlight.autoGenerate = true;
+    }
+
     // Backfill displaySettings if missing (pre-displaySettings projects)
     if (raw.timeline && !raw.timeline.displaySettings) {
         raw.timeline.displaySettings = {

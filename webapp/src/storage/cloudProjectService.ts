@@ -9,6 +9,8 @@ import { useSyncStatusStore } from './syncStatusStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
 import { migrateProject } from '../core/migrateProject';
 import { ProjectImpl } from '../core/Project';
+import { adaptDefaultsToSources } from '../core/projectDefaults';
+import type { ProjectSettings } from '@shared/types/settings';
 import { cloudStoragePath, hydrateMediaUrls } from './projectBlobs';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -136,6 +138,7 @@ export class CloudProjectService {
         workspaceId: string,
         cameraBlob?: Blob,
         micBlob?: Blob,
+        opts: { defaultSettings?: ProjectSettings } = {},
     ): Promise<{ project: Project; name: string; slug: string; bucket: string; uploads: { fileType: string; storagePath: string }[] }> {
         const projectId = recording.id;
 
@@ -147,9 +150,15 @@ export class CloudProjectService {
             ? { ...recording.microphoneSource, storagePath: '' }
             : undefined;
 
+        // Personal defaults (plans/user-default-project-settings): already
+        // resolved onto the factory by the caller; fitted here to the real
+        // camera's aspect. Absent → the shipped factory defaults.
+        const settings = opts.defaultSettings
+            ? adaptDefaultsToSources(opts.defaultSettings, cameraSource)
+            : undefined;
         const project = ProjectImpl.createFromSource(
             projectId, screenSource, recording.userEvents,
-            cameraSource, microphoneSource,
+            cameraSource, microphoneSource, settings,
         );
 
         let name = recording.name || 'New Project';

@@ -2,10 +2,10 @@ import { type Project, type ScreenMetadata, type CameraMetadata, type Microphone
 import { scaleProject } from '@shared/utils/projectScale';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 // Default display settings for tracks — single source of truth
-const DEFAULT_DISPLAY_SETTINGS = {
+export const DEFAULT_DISPLAY_SETTINGS = {
     showZoom: true,
     showSpotlight: true,
     showCameraMove: true,
@@ -14,7 +14,7 @@ const DEFAULT_DISPLAY_SETTINGS = {
 };
 
 // Empty events constant
-const EMPTY_USER_EVENTS: UserEvents = {
+export const EMPTY_USER_EVENTS: UserEvents = {
     mouseClicks: [],
     mousePositions: [],
     keyboardEvents: [],
@@ -26,7 +26,7 @@ const EMPTY_USER_EVENTS: UserEvents = {
 };
 
 // Create a placeholder source for empty projects
-const createPlaceholderSource = (): ScreenMetadata => ({
+export const createPlaceholderSource = (): ScreenMetadata => ({
     storagePath: '',
     durationMs: 0,
     size: { width: 1920, height: 1080 },
@@ -34,14 +34,18 @@ const createPlaceholderSource = (): ScreenMetadata => ({
 });
 
 /**
- * Default settings factory
+ * Default settings factory — the shipped defaults. Used directly when a
+ * user has no personal defaults (user_profiles.project_defaults IS NULL)
+ * and as the base every stored personal default is merged onto
+ * (webapp/src/core/projectDefaults.ts).
  */
-const createDefaultSettings = (): ProjectSettings => ({
+export const createDefaultSettings = (): ProjectSettings => ({
     outputSize: { width: 1920, height: 1080 },
     frameRate: 60,
 
     zoom: {
         enabled: true,
+        autoGenerate: true,
         maxZoom: 2,
         transitionDurationMs: 750,
         easing: 'ease-in-out'
@@ -49,6 +53,7 @@ const createDefaultSettings = (): ProjectSettings => ({
 
     spotlight: {
         enabled: true,
+        autoGenerate: true,
         dimOpacity: 0.5,
         enlargeScale: 1.25,
         transitionDurationMs: 750,
@@ -59,7 +64,7 @@ const createDefaultSettings = (): ProjectSettings => ({
 
     mouse: {
         mouseClickEnabled: true,
-        mouseDragEnabled: true,
+        mouseDragEnabled: false,
         effectType: 'ring',
         color: '#8b5cf6',
         size: 1.0,
@@ -164,7 +169,7 @@ const createDefaultSettings = (): ProjectSettings => ({
 /**
  * Default timeline factory
  */
-const createDefaultTimeline = (): Timeline => ({
+export const createDefaultTimeline = (): Timeline => ({
     id: crypto.randomUUID(),
     durationMs: 0,
     zoomSegments: [],
@@ -203,15 +208,18 @@ export class ProjectImpl {
      * Takes a mandatory screen source, events, and an optional camera source.
      * 
      * Sources and events are embedded directly in the project.
+     *
+     * `settings` defaults to the shipped factory; the import flow passes the
+     * user's resolved personal defaults instead (plans/user-default-project-settings).
      */
     static createFromSource(
         projectId: ID,
         screenSource: ScreenMetadata,
         userEvents: UserEvents,
         cameraSource?: CameraMetadata,
-        microphoneSource?: MicrophoneMetadata
+        microphoneSource?: MicrophoneMetadata,
+        settings: ProjectSettings = createDefaultSettings(),
     ): Project {
-        const settings = createDefaultSettings();
 
         // Use Screen Recording Duration as the Project Duration
         const durationMs = screenSource.durationMs;
