@@ -87,6 +87,107 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
     return { id, slug, name, ownerId };
 }
 
+export interface SeededScreenshot {
+    id: string;
+    slug: string;
+    name: string;
+    ownerId: string;
+    workspaceId: string;
+}
+
+export interface SeedScreenshotOptions {
+    ownerId?: string;
+    /** Defaults to ownerId (the storage prefix owner) */
+    createdBy?: string;
+    name?: string;
+    slug?: string;
+    /** Table default is 'private' — the opposite of seedProject's 'public' default */
+    sharePolicy?: 'private' | 'workspace' | 'public';
+    workspaceAccess?: 'view' | 'edit';
+    deletedAt?: string | null;
+    screenshotData?: unknown;
+    /** Defaults to the owner's seeded personal workspace */
+    workspaceId?: string;
+    /** Defaults to 'ready' (what screenshot-list returns); pass 'pending' for upload-flow cases */
+    uploadStatus?: 'pending' | 'ready';
+    permanentlyDeleted?: boolean;
+    cloudVersion?: number;
+    updatedAt?: string;
+    widthPx?: number;
+    heightPx?: number;
+    captureMode?: 'visible' | 'fullPage' | 'region';
+    sourceStoragePath?: string;
+    thumbnailStoragePath?: string | null;
+    renderStoragePath?: string | null;
+    renderCloudVersion?: number | null;
+    pageUrl?: string | null;
+    pageTitle?: string | null;
+}
+
+/** Screenshots are their own entity (plans/screenshots) — no cascade from projects. */
+export async function seedScreenshot(db: Db, opts: SeedScreenshotOptions = {}): Promise<SeededScreenshot> {
+    const id = randomUUID();
+    const ownerId = opts.ownerId ?? SEEDED_USER_ID;
+    const createdBy = opts.createdBy ?? ownerId;
+    const slug = opts.slug ?? `shot-${randomUUID()}`;
+    const name = opts.name ?? 'Test screenshot';
+
+    let workspaceId = opts.workspaceId;
+    if (!workspaceId) {
+        const { rows } = await db.query(
+            'SELECT id FROM workspaces WHERE owner_id = $1 LIMIT 1',
+            [ownerId],
+        );
+        workspaceId = (rows[0] as { id: string } | undefined)?.id;
+        if (!workspaceId) throw new Error(`No seeded workspace for owner ${ownerId}`);
+    }
+
+    await db.query(
+        `INSERT INTO screenshots
+            (id, created_by, owner_id, workspace_id, name, screenshot_data,
+             source_storage_path, width_px, height_px, capture_mode, page_url, page_title,
+             thumbnail_storage_path, slug, share_policy, workspace_access, deleted_at,
+             upload_status, permanently_deleted, cloud_version, updated_at,
+             render_storage_path, render_cloud_version)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb,
+                 $7, $8, $9, $10, $11, $12,
+                 $13, $14, $15, $16, $17,
+                 $18, $19, $20, COALESCE($21::timestamptz, now()),
+                 $22, $23)`,
+        [
+            id,
+            createdBy,
+            ownerId,
+            workspaceId,
+            name,
+            JSON.stringify(opts.screenshotData ?? {}),
+            opts.sourceStoragePath ?? `${createdBy}/screenshots/${id}/source.png`,
+            opts.widthPx ?? 1280,
+            opts.heightPx ?? 720,
+            opts.captureMode ?? 'visible',
+            opts.pageUrl ?? null,
+            opts.pageTitle ?? null,
+            opts.thumbnailStoragePath ?? null,
+            slug,
+            opts.sharePolicy ?? 'private',
+            opts.workspaceAccess ?? 'view',
+            opts.deletedAt ?? null,
+            opts.uploadStatus ?? 'ready',
+            opts.permanentlyDeleted ?? false,
+            opts.cloudVersion ?? 1,
+            opts.updatedAt ?? null,
+            opts.renderStoragePath ?? null,
+            opts.renderCloudVersion ?? null,
+        ],
+    );
+    return { id, slug, name, ownerId, workspaceId };
+}
+
+export async function deleteScreenshots(db: Db, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.query('DELETE FROM screenshots WHERE id = ANY($1::uuid[])', [ids]);
+}
+
 export interface SeedMuxVideoOptions {
     projectId: string;
     cloudVersion: number;

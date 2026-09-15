@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Button, Dropdown, Tooltip, type DropdownOption } from '@shared/components';
-import { LuGlobe, LuLink, LuLock, LuUsers } from 'react-icons/lu';
+import { LuLink } from 'react-icons/lu';
 import type { AccessRole, SharePolicy, WorkspaceMemberRow } from '@shared/api';
 import { invokeFunction } from '../api/client';
 import { useProjectMetaStore } from './useProjectMetaStore';
@@ -11,25 +11,7 @@ import { useToast } from '../components/Toast';
 import { captureError } from '../lib/sentry';
 import { videoUrl } from '../lib/videoUrls';
 import { trackPublishClicked, trackPublishFailed } from '../analytics';
-
-const POLICY_OPTIONS: DropdownOption<SharePolicy>[] = [
-    { value: 'private', label: 'Private (only me)', icon: <LuLock className="icon-sm" /> },
-    { value: 'workspace', label: 'Everyone in workspace', icon: <LuUsers className="icon-sm" /> },
-    { value: 'public', label: 'Anyone with the link', icon: <LuGlobe className="icon-sm" /> },
-];
-
-const ACCESS_OPTIONS: DropdownOption<AccessRole>[] = [
-    { value: 'view', label: 'Can view' },
-    { value: 'edit', label: 'Can edit' },
-];
-
-function Avatar({ name }: { name: string }) {
-    return (
-        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold shrink-0">
-            {name.slice(0, 2).toUpperCase()}
-        </div>
-    );
-}
+import { Avatar, OwnerOnlyNote, ShareCreatorRow, SharePolicyControls } from './SharePolicyControls';
 
 interface ShareModalProps {
     isOpen: boolean;
@@ -178,12 +160,6 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
         { value: 'remove', label: 'Remove', destructive: true },
     ];
 
-    const policySubtitle = meta.sharePolicy === 'public'
-        ? 'Published to web — anyone with the link can view'
-        : meta.sharePolicy === 'workspace'
-            ? `Workspace members can ${meta.workspaceAccess === 'edit' ? 'edit' : 'view'}`
-            : 'Only you and people added below can open it';
-
     return (
         <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[480px]" ariaLabel="Share project">
             <div className="flex flex-col gap-4">
@@ -222,56 +198,16 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                 <div className="flex flex-col gap-1">
                     <span className="text-sm text-text-highlighted">Who has access</span>
 
-                    {/* Visibility */}
-                    <div className="flex items-center gap-3 py-1.5">
-                        <div className="w-8 h-8 rounded-full bg-state-inactive flex items-center justify-center text-text-muted shrink-0">
-                            {meta.sharePolicy === 'public'
-                                ? <LuGlobe className="icon-md" />
-                                : meta.sharePolicy === 'workspace'
-                                    ? <LuUsers className="icon-md" />
-                                    : <LuLock className="icon-md" />}
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                            <Dropdown
-                                options={POLICY_OPTIONS}
-                                value={meta.sharePolicy}
-                                onChange={p => void applyShareSettings(p, meta.workspaceAccess)}
-                                ariaLabel="Visibility"
-                                disabled={!isOwner}
-                            />
-                            <p className="text-label">{policySubtitle}</p>
-                        </div>
-                    </div>
-
-                    {/* Workspace access level */}
-                    {meta.sharePolicy !== 'private' && (
-                        <div className="flex items-center gap-3 py-1.5">
-                            <div className="w-8 h-8 rounded-full bg-state-inactive flex items-center justify-center text-text-muted shrink-0">
-                                <LuUsers className="icon-md" />
-                            </div>
-                            <p className="flex-1 min-w-0 text-sm text-text-main truncate">Everyone in workspace</p>
-                            <Dropdown
-                                options={ACCESS_OPTIONS}
-                                value={meta.workspaceAccess}
-                                onChange={a => void applyShareSettings(meta.sharePolicy, a)}
-                                fullWidth={false}
-                                ariaLabel="Workspace access"
-                                disabled={!isOwner}
-                            />
-                        </div>
-                    )}
+                    <SharePolicyControls
+                        sharePolicy={meta.sharePolicy}
+                        workspaceAccess={meta.workspaceAccess}
+                        isOwner={isOwner}
+                        onChange={(p, a) => void applyShareSettings(p, a)}
+                        privateSubtitle="Only you and people added below can open it"
+                    />
 
                     {/* Creator */}
-                    <div className="flex items-center gap-3 py-1.5">
-                        <Avatar name={meta.ownerName ?? meta.ownerEmail} />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm text-text-main truncate">
-                                {meta.ownerName ?? meta.ownerEmail}{isOwner ? ' (you)' : ''}
-                            </p>
-                            <p className="text-label truncate">{meta.ownerEmail}</p>
-                        </div>
-                        <span className="text-xs text-text-muted">Creator</span>
-                    </div>
+                    <ShareCreatorRow name={meta.ownerName} email={meta.ownerEmail} isViewer={isOwner} />
 
                     {/* Individual grants */}
                     {meta.editors.map(e => (
@@ -296,9 +232,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
                         </div>
                     ))}
 
-                    {!isOwner && (
-                        <p className="text-label">Only the owner can change share settings.</p>
-                    )}
+                    {!isOwner && <OwnerOnlyNote />}
                 </div>
 
                 <Button variant="primary" fullWidth icon={LuLink} onClick={() => void handleCopyLink()}>

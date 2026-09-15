@@ -15,8 +15,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { BRIDGE_MSG, PORT_MSG, HANDOFF_PORT_NAME } from '../../shared/types/bridge';
-import type { RawRecording } from '../../shared/types';
+import type { RawRecording, RawScreenshot } from '../../shared/types';
 import { EMPTY_USER_EVENTS, SCREEN_DURATION_MS, SCREEN_SIZE } from './project';
+import { SCREENSHOT_PNG, SCREENSHOT_SIZE } from './screenshot';
 
 const SCREEN_WEBM = path.join(import.meta.dirname, 'assets/screen.webm');
 
@@ -25,11 +26,17 @@ const SCREEN_WEBM = path.join(import.meta.dirname, 'assets/screen.webm');
 const MOCK_CHUNK_SIZE = 16 * 1024;
 
 export interface ExtensionMockOptions {
-    /** The recording the fake extension holds. Its id becomes the project id. */
+    /** The recording (or screenshot) the fake extension holds. Its id becomes the project/screenshot id. */
     recordingId: string;
     name?: string;
     /** Reply to HANDOFF_REQUEST with this error instead of metadata. */
     failWith?: { error: string; code: 'NOT_FOUND' | 'STORAGE_ERROR' | 'UNKNOWN' };
+    /**
+     * Hand off a screenshot (plans/screenshots) instead of a recording: the
+     * metadata reply carries `kind: 'screenshot'` and the port streams the
+     * fixture PNG as `'image'` chunks.
+     */
+    kind?: 'recording' | 'screenshot';
 }
 
 /** Shape of entries in window.__extMockCalls. */
@@ -53,10 +60,27 @@ export async function installExtensionMock(page: Page, options: ExtensionMockOpt
         userEvents: EMPTY_USER_EVENTS,
     };
 
-    const screenB64 = readFileSync(SCREEN_WEBM).toString('base64');
+    const isScreenshot = options.kind === 'screenshot';
+    const screenshot: RawScreenshot = {
+        kind: 'screenshot',
+        id: options.recordingId,
+        name: options.name ?? 'e2e import screenshot',
+        timestamp: Date.now(),
+        captureMode: 'visible',
+        image: { storagePath: `recordio-blob://shot-${options.recordingId}-image`, mimeType: 'image/png', size: SCREENSHOT_SIZE },
+        page: {
+            url: 'https://example.com/e2e',
+            title: options.name ?? 'e2e import screenshot',
+            viewport: SCREENSHOT_SIZE,
+            devicePixelRatio: 1,
+            scale: 1,
+        },
+    };
+
+    const screenB64 = readFileSync(isScreenshot ? SCREENSHOT_PNG : SCREEN_WEBM).toString('base64');
 
     await page.addInitScript(
-        ({ screenB64, recording, failWith, chunkSize, portName, BRIDGE_MSG, PORT_MSG }) => {
+        ({ screenB64, recording, screenshot, isScreenshot, failWith, chunkSize, portName, BRIDGE_MSG, PORT_MSG }) => {
             const bin = atob(screenB64);
             const bytes = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -83,6 +107,17 @@ export async function installExtensionMock(page: Page, options: ExtensionMockOpt
                         respond({ success: false, error: 'Recording not found', code: 'NOT_FOUND' });
                         return;
                     }
+                    if (isScreenshot) {
+                        respond({
+                            success: true,
+                            kind: 'screenshot',
+                            screenshot,
+                            imageSize: bytes.length,
+                            imageType: 'image/png',
+                            extensionDistinctId: 'e2e-mock-distinct-id',
+                        });
+                        return;
+                    }
                     respond({
                         success: true,
                         recording,
@@ -106,7 +141,7 @@ export async function installExtensionMock(page: Page, options: ExtensionMockOpt
                                 const total = Math.max(1, Math.ceil(bytes.length / chunkSize));
                                 for (let i = 0; i < total; i++) {
                                     const data = Array.from(bytes.subarray(i * chunkSize, (i + 1) * chunkSize));
-                                    emit({ type: PORT_MSG.CHUNK, payload: { source: 'screen', index: i, total, data } });
+                                    emit({ type: PORT_MSG.CHUNK, payload: { source: isScreenshot ? 'image' : 'screen', index: i, total, data } });
                                 }
                                 emit({ type: PORT_MSG.STREAM_COMPLETE, payload: { recordingId: recording.id } });
                             });
@@ -120,6 +155,8 @@ export async function installExtensionMock(page: Page, options: ExtensionMockOpt
         {
             screenB64,
             recording,
+            screenshot,
+            isScreenshot,
             failWith: options.failWith ?? null,
             chunkSize: MOCK_CHUNK_SIZE,
             portName: HANDOFF_PORT_NAME,

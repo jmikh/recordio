@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
+import { ScreenshotEditorPage } from './pages/ScreenshotEditorPage';
+import { ScreenshotViewPage } from './pages/ScreenshotViewPage';
+import { SCREENSHOT_EDIT_PATH } from './lib/screenshotUrls';
 import { ImportPage } from './pages/import/ImportPage';
 import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
@@ -35,6 +38,9 @@ const VIDEO_EDIT_PATH = /^\/video\/[^/]+\/edit\/?$/;
  */
 function isGatedRoute(path: string) {
     if (path.startsWith('/video/')) return false;
+    // Screenshots (plans/screenshots): the editor prompts for auth itself,
+    // the view page is public
+    if (path.startsWith('/screenshot/')) return false;
     if (path.startsWith('/editor')) return false;
     if (path.startsWith('/import')) return false;
     return path !== '/uninstall' && path !== '/accept-invite';
@@ -106,6 +112,15 @@ export function App() {
 
         if (path.startsWith('/video/')) {
             return <VideoPage />;
+        }
+
+        // /screenshot/{slug}/edit (editor) and /screenshot/{slug} (public view)
+        if (SCREENSHOT_EDIT_PATH.test(path)) {
+            return <ScreenshotEditorPage />;
+        }
+
+        if (path.startsWith('/screenshot/')) {
+            return <ScreenshotViewPage />;
         }
 
         // Default to dashboard

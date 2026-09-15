@@ -18,6 +18,7 @@ import { projectsPurgeDeleted, PROJECTS_PURGE_BATCH_LIMIT } from './projectsPurg
 import { muxVideosPurgeSuperseded, MUX_PURGE_BATCH_LIMIT } from './muxVideosPurgeSuperseded.js';
 import { renderJobsPurgeSuperseded, RENDER_PURGE_BATCH_LIMIT } from './renderJobsPurgeSuperseded.js';
 import { userProfilesSendWelcome, WELCOME_SEND_BATCH_LIMIT } from './userProfilesSendWelcome.js';
+import { screenshotsPurgeDeleted, SCREENSHOTS_PURGE_BATCH_LIMIT } from './screenshotsPurgeDeleted.js';
 
 export interface JobDefinition {
     name: string;
@@ -43,6 +44,18 @@ export const jobs: JobDefinition[] = [
                 itemsProcessed: r.processed,
                 itemsFailed: r.failed,
                 batchFull: r.processed >= PROJECTS_PURGE_BATCH_LIMIT,
+            };
+        },
+    },
+    {
+        name: 'screenshots.purge-deleted',
+        period: 'daily',
+        async run(deps, log) {
+            const r = await screenshotsPurgeDeleted(deps, log);
+            return {
+                itemsProcessed: r.processed,
+                itemsFailed: r.failed,
+                batchFull: r.processed >= SCREENSHOTS_PURGE_BATCH_LIMIT,
             };
         },
     },

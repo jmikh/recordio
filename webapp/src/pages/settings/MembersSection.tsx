@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LuLoader, LuMail, LuMailX, LuX } from 'react-icons/lu';
+import { LuCircleAlert, LuInfo, LuLoader, LuMail, LuMailX, LuX } from 'react-icons/lu';
 import { Button, Dropdown, Modal } from '@shared/components';
 import { apiErrorMessage, invokeFunction } from '../../api/client';
 import { useToast } from '../../components/Toast';
@@ -188,8 +188,11 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     const reservedSeats  = details.invitations.filter(i => i.role !== 'viewer').length;
     const availableSeats = Math.max(0, purchasedSeats - usedSeats - reservedSeats);
     const noSeatLeft     = availableSeats === 0;
-    // With every seat taken, the creator option is disabled — fall back to viewer
-    const effectiveInviteRole: 'viewer' | 'creator' = noSeatLeft && inviteRole === 'creator' ? 'viewer' : inviteRole;
+    // Seats are gone and they still want a creator. Earlier this quietly
+    // rewrote the role to viewer and sent it anyway, so an admin could invite
+    // someone as a viewer while believing they'd invited a creator. The choice
+    // now stands and the send is refused until THEY change it.
+    const seatBlocked = noSeatLeft && inviteRole === 'creator';
 
     // Addresses the workspace already knows: a member can't be invited at all,
     // and a pending invitation is REPLACED by the server (delete + reinsert),
@@ -199,18 +202,22 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
     const existingMember = typedEmail ? details.members.find(m => m.email.toLowerCase() === typedEmail) : undefined;
     const existingInvite = typedEmail ? details.invitations.find(i => i.email.toLowerCase() === typedEmail) : undefined;
     // A pending invite for a DIFFERENT role is still worth sending — it swaps the role
-    const duplicateInvite = existingInvite?.role === effectiveInviteRole;
-    const inviteBlocked   = Boolean(existingMember) || duplicateInvite;
+    const duplicateInvite = existingInvite?.role === inviteRole;
+    // Flagged on the address field only when the ADDRESS is the problem —
+    // a seat shortage is about the role, so it must not redden the email
+    const emailBlocked  = Boolean(existingMember) || duplicateInvite;
+    const inviteBlocked = emailBlocked || seatBlocked;
 
     // Only say what the seat bar above can't — a routine invite needs no hint
     const inviteHint =
         existingMember  ? `${existingMember.email} is already a member of this workspace.`
-      : duplicateInvite ? `${typedEmail} already has a pending ${effectiveInviteRole} invitation — use Resend below.`
+      : duplicateInvite ? `${typedEmail} already has a pending ${inviteRole} invitation — use Resend below.`
       : existingInvite  ? `${typedEmail} is already invited as ${existingInvite.role} — sending replaces that invitation.`
-      : noSeatLeft      ? (isOwner
-                            ? 'No creator seats available — add a seat above to invite more creators.'
-                            : 'No creator seats available — ask the workspace owner to add seats.')
-      : effectiveInviteRole === 'viewer' ? 'Viewers are free — library access only.'
+      : seatBlocked     ? (isOwner
+                            ? 'No creator seats left — add a seat above, or switch the role to Viewer.'
+                            : 'No creator seats left — ask the workspace owner to add one, or switch the role to Viewer.')
+      : inviteRole === 'viewer'
+            ? 'Viewers are free — they can watch videos in this workspace but cannot create new ones.'
       : null;
 
     const inputClass = "px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius-interactive)] text-text-main placeholder:text-text-muted outline-none focus:border-primary transition-colors";
@@ -240,24 +247,24 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
             const { data, error } = await invokeFunction('workspace-invite', {
                 workspaceId: details.id,
                 email,
-                role: effectiveInviteRole,
+                role: inviteRole,
             });
             if (error) throw error;
             setInviteEmail('');
             onInvitationSent({
                 id: data.invitationId,
                 email,
-                role: effectiveInviteRole,
+                role: inviteRole,
                 invited_by: currentUserId ?? '',
                 created_at: new Date().toISOString(),
             });
             addToast({ type: 'success', title: `Invitation sent to ${email}` });
         } catch (err) {
             const failure = err instanceof Error ? err : undefined;
-            captureError(err, { flow: 'workspace', phase: 'invite', workspaceId: details.id, extra: { role: effectiveInviteRole } });
+            captureError(err, { flow: 'workspace', phase: 'invite', workspaceId: details.id, extra: { role: inviteRole } });
             trackWorkspaceInviteFailed({
                 workspace_id: details.id,
-                role: effectiveInviteRole,
+                role: inviteRole,
                 error: failure?.message || 'Unknown error',
                 error_name: failure?.name,
                 is_offline: !navigator.onLine,
@@ -351,17 +358,23 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                             placeholder="colleague@example.com"
                             value={inviteEmail}
                             onChange={e => setInviteEmail(e.target.value)}
-                            aria-invalid={inviteBlocked || undefined}
-                            className={`${inputClass} flex-1 ${inviteBlocked ? 'border-destructive' : ''}`}
+                            aria-invalid={emailBlocked || undefined}
+                            className={`${inputClass} flex-1 ${emailBlocked ? 'border-destructive' : ''}`}
                         />
                         <Dropdown<'creator' | 'viewer'>
                             options={[
-                                { value: 'creator', label: 'Creator', disabled: noSeatLeft },
+                                {
+                                    value: 'creator',
+                                    label: 'Creator',
+                                    disabled: noSeatLeft,
+                                    suffix: noSeatLeft ? <span className="text-2xs text-text-muted">No seats</span> : undefined,
+                                },
                                 { value: 'viewer', label: 'Viewer' },
                             ]}
-                            value={effectiveInviteRole}
+                            value={inviteRole}
                             onChange={setInviteRole}
                             ariaLabel="Invite role"
+                            hideSuffixInTrigger
                             fullWidth={false}
                         />
                         <Button
@@ -369,13 +382,21 @@ export function MembersSection({ details, currentUserId, hasTeamAccess, onMember
                             variant="primary"
                             disabled={inviting || !typedEmail || inviteBlocked}
                         >
-                            {inviting
-                                ? 'Sending…'
-                                : existingInvite && !duplicateInvite ? 'Update Invite' : 'Send Invite'}
+                            {inviting ? 'Sending…' : existingInvite && !duplicateInvite ? 'Update Invite' : 'Send Invite'}
                         </Button>
                     </form>
                     {inviteHint && (
-                        <p role="status" className={`text-xs mt-2 ${inviteBlocked ? 'text-destructive' : 'text-text-muted'}`}>
+                        <p
+                            role="status"
+                            className={`flex items-start gap-2 text-xs mt-3 px-3 py-2 rounded-[var(--radius-sm)] ${
+                                inviteBlocked
+                                    ? 'bg-destructive/10 border border-destructive/30 text-destructive'
+                                    : 'bg-state-inactive text-text-main'
+                            }`}
+                        >
+                            {inviteBlocked
+                                ? <LuCircleAlert className="icon-sm shrink-0 mt-0.5" />
+                                : <LuInfo className="icon-sm shrink-0 mt-0.5" />}
                             {inviteHint}
                         </p>
                     )}

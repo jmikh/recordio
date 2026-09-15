@@ -56,6 +56,18 @@ import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
 import { trialExtendRoutes } from './routes/billing/trialExtend.js';
 import { adminUserListRoutes } from './routes/admin/adminUserList.js';
 import { adminImpersonateRoutes } from './routes/admin/adminImpersonate.js';
+import { screenshotCreateRoutes } from './routes/screenshots/screenshotCreate.js';
+import { screenshotConfirmUploadRoutes } from './routes/screenshots/screenshotConfirmUpload.js';
+import { screenshotGetRoutes } from './routes/screenshots/screenshotGet.js';
+import { screenshotListRoutes } from './routes/screenshots/screenshotList.js';
+import { screenshotUpdateRoutes } from './routes/screenshots/screenshotUpdate.js';
+import { screenshotRenameRoutes } from './routes/screenshots/screenshotRename.js';
+import { screenshotDeleteRoutes } from './routes/screenshots/screenshotDelete.js';
+import { screenshotRestoreRoutes } from './routes/screenshots/screenshotRestore.js';
+import { screenshotShareRoutes } from './routes/screenshots/screenshotShare.js';
+import { screenshotUpdateThumbnailRoutes } from './routes/screenshots/screenshotUpdateThumbnail.js';
+import { screenshotRenderUploadRoutes } from './routes/screenshots/screenshotRenderUpload.js';
+import { sharedScreenshotGetRoutes } from './routes/sharedScreenshotGet.js';
 
 declare module 'fastify' {
     interface FastifyInstance {
@@ -228,6 +240,20 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
 
     // Billing revamp Step 3 — self-serve trial extension
     app.register(trialExtendRoutes);
+
+    // Screenshots sub-product (plans/screenshots/screenshots-tiered-plan.md)
+    app.register(screenshotCreateRoutes);
+    app.register(screenshotConfirmUploadRoutes);
+    app.register(screenshotGetRoutes);
+    app.register(screenshotListRoutes);
+    app.register(screenshotUpdateRoutes);
+    app.register(screenshotRenameRoutes);
+    app.register(screenshotDeleteRoutes);
+    app.register(screenshotRestoreRoutes);
+    app.register(screenshotShareRoutes);
+    app.register(screenshotUpdateThumbnailRoutes);
+    app.register(screenshotRenderUploadRoutes);
+    app.register(sharedScreenshotGetRoutes);
 
     // Admin user impersonation (plans/admin-user-impersonation-oneshot.md)
     app.register(adminUserListRoutes, { adminEmails: opts.adminEmails });

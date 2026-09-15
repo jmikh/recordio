@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { LuTrash2 } from 'react-icons/lu';
+import { LuImage, LuTrash2 } from 'react-icons/lu';
 import { CloudProjectService, toShareMeta, type ProjectListItem } from '../../storage/cloudProjectService';
 import { ShareModal } from '../../share/ShareModal';
 import { useProjectMetaStore } from '../../share/useProjectMetaStore';
 import { ProjectCard } from './ProjectCard';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
+import { ScreenshotsView } from './ScreenshotsView';
+import { ScreenshotService, toScreenshotMeta, type ScreenshotListItem } from '../../screenshot/screenshotService';
+import { ScreenshotStorage } from '../../screenshot/api/screenshotStorage';
+import { useScreenshotMetaStore } from '../../screenshot/store/useScreenshotMetaStore';
+import { ScreenshotShareModal } from '../../screenshot/components/ScreenshotShareModal';
+import { screenshotEditPath, screenshotUrl, screenshotViewPath } from '../../lib/screenshotUrls';
 import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
 import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
 import { PersonalSettingsPage } from '../settings/personal/PersonalSettingsPage';
@@ -38,7 +44,9 @@ import { editorPath, viewPath } from '../../lib/videoUrls';
 export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | 'personal' }) {
     const showSettings = settingsPage !== undefined;
     const [allProjects, setAllProjects] = useState<ProjectListItem[]>([]);
+    const [allScreenshots, setAllScreenshots] = useState<ScreenshotListItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [screenshotsLoading, setScreenshotsLoading] = useState(true);
     const [activeView, setActiveView] = useState<DashboardView>('all');
 
     const goToView = (view: DashboardView) => {
@@ -96,6 +104,30 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         [allProjects, userId],
     );
 
+    // Screenshots (plans/screenshots): own + shared to the workspace; own trashed
+    const visibleScreenshots = useMemo(
+        () => allScreenshots
+            .filter(s => !s.deletedAt && (s.ownerId === userId || s.sharePolicy === 'workspace' || s.sharePolicy === 'public'))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        [allScreenshots, userId],
+    );
+    const ownedScreenshotCount = useMemo(
+        () => allScreenshots.filter(s => !s.deletedAt && s.ownerId === userId).length,
+        [allScreenshots, userId],
+    );
+    const trashScreenshots = useMemo(
+        () => allScreenshots.filter(s => !!s.deletedAt && s.ownerId === userId),
+        [allScreenshots, userId],
+    );
+    /** Trash shows both kinds, most recently deleted first */
+    const trashItems = useMemo(() => {
+        const items: ({ kind: 'project'; item: ProjectListItem } | { kind: 'screenshot'; item: ScreenshotListItem })[] = [
+            ...trashProjects.map(item => ({ kind: 'project' as const, item })),
+            ...trashScreenshots.map(item => ({ kind: 'screenshot' as const, item })),
+        ];
+        return items.sort((a, b) => new Date(b.item.deletedAt!).getTime() - new Date(a.item.deletedAt!).getTime());
+    }, [trashProjects, trashScreenshots]);
+
     const isAuthenticated = !!userId;
     const [memberCount, setMemberCount] = useState<number | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -106,6 +138,8 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
     const [showShareUpgradeModal, setShowShareUpgradeModal] = useState(false);
     /** Project whose share settings are open (owner-only card menu action) */
     const [shareTarget, setShareTarget] = useState<ProjectListItem | null>(null);
+    /** Screenshot whose share settings are open */
+    const [screenshotShareTarget, setScreenshotShareTarget] = useState<ScreenshotListItem | null>(null);
 
     // Sort, filter, search state (persisted to localStorage)
     const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
@@ -179,6 +213,37 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 if (!ctrl.cancelled) captureError(error, { flow: 'dashboard_load', workspaceId });
             } finally {
                 if (!ctrl.cancelled) setLoading(false);
+            }
+        })();
+
+        return () => { ctrl.cancelled = true; };
+    }, [isAuthenticated, workspaceId]);
+
+    // Screenshots load alongside projects (plans/screenshots Step 11)
+    useEffect(() => {
+        if (!isAuthenticated || !workspaceId) return;
+
+        const ctrl = { cancelled: false };
+        setScreenshotsLoading(true);
+        (async () => {
+            try {
+                await AuthManager.ready;
+                if (ctrl.cancelled) return;
+                const loaded = await ScreenshotService.listScreenshots(workspaceId);
+                if (!ctrl.cancelled) {
+                    setAllScreenshots(loaded);
+                    ScreenshotService.loadThumbnails(loaded, (screenshotId, thumbnailUrl) => {
+                        if (!ctrl.cancelled) {
+                            setAllScreenshots(prev => prev.map(s =>
+                                s.id === screenshotId ? { ...s, thumbnail: thumbnailUrl } : s
+                            ));
+                        }
+                    });
+                }
+            } catch (error) {
+                if (!ctrl.cancelled) captureError(error, { flow: 'dashboard_screenshots_load', workspaceId });
+            } finally {
+                if (!ctrl.cancelled) setScreenshotsLoading(false);
             }
         })();
 
@@ -314,6 +379,80 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         }
     };
 
+    // ─── Screenshot actions (plans/screenshots Step 11) ───────────
+
+    const handleOpenScreenshot = (item: ScreenshotListItem) => {
+        const sharedToWorkspace = item.sharePolicy === 'workspace' || item.sharePolicy === 'public';
+        const canEdit = item.ownerId === userId
+            || (sharedToWorkspace && item.workspaceAccess === 'edit' && workspaceRole !== 'viewer');
+        navigate(canEdit ? screenshotEditPath(item.slug) : screenshotViewPath(item.slug));
+    };
+
+    const handleScreenshotShareSettings = async (item: ScreenshotListItem) => {
+        if (!entitlements.canShare) {
+            setShowShareUpgradeModal(true);
+            return;
+        }
+        try {
+            const row = await ScreenshotStorage.get({ screenshotId: item.id });
+            if (!row) throw new Error('Screenshot not found');
+            useScreenshotMetaStore.getState().setMeta(toScreenshotMeta(row));
+            setScreenshotShareTarget(item);
+        } catch {
+            addToast({ type: 'error', title: 'Failed to load share settings' });
+        }
+    };
+
+    const closeScreenshotShareModal = () => {
+        setScreenshotShareTarget(null);
+        const m = useScreenshotMetaStore.getState().meta;
+        if (m) {
+            setAllScreenshots(prev => prev.map(s => s.id === m.id
+                ? { ...s, sharePolicy: m.sharePolicy, workspaceAccess: m.workspaceAccess }
+                : s));
+        }
+        useScreenshotMetaStore.getState().clear();
+    };
+
+    const handleRenameScreenshot = async (screenshotId: string, newName: string) => {
+        try {
+            await ScreenshotService.renameScreenshot(screenshotId, newName);
+            setAllScreenshots(prev => prev.map(s => (s.id === screenshotId ? { ...s, name: newName } : s)));
+        } catch (err) {
+            captureError(err, { flow: 'screenshot', phase: 'rename', extra: { screenshotId } });
+            addToast({ type: 'error', title: 'Failed to rename screenshot' });
+        }
+    };
+
+    const handleDeleteScreenshot = async (screenshotId: string) => {
+        try {
+            await ScreenshotService.deleteScreenshot(screenshotId);
+            const now = new Date().toISOString();
+            setAllScreenshots(prev => prev.map(s => (s.id === screenshotId ? { ...s, deletedAt: now } : s)));
+            addToast({ type: 'success', title: 'Moved to Trash' });
+        } catch (err) {
+            captureError(err, { flow: 'screenshot', phase: 'delete', extra: { screenshotId } });
+            addToast({ type: 'error', title: 'Failed to delete screenshot' });
+        }
+    };
+
+    const handleRestoreScreenshot = async (screenshotId: string) => {
+        if (!entitlements.canRestore) {
+            setShowRestoreUpgradeModal(true);
+            return;
+        }
+        try {
+            const ok = await ScreenshotService.restoreScreenshot(screenshotId);
+            if (ok) {
+                setAllScreenshots(prev => prev.map(s => (s.id === screenshotId ? { ...s, deletedAt: null } : s)));
+                addToast({ type: 'success', title: 'Screenshot restored' });
+            }
+        } catch (err) {
+            captureError(err, { flow: 'screenshot', phase: 'restore', extra: { screenshotId } });
+            addToast({ type: 'error', title: 'Failed to restore screenshot' });
+        }
+    };
+
     // Restore from trash — the button always presses; free tier gets the
     // upgrade modal instead (server enforces canRestore regardless)
     const handleRestore = async (projectId: string) => {
@@ -417,10 +556,13 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                     activeView={settingsPage === 'personal' ? 'personal' : showSettings ? 'settings' : activeView}
                     onViewChange={handleViewChange}
                     projectCount={yourProjects.length}
+                    screenshotCount={visibleScreenshots.length}
                     workspaceCount={workspaceProjects.length}
                     ownedProjectCount={ownedProjectCount}
                     projectCap={entitlements.projectCap}
-                    trashCount={trashProjects.length}
+                    ownedScreenshotCount={ownedScreenshotCount}
+                    screenshotCap={entitlements.screenshotCap}
+                    trashCount={trashItems.length}
                     publishedCount={sharedCount}
                     onRecord={handleRecord}
                     isAuthenticated={isAuthenticated}
@@ -463,6 +605,16 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                         <main className="flex-1 overflow-y-auto p-8">
                             <WorkspaceSettingsPage />
                         </main>
+                    ) : activeView === 'screenshots' ? (
+                        <ScreenshotsView
+                            items={visibleScreenshots}
+                            loading={screenshotsLoading}
+                            userId={userId}
+                            onOpen={handleOpenScreenshot}
+                            onRename={handleRenameScreenshot}
+                            onDelete={handleDeleteScreenshot}
+                            onShare={item => void handleScreenshotShareSettings(item)}
+                        />
                     ) : activeView !== 'trash' ? (
                         <>
                             <DashboardHeader
@@ -530,34 +682,50 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                         <div className="mb-6">
                             <h1 className="heading-2">Trash</h1>
                             <p className="text-sm text-text-muted mt-1">
-                                Projects in trash are permanently deleted after 30 days.
+                                Videos and screenshots in trash are permanently deleted after 30 days.
                             </p>
                         </div>
-                        {loading ? (
+                        {loading || screenshotsLoading ? (
                             <div className="flex items-center justify-center h-64">
                                 <div className="text-text-muted">Loading...</div>
                             </div>
-                        ) : trashProjects.length === 0 ? (
+                        ) : trashItems.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 gap-3">
                                 <LuTrash2 size={40} className="text-text-muted/50" />
                                 <p className="text-sm text-text-muted">Trash is empty</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-                                {trashProjects.map(item => (
+                                {trashItems.map(entry => entry.kind === 'project' ? (
                                     <ProjectCard
-                                        key={item.id}
+                                        key={`project-${entry.item.id}`}
                                         variant="grid"
                                         project={{
-                                            id: item.id,
-                                            name: item.name,
-                                            thumbnail: item.thumbnail,
-                                            createdAt: item.createdAt,
-                                            durationMs: item.durationMs,
-                                            deletedAt: item.deletedAt,
+                                            id: entry.item.id,
+                                            name: entry.item.name,
+                                            thumbnail: entry.item.thumbnail,
+                                            createdAt: entry.item.createdAt,
+                                            durationMs: entry.item.durationMs,
+                                            deletedAt: entry.item.deletedAt,
                                         }}
                                         onOpen={() => {}}
-                                        onRestore={() => handleRestore(item.id)}
+                                        onRestore={() => handleRestore(entry.item.id)}
+                                    />
+                                ) : (
+                                    <ProjectCard
+                                        key={`screenshot-${entry.item.id}`}
+                                        variant="grid"
+                                        project={{
+                                            id: entry.item.id,
+                                            name: entry.item.name,
+                                            thumbnail: entry.item.thumbnail,
+                                            createdAt: entry.item.createdAt,
+                                            deletedAt: entry.item.deletedAt,
+                                        }}
+                                        shareUrl={screenshotUrl(entry.item.slug)}
+                                        badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
+                                        onOpen={() => {}}
+                                        onRestore={() => handleRestoreScreenshot(entry.item.id)}
                                     />
                                 ))}
                             </div>
@@ -621,6 +789,10 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 isOpen={!!shareTarget}
                 onClose={closeShareModal}
                 projectName={shareTarget?.name ?? ''}
+            />
+            <ScreenshotShareModal
+                isOpen={!!screenshotShareTarget}
+                onClose={closeScreenshotShareModal}
             />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
             <AuthModal

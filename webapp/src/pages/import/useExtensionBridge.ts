@@ -17,9 +17,10 @@ import {
     HANDOFF_PORT_NAME,
     type HandoffRequestResponse,
     type HandoffMetadataResponse,
+    type HandoffKind,
     type ChunkPayload,
 } from '@shared/types/bridge';
-import type { RawRecording } from '@shared/types';
+import type { RawRecording, RawScreenshot } from '@shared/types';
 
 /** Extension ID — read from the `ext` query param (set by the extension when opening
  *  the import page), with a fallback to the Web Store production ID. */
@@ -32,7 +33,7 @@ const EXTENSION_ID = new URLSearchParams(window.location.search).get('ext')
 
 export interface HandoffProgress {
     phase: 'metadata' | 'streaming' | 'complete';
-    source: 'screen' | 'camera' | 'mic' | null;
+    source: ChunkPayload['source'] | null;
     chunksReceived: number;
     totalChunks: number;
     bytesReceived: number;
@@ -41,7 +42,10 @@ export interface HandoffProgress {
 
 export interface HandoffState {
     status: 'idle' | 'requesting' | 'streaming' | 'success' | 'error';
+    /** The capture id (recording or screenshot) being handed off */
     recordingId: string | null;
+    /** Known once metadata arrives */
+    kind: HandoffKind | null;
     error: string | null;
     progress: HandoffProgress | null;
     // Result data (available when status === 'success')
@@ -49,7 +53,16 @@ export interface HandoffState {
     screenVideo: Blob | null;
     cameraVideo: Blob | null;
     micAudio: Blob | null;
+    /** Screenshot handoff (plans/screenshots): capture metadata + the PNG */
+    screenshot: RawScreenshot | null;
+    image: Blob | null;
     extensionDistinctId: string | null;
+}
+
+/** Total payload bytes announced by the metadata response. */
+function totalBytesOf(meta: HandoffMetadataResponse): number {
+    if (meta.kind === 'screenshot') return meta.imageSize;
+    return meta.screenVideoSize + (meta.cameraVideoSize || 0) + (meta.micAudioSize || 0);
 }
 
 // ============================================
@@ -134,12 +147,15 @@ export function useExtensionBridge() {
     const [state, setState] = useState<HandoffState>({
         status: 'idle',
         recordingId: null,
+        kind: null,
         error: null,
         progress: null,
         recording: null,
         screenVideo: null,
         cameraVideo: null,
         micAudio: null,
+        screenshot: null,
+        image: null,
         extensionDistinctId: null,
     });
 
@@ -147,10 +163,17 @@ export function useExtensionBridge() {
     const screenChunksRef = useRef<Map<number, Uint8Array>>(new Map());
     const cameraChunksRef = useRef<Map<number, Uint8Array>>(new Map());
     const micChunksRef = useRef<Map<number, Uint8Array>>(new Map());
+    const imageChunksRef = useRef<Map<number, Uint8Array>>(new Map());
     const screenTotalRef = useRef<number>(0);
     const cameraTotalRef = useRef<number>(0);
     const micTotalRef = useRef<number>(0);
+    const imageTotalRef = useRef<number>(0);
     const metadataRef = useRef<HandoffMetadataResponse | null>(null);
+
+    const chunksReceived = () =>
+        screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size + imageChunksRef.current.size;
+    const chunksExpected = () =>
+        screenTotalRef.current + cameraTotalRef.current + micTotalRef.current + imageTotalRef.current;
 
     /**
      * Request handoff from extension.
@@ -163,20 +186,25 @@ export function useExtensionBridge() {
         screenChunksRef.current = new Map();
         cameraChunksRef.current = new Map();
         micChunksRef.current = new Map();
+        imageChunksRef.current = new Map();
         screenTotalRef.current = 0;
         cameraTotalRef.current = 0;
         micTotalRef.current = 0;
+        imageTotalRef.current = 0;
         metadataRef.current = null;
 
         setState({
             status: 'requesting',
             recordingId,
+            kind: null,
             error: null,
             progress: { phase: 'metadata', source: null, chunksReceived: 0, totalChunks: 0, bytesReceived: 0, totalBytes: 0 },
             recording: null,
             screenVideo: null,
             cameraVideo: null,
             micAudio: null,
+            screenshot: null,
+            image: null,
             extensionDistinctId: null,
         });
 
@@ -193,16 +221,16 @@ export function useExtensionBridge() {
             }
 
             metadataRef.current = response;
-            const totalBytes = response.screenVideoSize + (response.cameraVideoSize || 0) + (response.micAudioSize || 0);
-
-
+            const kind: HandoffKind = response.kind === 'screenshot' ? 'screenshot' : 'recording';
+            const totalBytes = totalBytesOf(response);
 
             setState(prev => ({
                 ...prev,
                 status: 'streaming',
+                kind,
                 progress: {
                     phase: 'streaming',
-                    source: 'screen',
+                    source: kind === 'screenshot' ? 'image' : 'screen',
                     chunksReceived: 0,
                     totalChunks: 0,
                     bytesReceived: 0,
@@ -216,18 +244,37 @@ export function useExtensionBridge() {
 
             // Phase 3: Reconstruct blobs from ordered chunks
 
+            if (response.kind === 'screenshot') {
+                const imageChunksOrdered = reassembleChunks(imageChunksRef.current, imageTotalRef.current);
+                const image = new Blob(imageChunksOrdered as BlobPart[], { type: response.imageType });
+                if (image.size !== response.imageSize) {
+                    captureImportError(
+                        new Error(`Image blob size mismatch: expected ${response.imageSize}, got ${image.size}`),
+                        { recordingId, phase: 'streaming', extra: { kind: 'screenshot' } },
+                    );
+                }
+                setState(prev => ({
+                    ...prev,
+                    status: 'success',
+                    progress: { ...prev.progress!, phase: 'complete' },
+                    screenshot: response.screenshot,
+                    image,
+                    extensionDistinctId: response.extensionDistinctId || null,
+                }));
+                return;
+            }
 
             // Reassemble chunks in correct order
             const screenChunksOrdered = reassembleChunks(screenChunksRef.current, screenTotalRef.current);
             const screenVideo = new Blob(screenChunksOrdered as BlobPart[], {
-                type: metadataRef.current!.screenVideoType,
+                type: response.screenVideoType,
             });
 
             let cameraVideo: Blob | null = null;
             if (cameraChunksRef.current.size > 0 && cameraTotalRef.current > 0) {
                 const cameraChunksOrdered = reassembleChunks(cameraChunksRef.current, cameraTotalRef.current);
                 cameraVideo = new Blob(cameraChunksOrdered as BlobPart[], {
-                    type: metadataRef.current!.cameraVideoType!,
+                    type: response.cameraVideoType!,
                 });
             }
 
@@ -235,7 +282,7 @@ export function useExtensionBridge() {
             if (micChunksRef.current.size > 0 && micTotalRef.current > 0) {
                 const micChunksOrdered = reassembleChunks(micChunksRef.current, micTotalRef.current);
                 micAudio = new Blob(micChunksOrdered as BlobPart[], {
-                    type: metadataRef.current!.micAudioType!,
+                    type: response.micAudioType!,
                 });
             }
 
@@ -280,22 +327,22 @@ export function useExtensionBridge() {
 
         } catch (error) {
             console.error('[useExtensionBridge] Error:', error);
+            const meta = metadataRef.current;
+            const recordingMeta = meta && meta.kind !== 'screenshot' ? meta : null;
+            const primaryChunks = meta?.kind === 'screenshot' ? imageChunksRef.current : screenChunksRef.current;
             captureImportError(error, {
                 recordingId,
-                phase: metadataRef.current ? 'streaming' : 'receiving',
-                bridgeStatus: metadataRef.current ? 'post-metadata' : 'pre-metadata',
-                screenVideoSize: metadataRef.current?.screenVideoSize,
-                cameraVideoSize: metadataRef.current?.cameraVideoSize,
-                micAudioSize: metadataRef.current?.micAudioSize,
+                phase: meta ? 'streaming' : 'receiving',
+                bridgeStatus: meta ? 'post-metadata' : 'pre-metadata',
+                screenVideoSize: recordingMeta?.screenVideoSize,
+                cameraVideoSize: recordingMeta?.cameraVideoSize,
+                micAudioSize: recordingMeta?.micAudioSize,
+                extra: meta?.kind === 'screenshot' ? { kind: 'screenshot', imageSize: meta.imageSize } : undefined,
                 progress: {
-                    bytesReceived: screenChunksRef.current.size > 0
-                        ? [...screenChunksRef.current.values()].reduce((s, c) => s + c.byteLength, 0)
-                        : 0,
-                    totalBytes: metadataRef.current
-                        ? (metadataRef.current.screenVideoSize + (metadataRef.current.cameraVideoSize || 0) + (metadataRef.current.micAudioSize || 0))
-                        : 0,
-                    chunksReceived: screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size,
-                    totalChunks: screenTotalRef.current + cameraTotalRef.current + micTotalRef.current,
+                    bytesReceived: [...primaryChunks.values()].reduce((s, c) => s + c.byteLength, 0),
+                    totalBytes: meta ? totalBytesOf(meta) : 0,
+                    chunksReceived: chunksReceived(),
+                    totalChunks: chunksExpected(),
                     source: null,
                 },
             });
@@ -337,20 +384,20 @@ export function useExtensionBridge() {
                             } else if (chunk.source === 'mic') {
                                 micChunksRef.current.set(chunk.index, data);
                                 micTotalRef.current = chunk.total;
+                            } else if (chunk.source === 'image') {
+                                imageChunksRef.current.set(chunk.index, data);
+                                imageTotalRef.current = chunk.total;
                             }
 
                             bytesReceived += data.byteLength;
-
-                            // Calculate total chunks received across both sources
-                            const totalChunksReceived = screenChunksRef.current.size + cameraChunksRef.current.size;
 
                             setStateCallback(prev => ({
                                 ...prev,
                                 progress: {
                                     phase: 'streaming',
                                     source: chunk.source,
-                                    chunksReceived: totalChunksReceived,
-                                    totalChunks: screenTotalRef.current + cameraTotalRef.current,
+                                    chunksReceived: chunksReceived(),
+                                    totalChunks: chunksExpected(),
                                     bytesReceived,
                                     totalBytes,
                                 },
@@ -375,8 +422,8 @@ export function useExtensionBridge() {
                                     progress: {
                                         bytesReceived,
                                         totalBytes,
-                                        chunksReceived: screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size,
-                                        totalChunks: screenTotalRef.current + cameraTotalRef.current + micTotalRef.current,
+                                        chunksReceived: chunksReceived(),
+                                        totalChunks: chunksExpected(),
                                         source: null,
                                     },
                                 }
@@ -398,8 +445,8 @@ export function useExtensionBridge() {
                             progress: {
                                 bytesReceived,
                                 totalBytes,
-                                chunksReceived: screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size,
-                                totalChunks: screenTotalRef.current + cameraTotalRef.current + micTotalRef.current,
+                                chunksReceived: chunksReceived(),
+                                totalChunks: chunksExpected(),
                                 source: null,
                             },
                         });
@@ -421,6 +468,8 @@ export function useExtensionBridge() {
 
     /**
      * Confirm handoff complete (extension can delete its copy).
+     * `projectId` is the created cloud row's id — for screenshots, the
+     * screenshot id (the bridge payload field predates screenshots).
      */
     const confirmHandoff = useCallback(async (projectId: string) => {
         if (!state.recordingId) return;

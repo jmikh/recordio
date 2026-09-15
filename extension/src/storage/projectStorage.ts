@@ -1,5 +1,6 @@
 
-import type { ID, RawRecording } from '@shared/types';
+import type { ID, RawRecording, RawCaptureItem, RawScreenshot } from '@shared/types';
+import { isRawScreenshot } from '@shared/types';
 import { captureException } from '../utils/sentry';
 
 const DB_NAME = 'RecordioDB';
@@ -94,11 +95,25 @@ export class ProjectStorage {
     }
 
     /**
-     * Loads a RawRecording by ID from the 'projects' store.
+     * Saves a RawScreenshot to the same 'projects' store (plans/screenshots).
+     * Discriminated from recordings by `kind`; the PNG blob goes through
+     * saveRecordingBlob under `shot-<id>-image`, so clearAll / deleteRawRecording
+     * (which match blob keys containing the item id) keep working unchanged.
      */
-    static async loadRawRecording(id: string): Promise<RawRecording | null> {
+    static async saveRawScreenshot(screenshot: RawScreenshot): Promise<void> {
         const db = await this.getDB();
-        const result = await new Promise<RawRecording | undefined>((resolve, reject) => {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('projects', 'readwrite');
+            tx.objectStore('projects').put(screenshot);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    /** Loads whatever is stored under the id — a recording or a screenshot. */
+    static async loadRawItem(id: string): Promise<RawCaptureItem | null> {
+        const db = await this.getDB();
+        const result = await new Promise<RawCaptureItem | undefined>((resolve, reject) => {
             const tx = db.transaction('projects', 'readonly');
             const store = tx.objectStore('projects');
             const req = store.get(id);
@@ -106,6 +121,14 @@ export class ProjectStorage {
             req.onerror = () => reject(req.error);
         });
         return result || null;
+    }
+
+    /**
+     * Loads a RawRecording by ID from the 'projects' store (null for screenshots).
+     */
+    static async loadRawRecording(id: string): Promise<RawRecording | null> {
+        const item = await this.loadRawItem(id);
+        return item && !isRawScreenshot(item) ? item : null;
     }
 
     /**

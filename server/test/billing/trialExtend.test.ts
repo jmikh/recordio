@@ -107,6 +107,7 @@ describe.runIf(hasTestDb())('POST /trial-extend (e2e, real Postgres)', () => {
                 canInvite: false, // trials are solo
                 canRestore: true,
                 projectCap: null,
+                screenshotCap: null,
                 trialEndsAt: EXTENDED_TRIAL_END,
                 canExtendTrial: false, // the one extension is now spent
             },

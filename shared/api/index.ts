@@ -40,6 +40,26 @@ import type {
     RenderJobGetStatusResponse,
 } from './renderJobs';
 import type {
+    CloudScreenshot,
+    ScreenshotConfirmUploadResponse,
+    ScreenshotCreateRequest,
+    ScreenshotCreateResponse,
+    ScreenshotDeleteResponse,
+    ScreenshotGetRequest,
+    ScreenshotIdRequest,
+    ScreenshotListRequest,
+    ScreenshotListResponse,
+    ScreenshotRenameRequest,
+    ScreenshotRenameResponse,
+    ScreenshotRestoreResponse,
+    ScreenshotShareRequest,
+    ScreenshotShareResponse,
+    ScreenshotUpdateRequest,
+    ScreenshotUpdateResponse,
+    SharedScreenshotGetRequest,
+    SharedScreenshotGetResponse,
+} from './screenshots';
+import type {
     WorkspaceDetails,
     WorkspaceIdRequest,
     WorkspaceInviteAcceptRequest,
@@ -82,6 +102,7 @@ export * from './assets';
 export * from './entitlements';
 export * from './projects';
 export * from './renderJobs';
+export * from './screenshots';
 export * from './workspaces';
 export * from './session';
 
@@ -100,6 +121,16 @@ export interface ApiRoutes {
     'project-restore': { request: ProjectIdRequest; response: ProjectRestoreResponse };
     'project-confirm-upload': { request: ProjectIdRequest; response: ProjectConfirmUploadResponse };
     'render-job-get-status': { request: RenderJobGetStatusRequest; response: RenderJobGetStatusResponse };
+    'screenshot-create': { request: ScreenshotCreateRequest; response: ScreenshotCreateResponse };
+    'screenshot-get': { request: ScreenshotGetRequest; response: CloudScreenshot | null };
+    'screenshot-list': { request: ScreenshotListRequest; response: ScreenshotListResponse };
+    'screenshot-update': { request: ScreenshotUpdateRequest; response: ScreenshotUpdateResponse };
+    'screenshot-rename': { request: ScreenshotRenameRequest; response: ScreenshotRenameResponse };
+    'screenshot-share': { request: ScreenshotShareRequest; response: ScreenshotShareResponse };
+    'screenshot-delete': { request: ScreenshotIdRequest; response: ScreenshotDeleteResponse };
+    'screenshot-restore': { request: ScreenshotIdRequest; response: ScreenshotRestoreResponse };
+    'screenshot-confirm-upload': { request: ScreenshotIdRequest; response: ScreenshotConfirmUploadResponse };
+    'shared-screenshot-get': { request: SharedScreenshotGetRequest; response: SharedScreenshotGetResponse };
     'workspace-get': { request: WorkspaceIdRequest; response: WorkspaceDetails | null };
     'workspace-list': { request: EmptyRequest; response: WorkspaceListResponse };
     'workspace-rename': { request: WorkspaceRenameRequest; response: WorkspaceRenamed };

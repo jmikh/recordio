@@ -22,9 +22,9 @@ import { TbBlur } from 'react-icons/tb';
 import { MSG_TYPES } from '../shared/messageTypes';
 import { useAudioLevel } from '../shared/useAudioLevel';
 import { enterBlurMode } from './blurMode';
+import { loadPrefs, updatePrefs } from './prefs';
+import { isActiveTabCapturable } from './activeTab';
 import permissionsImage from '../assets/permissions-small.png';
-
-const PREFS_KEY = 'recordio_prefs';
 
 // --- Audio level meter ---
 
@@ -77,10 +77,8 @@ export function PreRecordingView() {
 
     // --- Prefs: load on mount ---
     useEffect(() => {
-        chrome.storage.local.get(PREFS_KEY).then((result) => {
-            const prefs = result[PREFS_KEY] as any;
+        loadPrefs().then((prefs) => {
             prefsLoadedRef.current = true;
-            if (!prefs) return;
             if (prefs.selectedMicId) setSelectedMicId(prefs.selectedMicId);
             if (prefs.selectedCamId) setSelectedCamId(prefs.selectedCamId);
             if (prefs.micEnabled) {
@@ -94,24 +92,15 @@ export function PreRecordingView() {
         });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // --- Prefs: save on change (after initial load) ---
+    // --- Prefs: save on change (after initial load); merged so the popup mode key survives ---
     useEffect(() => {
         if (!prefsLoadedRef.current) return;
-        chrome.storage.local.set({
-            [PREFS_KEY]: { micEnabled, camEnabled, selectedMicId, selectedCamId },
-        });
+        void updatePrefs({ micEnabled, camEnabled, selectedMicId, selectedCamId });
     }, [micEnabled, camEnabled, selectedMicId, selectedCamId]);
 
     // --- canRecordTab: URL check (cheaper than a scripting round-trip) ---
     useEffect(() => {
-        chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-            const url = tab?.url ?? '';
-            const injectable =
-                url.startsWith('http://') ||
-                url.startsWith('https://') ||
-                url.startsWith('file://');
-            setCanRecordTab(!!tab?.id && injectable);
-        });
+        isActiveTabCapturable().then(setCanRecordTab);
     }, []);
 
     // Attach camera stream to video element

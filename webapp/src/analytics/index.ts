@@ -219,6 +219,49 @@ export function trackProjectCreated(params: ProjectCreatedParams) {
     trackEvent('project_created', params);
 }
 
+// ============================================================================
+// Screenshots (plans/screenshots)
+// ============================================================================
+
+export interface ScreenshotCreatedParams {
+    capture_mode: 'visible' | 'fullPage' | 'region';
+    width_px: number;
+    height_px: number;
+    page_host: string | null;
+    user_id: string | null;
+    success: boolean;
+    error?: string;
+}
+
+export function trackScreenshotCreated(params: ScreenshotCreatedParams) {
+    trackEvent('screenshot_created', params);
+}
+
+export function trackScreenshotEditorLoaded(workspaceId: string | null, screenshotId: string) {
+    trackEvent('screenshot_editor_loaded', { workspace_id: workspaceId, screenshot_id: screenshotId });
+}
+
+export function trackScreenshotShared(params: {
+    screenshot_id: string;
+    share_policy: 'private' | 'workspace' | 'public';
+    workspace_access: 'view' | 'edit';
+}) {
+    trackEvent('screenshot_shared', params);
+}
+
+export function trackScreenshotViewed(params: { slug: string; published: boolean; stale: boolean }) {
+    trackEvent('screenshot_view_page_loaded', params);
+}
+
+export function trackScreenshotExported(params: {
+    format: 'png' | 'pdf' | 'copy';
+    screenshot_id: string;
+    success: boolean;
+    error?: string;
+}) {
+    trackEvent('screenshot_exported', params);
+}
+
 export function trackProjectOpened() {
     trackEvent('project_opened');
 }

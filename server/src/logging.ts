@@ -40,6 +40,13 @@ export type ErrorType =
 export interface DomainLogFields {
     'project.id'?: string;
     'project.slug'?: string;
+    /** Screenshots sub-product (plans/screenshots) — its own entity, own key space */
+    'screenshot.id'?: string;
+    'screenshot.slug'?: string;
+    /** cloud_version a flattened render was produced from (/screenshot-render-upload) */
+    'screenshot.render_version'?: number;
+    'screenshot.render_published'?: boolean;
+    'screenshot.render_stale'?: boolean;
     'share.policy'?: string;
     /** Individual grants removed by the share override rule */
     'share.removed_editors'?: number;

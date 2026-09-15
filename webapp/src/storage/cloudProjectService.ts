@@ -12,6 +12,7 @@ import { ProjectImpl } from '../core/Project';
 import { adaptDefaultsToSources } from '../core/projectDefaults';
 import type { ProjectSettings } from '@shared/types/settings';
 import { cloudStoragePath, hydrateMediaUrls } from './projectBlobs';
+import { dataHash } from './dataHash';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -117,10 +118,7 @@ export class CloudProjectService {
      */
     private static async projectDataHash(project: Project): Promise<string> {
         const { userEvents, ...rest } = project as any;
-        const json = JSON.stringify(rest);
-        const buffer = new TextEncoder().encode(json);
-        const hash = await crypto.subtle.digest('SHA-256', buffer);
-        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return dataHash(rest);
     }
 
     // ─── Import / Upload (TUS resumable) ─────────────────────

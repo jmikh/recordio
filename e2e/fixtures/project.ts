@@ -86,11 +86,12 @@ export interface SeededProject {
 export async function seedProject(name = `e2e project ${randomUUID().slice(0, 8)}`): Promise<SeededProject> {
     const { token, userId } = await signIn();
 
-    // Oldest workspace = the user's original/default one (workspace-list orders
-    // created_at ASC on purpose — see server/src/routes/workspaces/workspaceList.ts)
-    const { workspaces } = await api('workspace-list', token, {});
-    if (!workspaces?.length) throw new Error('e2e user has no workspace — did auth.setup run?');
-    const workspaceId = workspaces[0].id as string;
+    // The DEFAULT workspace — what the dashboard opens and where /import
+    // creates rows. (The oldest workspace from workspace-list is not
+    // necessarily the default: the e2e user's default is "Teams Workspace".)
+    const defaultWorkspace = await api('workspace-get-default', token, {});
+    if (!defaultWorkspace?.id) throw new Error('e2e user has no default workspace — did auth.setup run?');
+    const workspaceId = defaultWorkspace.id as string;
 
     const projectId = randomUUID();
     const storagePath = cloudStoragePath(userId, projectId, 'screen');

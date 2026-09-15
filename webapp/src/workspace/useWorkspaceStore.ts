@@ -13,6 +13,7 @@ const PRO_ENTITLEMENTS: WorkspaceEntitlements = {
     canInvite: true,
     canRestore: true,
     projectCap: null,
+    screenshotCap: null,
     trialEndsAt: null,
     canExtendTrial: false,
 };

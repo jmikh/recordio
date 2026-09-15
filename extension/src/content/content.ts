@@ -21,6 +21,9 @@ import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
 import { showCountdown } from './countdownOverlay';
 import { BlurManager } from './blurManager';
+import { showRegionSelect } from './regionSelectOverlay';
+import { FullPageSession } from './fullPageCapture';
+import type { FullPageScrollToPayload, PageInfo } from '../shared/messageTypes';
 
 // Initialize Sentry for error tracking
 initSentry('content');
@@ -39,6 +42,11 @@ window.addEventListener('recordio-cleanup', () => {
         hideCountdown = null;
     }
     blurManager.disable();
+    if (hideRegionSelect) {
+        hideRegionSelect();
+        hideRegionSelect = null;
+    }
+    fullPage.finish();
     // Remove listeners
     chrome.runtime.onMessage.removeListener(handleMessage);
 }, { once: true });
@@ -62,10 +70,73 @@ chrome.runtime.sendMessage({
 let eventRecorder: EventRecorder | null = null;
 let hideCountdown: (() => void) | null = null;
 const blurManager = new BlurManager();
+// Screenshots (plans/screenshots): region overlay + full-page page-side session
+let hideRegionSelect: (() => void) | null = null;
+const fullPage = new FullPageSession(() => blurManager.disable());
+
+function getPageInfo(): PageInfo {
+    return {
+        url: location.href,
+        title: document.title,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        devicePixelRatio: window.devicePixelRatio,
+        visualScale: window.visualViewport?.scale ?? 1,
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+    };
+}
 
 // --- Message Listener ---
-const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, _sendResponse: Function) => {
+// Returns true for the screenshot handlers that respond asynchronously.
+const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void): boolean | void => {
     switch (message.type) {
+        // ── Screenshots ──────────────────────────────────────────────────────
+        case MSG_TYPES.BACKGROUND_CONTENT_GET_PAGE_INFO:
+            sendResponse(getPageInfo());
+            return;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_START_REGION_SELECT:
+            blurManager.disable();
+            hideRegionSelect?.();
+            hideRegionSelect = showRegionSelect(
+                (selection) => {
+                    hideRegionSelect = null;
+                    chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_SELECTED, payload: selection }).catch(() => {});
+                },
+                () => {
+                    hideRegionSelect = null;
+                    chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_CANCELLED }).catch(() => {});
+                },
+            );
+            sendResponse({ ok: true });
+            return;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_CANCEL_REGION_SELECT:
+            if (hideRegionSelect) {
+                hideRegionSelect();
+                hideRegionSelect = null;
+                chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_CANCELLED }).catch(() => {});
+            }
+            return;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_PREPARE:
+            fullPage.prepare().then(sendResponse, (err) => {
+                fullPage.finish();
+                sendResponse({ error: err instanceof Error ? err.message : String(err) });
+            });
+            return true;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO:
+            fullPage.scrollTo(message.payload as FullPageScrollToPayload).then(sendResponse, () => {
+                sendResponse({ cancelled: true, scrollY: window.scrollY, documentHeight: document.documentElement.scrollHeight });
+            });
+            return true;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_FINISH:
+            fullPage.finish();
+            sendResponse({ ok: true });
+            return;
+
         case MSG_TYPES.START_RECORDING_EVENTS:
             handleStartRecording(message);
             break;

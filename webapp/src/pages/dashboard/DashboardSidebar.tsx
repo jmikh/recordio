@@ -1,4 +1,4 @@
-import { LuBug, LuLayoutGrid, LuPlus, LuSettings, LuShare2, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
+import { LuBug, LuImage, LuLayoutGrid, LuPlus, LuSettings, LuShare2, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
 import { Button, StatusBadge, LogoLink, SidebarNav, SidebarNavItem, type StatusBadgeVariant } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
@@ -14,18 +14,23 @@ const PLAN_BADGE: Record<WorkspaceEntitlementsState, { label: string; variant: S
     pro: { label: 'Pro', variant: 'primary' },
 };
 
-export type DashboardView = 'all' | 'workspace' | 'published' | 'trash' | 'settings' | 'personal';
+export type DashboardView = 'all' | 'screenshots' | 'workspace' | 'published' | 'trash' | 'settings' | 'personal';
 
 interface DashboardSidebarProps {
     activeView: DashboardView;
     onViewChange: (view: DashboardView) => void;
     projectCount: number;
+    /** Screenshots the caller can see (plans/screenshots) */
+    screenshotCount: number;
     /** Videos shared within the workspace or publicly */
     workspaceCount: number;
     /** The caller's own live projects — the set the free cap counts (Step 4) */
     ownedProjectCount: number;
     /** Server-sourced cap from entitlements; null = uncapped (trial/pro) */
     projectCap: number | null;
+    /** The caller's own live screenshots — the separate free screenshot cap counts these */
+    ownedScreenshotCount: number;
+    screenshotCap: number | null;
     trashCount: number;
     publishedCount: number;
     onRecord: () => void;
@@ -51,13 +56,48 @@ interface NavItem {
     count?: number;
 }
 
+/** Free-plan usage bar — cap and count come from the server (Step 4). */
+function UsageMeter({ used, cap, noun, onOpenBilling }: { used: number; cap: number; noun: string; onOpenBilling: () => void }) {
+    const atCap = used >= cap;
+    return (
+        <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
+            <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-text-main">
+                    {used} of {cap} {noun} used
+                </span>
+            </div>
+            <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden">
+                <div
+                    className={`h-full rounded-full transition-all ${atCap ? 'bg-destructive' : 'bg-primary'}`}
+                    style={{ width: `${Math.min((used / cap) * 100, 100)}%` }}
+                />
+            </div>
+            {atCap && (
+                <>
+                    <button
+                        type="button"
+                        onClick={onOpenBilling}
+                        className="text-xs text-primary hover:underline mt-1.5 cursor-pointer block text-left"
+                    >
+                        Upgrade to Pro for unlimited {noun}
+                    </button>
+                    <TrialExtendLink label="or extend free trial" className="mt-1 text-xs" />
+                </>
+            )}
+        </div>
+    );
+}
+
 export function DashboardSidebar({
     activeView,
     onViewChange,
     projectCount,
+    screenshotCount,
     workspaceCount,
     ownedProjectCount,
     projectCap,
+    ownedScreenshotCount,
+    screenshotCap,
     trashCount,
     publishedCount,
     onRecord,
@@ -77,6 +117,7 @@ export function DashboardSidebar({
 
     const libraryItems: NavItem[] = [
         { icon: LuLayoutGrid, label: 'Your Videos', view: 'all', count: projectCount },
+        { icon: LuImage, label: 'Screenshots', view: 'screenshots', count: screenshotCount },
         { icon: LuUsers, label: 'Workspace', view: 'workspace', count: workspaceCount },
         { icon: LuShare2, label: 'Published', view: 'published', count: publishedCount },
         { icon: LuTrash2, label: 'Trash', view: 'trash', count: trashCount },
@@ -186,35 +227,12 @@ export function DashboardSidebar({
                     </SidebarNav>
                 </div>
 
-                {/* Free plan usage — cap and count come from the server (Step 4) */}
+                {/* Free plan usage — the two caps are independent (plans/screenshots) */}
                 {projectCap != null && (
-                    <div className="mx-3 mt-4 px-3 py-3 bg-surface-raised rounded-[var(--radius-md)] border border-border">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs text-text-main">
-                                {ownedProjectCount} of {projectCap} projects used
-                            </span>
-                        </div>
-                        <div className="h-1.5 bg-state-inactive rounded-full overflow-hidden">
-                            <div
-                                className={`h-full rounded-full transition-all ${
-                                    ownedProjectCount >= projectCap ? 'bg-destructive' : 'bg-primary'
-                                }`}
-                                style={{ width: `${Math.min((ownedProjectCount / projectCap) * 100, 100)}%` }}
-                            />
-                        </div>
-                        {ownedProjectCount >= projectCap && (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={onOpenBilling}
-                                    className="text-xs text-primary hover:underline mt-1.5 cursor-pointer block text-left"
-                                >
-                                    Upgrade to Pro for unlimited projects
-                                </button>
-                                <TrialExtendLink label="or extend free trial" className="mt-1 text-xs" />
-                            </>
-                        )}
-                    </div>
+                    <UsageMeter used={ownedProjectCount} cap={projectCap} noun="projects" onOpenBilling={onOpenBilling} />
+                )}
+                {screenshotCap != null && (
+                    <UsageMeter used={ownedScreenshotCount} cap={screenshotCap} noun="screenshots" onOpenBilling={onOpenBilling} />
                 )}
             </div>
 

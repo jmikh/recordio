@@ -13,6 +13,7 @@ import {
     deriveEntitlementsState,
     entitlementsForState,
     FREE_PROJECT_CAP,
+    FREE_SCREENSHOT_CAP,
 } from '../src/services/entitlements.js';
 
 const NOW = new Date('2026-09-01T12:00:00Z');
@@ -62,6 +63,7 @@ describe('entitlementsForState', () => {
             canInvite: false,
             canRestore: false,
             projectCap: FREE_PROJECT_CAP,
+            screenshotCap: FREE_SCREENSHOT_CAP,
             trialEndsAt: null,
             canExtendTrial: false,
         });
@@ -77,6 +79,7 @@ describe('entitlementsForState', () => {
             canInvite: false,
             canRestore: true,
             projectCap: null,
+            screenshotCap: null,
             trialEndsAt: FUTURE.toISOString(),
             canExtendTrial: false,
         });
@@ -92,6 +95,7 @@ describe('entitlementsForState', () => {
             canInvite: true,
             canRestore: true,
             projectCap: null,
+            screenshotCap: null,
             trialEndsAt: null,
             canExtendTrial: false,
         });

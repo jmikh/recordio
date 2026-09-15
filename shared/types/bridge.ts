@@ -11,6 +11,7 @@
  */
 
 import type { RawRecording } from './core';
+import type { RawScreenshot } from './screenshot';
 
 // ============================================
 // Message Types (sendMessage-based)
@@ -61,9 +62,14 @@ export interface HandoffRequestPayload {
     recordingId: string;
 }
 
-/** Extension → Website: Direct response to HANDOFF_REQUEST */
-export interface HandoffMetadataResponse {
+/**
+ * Extension → Website: Direct response to HANDOFF_REQUEST for a recording.
+ * `kind` is optional for backward compatibility — extensions that predate
+ * screenshots never set it, and the website treats undefined as 'recording'.
+ */
+export interface HandoffRecordingMetadataResponse {
     success: true;
+    kind?: 'recording';
     recording: RawRecording;
     screenVideoSize: number;      // bytes
     screenVideoType: string;      // MIME type
@@ -73,6 +79,20 @@ export interface HandoffMetadataResponse {
     micAudioType?: string;        // MIME type (optional)
     extensionDistinctId?: string; // Mixpanel anonymous ID for identity linking
 }
+
+/** Extension → Website: Direct response to HANDOFF_REQUEST for a screenshot (streamed as one 'image' source). */
+export interface HandoffScreenshotMetadataResponse {
+    success: true;
+    kind: 'screenshot';
+    screenshot: RawScreenshot;
+    imageSize: number;            // bytes
+    imageType: string;            // MIME type
+    extensionDistinctId?: string; // Mixpanel anonymous ID for identity linking
+}
+
+export type HandoffMetadataResponse = HandoffRecordingMetadataResponse | HandoffScreenshotMetadataResponse;
+
+export type HandoffKind = 'recording' | 'screenshot';
 
 /** Extension → Website: Error response */
 export interface HandoffErrorResponse {
@@ -103,9 +123,9 @@ export interface StartStreamPayload {
     recordingId: string;
 }
 
-/** Extension → Website: A chunk of video data */
+/** Extension → Website: A chunk of media data ('image' = screenshot PNG) */
 export interface ChunkPayload {
-    source: 'screen' | 'camera' | 'mic';
+    source: 'screen' | 'camera' | 'mic' | 'image';
     index: number;
     total: number;
     data: number[];  // ArrayBuffer as number[] for structured clone
@@ -149,7 +169,10 @@ export function getEditorOrigin(): string {
 }
 
 /** Build URL for import page. Includes the extension's own ID so the webapp
- *  can connect back without hardcoding it. */
-export function buildImportUrl(recordingId: string, extensionId: string): string {
-    return `${getEditorOrigin()}${IMPORT_PATH}?id=${recordingId}&ext=${extensionId}`;
+ *  can connect back without hardcoding it. `kind` is a cosmetic hint so the
+ *  import page can label the transfer before metadata arrives; the metadata
+ *  response is the source of truth. */
+export function buildImportUrl(itemId: string, extensionId: string, kind?: HandoffKind): string {
+    const kindParam = kind === 'screenshot' ? '&kind=screenshot' : '';
+    return `${getEditorOrigin()}${IMPORT_PATH}?id=${itemId}&ext=${extensionId}${kindParam}`;
 }

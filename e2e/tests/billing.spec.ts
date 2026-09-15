@@ -100,13 +100,14 @@ test.describe('billing (seat pre-purchase)', () => {
         await invite(page, 'e2e-creator-a@example.com', 'Creator');
         await invite(page, 'e2e-creator-b@example.com', 'Creator');
         await expect(page.getByRole('img', { name: /2 reserved by pending invitations/ })).toBeVisible();
-        await expect(page.getByText('No creator seats available')).toBeVisible();
-        // …so the role picker can only offer Viewer now
-        await expect(page.getByRole('button', { name: 'Invite role' })).toHaveText(/Viewer/);
+        // …so a further creator invite is REFUSED rather than quietly downgraded
+        // to a viewer: the picker keeps the admin's choice and the send is blocked.
+        await expect(page.getByRole('button', { name: 'Invite role' })).toHaveText(/Creator/);
+        await expect(page.getByText('No creator seats left')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Send Invite' })).toBeDisabled();
 
-        // Viewers are free — still invitable
+        // Viewers are free — still invitable once the admin picks that role
         await invite(page, 'e2e-viewer@example.com', 'Viewer');
-        await expect(page.getByText('No creator seats available')).toBeVisible();
     });
 });
 

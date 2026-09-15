@@ -7,21 +7,33 @@
  *   - Not paused → immediately pause and show RecordingView (user resumes/finishes/cancels)
  *   - Paused     → show RecordingView as-is (user was already paused)
  *
- * When no recording is active, renders PreRecordingView as normal.
+ * When no recording is active, the header's Video | Image toggle picks the
+ * product: PreRecordingView (video) or ImageCaptureView (screenshots,
+ * plans/screenshots). The choice is persisted in recordio_prefs. A screenshot
+ * capture in progress (full page) shows CapturingView instead.
  */
 
 import { useEffect, useState } from 'react';
-import { LuCircleAlert } from 'react-icons/lu';
-import { Button, LogoLink } from '@shared/components';
-import { MSG_TYPES, STORAGE_KEYS, type RecordingState } from '../shared/messageTypes';
+import { LuCircleAlert, LuImage, LuVideo } from 'react-icons/lu';
+import { Button, LogoLink, MultiToggle } from '@shared/components';
+import { MSG_TYPES, STORAGE_KEYS, type RecordingState, type ScreenshotState } from '../shared/messageTypes';
 import { getEditorOrigin } from '@shared/types/bridge';
 import { PreRecordingView } from './PreRecordingView';
 import { RecordingView } from './RecordingView';
+import { ImageCaptureView, CapturingView } from './ImageCaptureView';
 import { closeBlurMode } from './blurMode';
+import { loadPrefs, updatePrefs, type PopupMode } from './prefs';
+
+interface StoredError {
+    title: string;
+    message: string;
+}
 
 export function PopupApp() {
     const [recordingState, setRecordingState] = useState<RecordingState | null>(null);
-    const [recordingError, setRecordingError] = useState<string | null>(null);
+    const [screenshotState, setScreenshotState] = useState<ScreenshotState | null>(null);
+    const [storedError, setStoredError] = useState<StoredError | null>(null);
+    const [mode, setMode] = useState<PopupMode>('video');
     const [ready, setReady] = useState(false);
 
     useEffect(() => {
@@ -29,17 +41,31 @@ export function PopupApp() {
         closeBlurMode();
 
         (async () => {
-        const result = await chrome.storage.session.get([STORAGE_KEYS.RECORDING_STATE, STORAGE_KEYS.RECORDING_ERROR]);
-            // Check for a recording save failure first
-            const errorData = result[STORAGE_KEYS.RECORDING_ERROR] as { message: string } | undefined;
-            if (errorData?.message) {
-                setRecordingError(errorData.message);
-                // Clear it and the error badge now that the user is seeing it
-                chrome.storage.session.remove(STORAGE_KEYS.RECORDING_ERROR);
+            const prefs = await loadPrefs();
+            setMode(prefs.mode ?? 'video');
+
+            const result = await chrome.storage.session.get([
+                STORAGE_KEYS.RECORDING_STATE,
+                STORAGE_KEYS.RECORDING_ERROR,
+                STORAGE_KEYS.SCREENSHOT_STATE,
+                STORAGE_KEYS.SCREENSHOT_ERROR,
+            ]);
+
+            // A failed save/capture takes precedence — show it, clear it and the badge
+            const recordingError = result[STORAGE_KEYS.RECORDING_ERROR] as { message: string } | undefined;
+            const screenshotError = result[STORAGE_KEYS.SCREENSHOT_ERROR] as { message: string } | undefined;
+            if (recordingError?.message || screenshotError?.message) {
+                setStoredError(recordingError?.message
+                    ? { title: 'Recording failed to save', message: recordingError.message }
+                    : { title: 'Screenshot failed', message: screenshotError!.message });
+                chrome.storage.session.remove([STORAGE_KEYS.RECORDING_ERROR, STORAGE_KEYS.SCREENSHOT_ERROR]);
                 chrome.action.setBadgeText({ text: '' });
                 setReady(true);
                 return;
             }
+
+            const shot = result[STORAGE_KEYS.SCREENSHOT_STATE] as ScreenshotState | undefined;
+            if (shot?.active) setScreenshotState(shot);
 
             const state = result[STORAGE_KEYS.RECORDING_STATE] as RecordingState | undefined;
             if (state?.isRecording) {
@@ -60,43 +86,68 @@ export function PopupApp() {
         })();
     }, []);
 
-    // Keep RecordingView in sync with state changes from background
+    // Keep RecordingView / CapturingView in sync with state changes from background
     useEffect(() => {
-        if (!recordingState) return;
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
-            if (area === 'session' && changes[STORAGE_KEYS.RECORDING_STATE]) {
+            if (area !== 'session') return;
+            if (changes[STORAGE_KEYS.RECORDING_STATE]) {
                 const newState = changes[STORAGE_KEYS.RECORDING_STATE].newValue as RecordingState | undefined;
                 setRecordingState(newState?.isRecording ? newState : null);
+            }
+            if (changes[STORAGE_KEYS.SCREENSHOT_STATE]) {
+                const newState = changes[STORAGE_KEYS.SCREENSHOT_STATE].newValue as ScreenshotState | undefined;
+                setScreenshotState(newState?.active ? newState : null);
             }
         };
         chrome.storage.onChanged.addListener(listener);
         return () => chrome.storage.onChanged.removeListener(listener);
-    }, [!!recordingState]);
+    }, []);
+
+    const handleModeChange = (next: PopupMode) => {
+        setMode(next);
+        void updatePrefs({ mode: next });
+    };
 
     if (!ready) {
         return null;
     }
 
+    const showToggle = !storedError && !recordingState && !screenshotState;
+
     return (
         <div className="bg-surface-body p-1 flex flex-col gap-1">
-            {/* Logo doubles as the dashboard link */}
-            <Button
-                variant="ghost"
-                onClick={() => chrome.tabs.create({ url: getEditorOrigin() })}
-                aria-label="Open dashboard"
-                title="Open dashboard"
-                className="self-start hover:opacity-80 transition-opacity"
-            >
-                <LogoLink imgClassName="h-6 w-auto" />
-            </Button>
+            <div className="flex items-center justify-between">
+                {/* Logo doubles as the dashboard link */}
+                <Button
+                    variant="ghost"
+                    onClick={() => chrome.tabs.create({ url: getEditorOrigin() })}
+                    aria-label="Open dashboard"
+                    title="Open dashboard"
+                    className="self-start hover:opacity-80 transition-opacity"
+                >
+                    <LogoLink imgClassName="h-6 w-auto" />
+                </Button>
+                {showToggle && (
+                    <div aria-label="Capture mode" className="mr-1">
+                        <MultiToggle<PopupMode>
+                            options={[
+                                { value: 'video', icon: <LuVideo className="icon-sm" />, tooltip: 'Record video' },
+                                { value: 'image', icon: <LuImage className="icon-sm" />, tooltip: 'Capture screenshot' },
+                            ]}
+                            value={mode}
+                            onChange={handleModeChange}
+                        />
+                    </div>
+                )}
+            </div>
             <div className="bg-surface border border-border rounded-[var(--radius-lg)] shadow-sm overflow-hidden">
-                {recordingError ? (
+                {storedError ? (
                     <div className="flex flex-col gap-3 p-3">
                         <div className="flex items-start gap-2.5">
                             <LuCircleAlert className="icon-md text-destructive shrink-0 mt-0.5" />
                             <div className="flex flex-col gap-1">
-                                <p className="text-sm text-text-main">Recording failed to save</p>
-                                <p className="text-xs text-text-muted">{recordingError}</p>
+                                <p role="alert" className="text-sm text-text-main">{storedError.title}</p>
+                                <p className="text-xs text-text-muted">{storedError.message}</p>
                             </div>
                         </div>
                         <p className="text-xs text-text-muted">
@@ -112,6 +163,10 @@ export function PopupApp() {
                     </div>
                 ) : recordingState ? (
                     <RecordingView recordingState={recordingState} />
+                ) : screenshotState ? (
+                    <CapturingView state={screenshotState} />
+                ) : mode === 'image' ? (
+                    <ImageCaptureView />
                 ) : (
                     <PreRecordingView />
                 )}

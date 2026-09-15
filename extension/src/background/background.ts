@@ -30,10 +30,23 @@ import {
     getEditorOrigin,
     type HandoffCompletePayload,
 } from '@shared/types/bridge';
-import type { RawRecording } from '@shared/types';
+import type { RawRecording, RawScreenshot } from '@shared/types';
+import { isRawScreenshot } from '@shared/types';
+import {
+    cancelScreenshot,
+    cancelScreenshotForTab,
+    onContentCancelled,
+    onRegionCancelled,
+    onRegionSelected,
+    resetScreenshotStateOnStartup,
+    startScreenshot,
+} from './screenshotCapture';
 
 // Initialize Sentry for error tracking
 initSentry('background');
+
+// A restarted service worker has no capture session — clear any stale mirror
+resetScreenshotStateOnStartup();
 
 // --- State Management ---
 
@@ -395,6 +408,7 @@ async function handleRecordingAborted(controllerTabId: number | null) {
 // --- Tab Removal Listener ---
 // Detect if the controller tab or the recorded tab is closed during recording
 chrome.tabs.onRemoved.addListener(async (tabId) => {
+    await cancelScreenshotForTab(tabId);
     await ensureState();
     if (!currentState) return;
 
@@ -420,6 +434,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
     if (!changeInfo.url) return; // Only care about URL changes
 
+    await cancelScreenshotForTab(tabId);
     await ensureState();
     if (!currentState || currentState.controllerTabId !== tabId) return;
 
@@ -832,6 +847,38 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 break;
             }
 
+            // ── Screenshots (plans/screenshots) ──────────────────────────────
+
+            case MSG_TYPES.POPUP_CAPTURE_SCREENSHOT: {
+                const mode = message.payload?.mode;
+                if (mode !== 'visible' && mode !== 'fullPage' && mode !== 'region') {
+                    sendResponse({ success: false, error: 'Unknown capture mode' });
+                    return;
+                }
+                sendResponse(await startScreenshot(mode, { isRecording: currentState.isRecording, contentScriptPath }));
+                break;
+            }
+
+            case MSG_TYPES.POPUP_CANCEL_SCREENSHOT: {
+                sendResponse({ success: await cancelScreenshot() });
+                break;
+            }
+
+            case MSG_TYPES.CONTENT_REGION_SELECTED:
+                onRegionSelected(_sender.tab?.id, message.payload);
+                sendResponse({ success: true });
+                break;
+
+            case MSG_TYPES.CONTENT_REGION_CANCELLED:
+                onRegionCancelled(_sender.tab?.id);
+                sendResponse({ success: true });
+                break;
+
+            case MSG_TYPES.CONTENT_SCREENSHOT_CANCELLED:
+                onContentCancelled(_sender.tab?.id);
+                sendResponse({ success: true });
+                break;
+
             // ── New: Offscreen → Background ──────────────────────────────────
 
             case MSG_TYPES.OFFSCREEN_DONE: {
@@ -880,12 +927,13 @@ import {
 } from '@shared/types/bridge';
 
 // Cache for pending handoff data (between metadata request and stream)
-const pendingHandoffs = new Map<string, {
-    recording: RawRecording;
-    screenBlob: Blob;
-    cameraBlob?: Blob;
-    micBlob?: Blob;
-}>();
+type PendingHandoff =
+    | { kind: 'recording'; recording: RawRecording; screenBlob: Blob; cameraBlob?: Blob; micBlob?: Blob }
+    | { kind: 'screenshot'; screenshot: RawScreenshot; imageBlob: Blob };
+
+const pendingHandoffs = new Map<string, PendingHandoff>();
+
+const BLOB_PROTOCOL = 'recordio-blob://';
 
 chrome.runtime.onMessageExternal.addListener((message, _sender, sendResponse) => {
     (async () => {
@@ -928,9 +976,9 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
     const { recordingId } = payload;
 
     try {
-        const recording = await ProjectStorage.loadRawRecording(recordingId);
+        const item = await ProjectStorage.loadRawItem(recordingId);
 
-        if (!recording) {
+        if (!item) {
             console.error('[Background] Recording not found:', recordingId);
             captureException(new Error(`Recording not found: ${recordingId}`));
             const errorResponse: HandoffErrorResponse = {
@@ -942,6 +990,23 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             return;
         }
 
+        if (isRawScreenshot(item)) {
+            const imageBlob = await ProjectStorage.getRecordingBlob(item.image.storagePath.replace(BLOB_PROTOCOL, ''));
+            if (!imageBlob) throw new Error('Screenshot image not found');
+            pendingHandoffs.set(recordingId, { kind: 'screenshot', screenshot: item, imageBlob });
+            const response: HandoffMetadataResponse = {
+                success: true,
+                kind: 'screenshot',
+                screenshot: item,
+                imageSize: imageBlob.size,
+                imageType: imageBlob.type || 'image/png',
+                extensionDistinctId: await getDistinctId(),
+            };
+            sendResponse(response);
+            return;
+        }
+
+        const recording = item;
         if (!recording.screenSource.storagePath) {
             throw new Error('Screen source has no storage URL');
         }
@@ -964,7 +1029,7 @@ async function handleHandoffRequest(payload: HandoffRequestPayload, sendResponse
             micBlob = await ProjectStorage.getRecordingBlob(micBlobId);
         }
 
-        pendingHandoffs.set(recordingId, { recording, screenBlob, cameraBlob, micBlob });
+        pendingHandoffs.set(recordingId, { kind: 'recording', recording, screenBlob, cameraBlob, micBlob });
 
         const extensionDistinctId = await getDistinctId();
         const response: HandoffMetadataResponse = {
@@ -1019,17 +1084,20 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
         return;
     }
 
-    const { screenBlob, cameraBlob, micBlob } = cached;
-
     try {
-        await streamBlobChunks(port, screenBlob, 'screen');
+        if (cached.kind === 'screenshot') {
+            await streamBlobChunks(port, cached.imageBlob, 'image');
+        } else {
+            const { screenBlob, cameraBlob, micBlob } = cached;
+            await streamBlobChunks(port, screenBlob, 'screen');
 
-        if (cameraBlob) {
-            await streamBlobChunks(port, cameraBlob, 'camera');
-        }
+            if (cameraBlob) {
+                await streamBlobChunks(port, cameraBlob, 'camera');
+            }
 
-        if (micBlob) {
-            await streamBlobChunks(port, micBlob, 'mic');
+            if (micBlob) {
+                await streamBlobChunks(port, micBlob, 'mic');
+            }
         }
 
         port.postMessage({
@@ -1050,7 +1118,7 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
 async function streamBlobChunks(
     port: chrome.runtime.Port,
     blob: Blob,
-    source: 'screen' | 'camera' | 'mic'
+    source: ChunkPayload['source']
 ) {
     const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
 

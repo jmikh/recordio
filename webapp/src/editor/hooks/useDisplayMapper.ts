@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { DisplayMapper } from '@shared/mappers/displayMapper';
 import type { Size } from '@shared/types';
 import { useProjectStore } from '../stores/useProjectStore';
@@ -34,29 +35,39 @@ export const getDisplayMapper = (outputSize: Size, displaySize: Size): DisplayMa
 };
 
 /**
+ * Hosts that aren't the video editor (the screenshot editor,
+ * plans/screenshots) provide their own mapper here so the bounding-box
+ * kit, arrow handles and inline text editor work unchanged.
+ */
+export const DisplayMapperContext = createContext<DisplayMapper | null>(null);
+export const DisplayMapperProvider = DisplayMapperContext.Provider;
+
+/**
  * Hook to get a DisplayMapper instance for coordinate conversions.
- * 
- * Gets outputSize from the project store and displaySize (canvasContainerSize) 
- * from the UI store. This allows any component to get the mapper without 
- * needing to pass sizes as props.
- * 
+ *
+ * Inside a DisplayMapperProvider it returns the provided mapper. Otherwise
+ * it gets outputSize from the project store and displaySize
+ * (canvasContainerSize) from the UI store, so any video-editor component
+ * can get the mapper without needing to pass sizes as props.
+ *
  * NOTE: The canvas container must set its size via setCanvasContainerSize
- * for this hook to return accurate mappings.
- * 
+ * for the store-derived path to return accurate mappings.
+ *
  * @returns A DisplayMapper instance for coordinate conversions
- * 
+ *
  * @example
  * const displayMapper = useDisplayMapper();
- * 
+ *
  * // Convert output rect to display
  * const displayRect = displayMapper.outputToDisplay(spotlightRect);
- * 
+ *
  * // Get sizes if needed
  * const { outputSize, displaySize } = displayMapper;
  */
 export const useDisplayMapper = (): DisplayMapper => {
+    const provided = useContext(DisplayMapperContext);
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
     const displaySize = useUIStore(s => s.canvasContainerSize);
 
-    return getDisplayMapper(outputSize, displaySize);
+    return provided ?? getDisplayMapper(outputSize, displaySize);
 };

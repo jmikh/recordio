@@ -171,3 +171,31 @@ export function trackRecordingError(props: {
     track('recording_error', props);
 }
 
+// ── Screenshots (plans/screenshots) ──────────────────────────────────────
+
+export type ScreenshotCaptureMode = 'visible' | 'fullPage' | 'region';
+
+export function trackScreenshotCaptured(props: {
+    mode: ScreenshotCaptureMode;
+    width: number;
+    height: number;
+    duration_ms: number;
+    tile_count?: number;
+    truncated?: boolean;
+    downscaled?: boolean;
+    strip_count?: number;
+    header_clipped?: boolean;
+    replanned?: boolean;
+    walk_budget_hit?: boolean;
+    bottom_fixed?: boolean;
+}) {
+    track('screenshot_captured', props);
+}
+
+export function trackScreenshotError(props: {
+    mode: ScreenshotCaptureMode;
+    error: string;
+}) {
+    track('screenshot_error', props);
+}
+

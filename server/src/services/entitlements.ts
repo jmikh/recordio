@@ -31,6 +31,9 @@ import type { Clock, Db } from '../deps.js';
 /** Active-project cap on free workspaces (finalized 2026-09-01, revamp Step 4). */
 export const FREE_PROJECT_CAP = 5;
 
+/** Live-screenshot cap on free workspaces (screenshots sub-product, Step 1). */
+export const FREE_SCREENSHOT_CAP = 20;
+
 const PRO_STATUSES = new Set(['active', 'past_due', 'trialing']);
 
 export function deriveEntitlementsState(
@@ -63,6 +66,7 @@ export function entitlementsForState(
         canInvite: state === 'pro',
         canRestore: paid,
         projectCap: paid ? null : FREE_PROJECT_CAP,
+        screenshotCap: paid ? null : FREE_SCREENSHOT_CAP,
         trialEndsAt: state === 'trial' && trialEndsAt ? trialEndsAt.toISOString() : null,
         canExtendTrial: state === 'free' && canExtendTrial,
     };

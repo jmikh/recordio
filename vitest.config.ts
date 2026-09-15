@@ -8,6 +8,7 @@ export default defineConfig({
     test: {
         include: [
             'shared/**/*.test.ts',
+            'extension/src/**/*.test.ts',
             'webapp/src/**/*.test.ts',
             'render-worker/src/**/*.test.ts',
             'server/src/**/*.test.ts',

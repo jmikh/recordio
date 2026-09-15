@@ -24,3 +24,6 @@ export * from './project';
 
 // Device frame types
 export * from './deviceFrames';
+
+// Screenshot sub-product (raw capture + editor document)
+export * from './screenshot';

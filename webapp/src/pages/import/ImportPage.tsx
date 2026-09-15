@@ -4,7 +4,9 @@ import { useExtensionBridge } from './useExtensionBridge';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
 import { captureImportError } from '../../lib/sentry';
-import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed } from '../../analytics';
+import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed, trackScreenshotCreated } from '../../analytics';
+import { ScreenshotService, readScreenshotCapError } from '../../screenshot/screenshotService';
+import { screenshotEditPath } from '../../lib/screenshotUrls';
 import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
 import { LogoLink, Button } from '@shared/components';
@@ -64,7 +66,7 @@ export function ImportPage() {
     const [hasStarted, setHasStarted] = useState(false);
     const [uploadPhase, setUploadPhase] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [capInfo, setCapInfo] = useState<{ cap: number | null } | null>(null);
+    const [capInfo, setCapInfo] = useState<{ cap: number | null; kind: 'project' | 'screenshot' } | null>(null);
     // The recovery panel switches workspaces; retries follow the store
     const storeWorkspaceId = useWorkspaceStore(s => s.workspaceId);
 
@@ -76,6 +78,13 @@ export function ImportPage() {
     // Get recording ID from URL, stripping any legacy "proj-" prefix
     const params = new URLSearchParams(window.location.search);
     const recordingId = params.get('id')?.replace(/^proj-/, '') ?? null;
+    // Screenshot handoff (plans/screenshots): the extension tags the URL so the
+    // copy is right before metadata arrives; the bridge's `kind` is authoritative
+    const isScreenshot = state.kind ? state.kind === 'screenshot' : params.get('kind') === 'screenshot';
+    /** The handoff delivered everything the upload needs. */
+    const hasPayload = state.kind === 'screenshot'
+        ? !!(state.screenshot && state.image)
+        : !!(state.recording && state.screenVideo);
 
     // Track page view once on mount
     useEffect(() => {
@@ -108,7 +117,7 @@ export function ImportPage() {
             setStatus('streaming');
         }
 
-        if (state.status === 'success' && state.recording && state.screenVideo) {
+        if (state.status === 'success' && hasPayload) {
             // Blobs received — now upload to cloud
             const { userId } = useUserStore.getState();
 
@@ -175,20 +184,19 @@ export function ImportPage() {
         return { settings: resolveProjectDefaults(stored), personal: stored !== null };
     }
     useEffect(() => {
-        if (showAuthModal && userId && state.status === 'success' && state.recording && state.screenVideo) {
+        if (showAuthModal && userId && state.status === 'success' && hasPayload) {
             setShowAuthModal(false);
             performUpload();
         }
     }, [userId, showAuthModal, state.status]);
 
-    async function performUpload() {
-        if (!state.recording || !state.screenVideo) return;
-
+    /** Shared preamble of both upload paths; null (after reporting) when no workspace resolves. */
+    async function prepareUpload(phase: string): Promise<string | null> {
         // Reset any lingering sync-error state from a previous attempt
         useSyncStatusStore.getState().setIdle();
 
         setStatus('uploading');
-        setUploadPhase('Saving project...');
+        setUploadPhase(phase);
         setUploadProgress(0);
 
         // Tell extension which user this is so its events share the same Mixpanel distinct_id.
@@ -216,8 +224,17 @@ export function ImportPage() {
                 is_offline: !navigator.onLine,
             });
             setStatus('error-upload');
-            return;
+            return null;
         }
+        return workspaceId;
+    }
+
+    async function performUpload() {
+        if (state.kind === 'screenshot') return performScreenshotUpload();
+        if (!state.recording || !state.screenVideo) return;
+
+        const workspaceId = await prepareUpload('Saving project...');
+        if (!workspaceId) return;
 
         try {
             // 1. Create project on server, get storage paths, cache blobs locally.
@@ -256,7 +273,7 @@ export function ImportPage() {
             // no Sentry, dedicated recovery UI (revamp Step 4)
             const capRefusal = await readProjectCapError(error);
             if (capRefusal) {
-                setCapInfo(capRefusal);
+                setCapInfo({ ...capRefusal, kind: 'project' });
                 setStatus('error-cap');
                 trackImportFailed({
                     recording_id: recordingId,
@@ -289,6 +306,78 @@ export function ImportPage() {
                 mic_audio_size: state.micAudio?.size ?? undefined,
             });
             trackProjectCreatedFailure('import', error instanceof Error ? error.message : undefined);
+        }
+    }
+
+    /**
+     * Screenshot path (plans/screenshots Step 6): create the row, upload the
+     * PNG (awaited — one small file), then open the editor. The cap refusal
+     * gets the same recovery panel as projects, listing screenshots.
+     */
+    async function performScreenshotUpload() {
+        const { screenshot, image } = state;
+        if (!screenshot || !image) return;
+
+        const workspaceId = await prepareUpload('Saving screenshot...');
+        if (!workspaceId) return;
+
+        const { userId: uid } = useUserStore.getState();
+        let pageHost: string | null = null;
+        try { pageHost = new URL(screenshot.page.url).hostname; } catch { /* file:// etc. */ }
+
+        try {
+            const result = await ScreenshotService.importScreenshot(
+                screenshot,
+                image,
+                workspaceId,
+                fraction => setUploadProgress(Math.round(fraction * 100)),
+            );
+
+            setUploadProgress(100);
+            setStatus('success');
+            confirmHandoff(result.id);
+            trackScreenshotCreated({
+                capture_mode: screenshot.captureMode,
+                width_px: result.doc.source.widthPx,
+                height_px: result.doc.source.heightPx,
+                page_host: pageHost,
+                user_id: uid,
+                success: true,
+            });
+            navigate(screenshotEditPath(result.slug));
+        } catch (error: unknown) {
+            const capRefusal = await readScreenshotCapError(error);
+            if (capRefusal) {
+                setCapInfo({ ...capRefusal, kind: 'screenshot' });
+                setStatus('error-cap');
+                trackImportFailed({
+                    recording_id: recordingId,
+                    phase: 'cap',
+                    error: 'screenshot_cap_reached',
+                    is_offline: !navigator.onLine,
+                });
+                return;
+            }
+
+            console.error('[ImportPage] Screenshot import failed:', error);
+            captureImportError(error, {
+                recordingId,
+                phase: 'uploading',
+                bridgeStatus: state.status,
+                extra: { kind: 'screenshot', imageSize: image.size },
+            });
+            const message = error instanceof Error && error.message ? error.message : 'Import failed';
+            setStatus('error-upload');
+            setErrorDetails(message);
+            trackScreenshotCreated({
+                capture_mode: screenshot.captureMode,
+                width_px: screenshot.image.size.width,
+                height_px: screenshot.image.size.height,
+                page_host: pageHost,
+                user_id: uid,
+                success: false,
+                error: message,
+            });
         }
     }
 
@@ -378,21 +467,21 @@ export function ImportPage() {
             case 'init':
             case 'receiving':
             case 'streaming':
-                return 'Receiving Recording';
+                return isScreenshot ? 'Receiving screenshot' : 'Receiving Recording';
             case 'uploading':
                 return uploadPhase || 'Uploading...';
             case 'success':
                 return 'Opening Editor...';
             case 'error-no-id':
-                return 'No recording ID provided';
+                return isScreenshot ? 'No screenshot ID provided' : 'No recording ID provided';
             case 'error-extension':
-                return 'Failed to receive recording';
+                return isScreenshot ? 'Failed to receive screenshot' : 'Failed to receive recording';
             case 'error-auth':
                 return 'Sign in required';
             case 'error-upload':
-                return 'Failed to upload project';
+                return isScreenshot ? 'Failed to upload screenshot' : 'Failed to upload project';
             case 'error-cap':
-                return 'Project limit reached';
+                return isScreenshot ? 'Screenshot limit reached' : 'Project limit reached';
         }
     };
 
@@ -449,6 +538,7 @@ export function ImportPage() {
 
                 {status === 'error-cap' && capInfo && storeWorkspaceId && (
                     <CapRecoveryPanel
+                        kind={capInfo.kind}
                         cap={capInfo.cap}
                         workspaceId={storeWorkspaceId}
                         onRetry={() => performUpload()}
@@ -457,7 +547,7 @@ export function ImportPage() {
 
                 {isError && status !== 'error-cap' && (
                     <div className="mt-4 flex flex-col items-center gap-2">
-                        {status === 'error-upload' && state.recording && state.screenVideo && (
+                        {status === 'error-upload' && hasPayload && (
                             <Button
                                 variant="primary"
                                 onClick={() => performUpload()}

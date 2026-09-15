@@ -100,6 +100,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
             canInvite: true,
             canRestore: true,
             projectCap: null,
+            screenshotCap: null,
             trialEndsAt: null,
             canExtendTrial: false,
         });
@@ -160,6 +161,7 @@ describe.runIf(hasTestDb())('POST /subscription-get (e2e, real Postgres)', () =>
                 canInvite: false, // trials are solo
                 canRestore: true,
                 projectCap: null,
+                screenshotCap: null,
                 trialEndsAt: '2026-06-01T00:00:00.000Z',
                 canExtendTrial: false, // live trial — the offer is post-lapse only
             },

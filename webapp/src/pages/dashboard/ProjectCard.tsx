@@ -41,6 +41,12 @@ interface ProjectCardProps {
     /** Opens share settings — pass only for projects the viewer owns */
     onShare?: (id: string) => void;
     showUpdatedAt?: boolean;
+    /** Copy-link URL override (default: the video URL of `shareSlug`) — screenshots pass theirs */
+    shareUrl?: string | null;
+    /** Replaces the duration badge (e.g. an image icon for screenshots) */
+    badge?: React.ReactNode;
+    /** Hide the duration badge entirely (default: shown) */
+    showDuration?: boolean;
 }
 
 function formatDuration(ms: number): string {
@@ -73,6 +79,9 @@ export const ProjectCard = ({
     onDelete,
     onShare,
     showUpdatedAt = false,
+    shareUrl: shareUrlOverride,
+    badge,
+    showDuration = true,
 }: ProjectCardProps) => {
     const isGrid = variant === 'grid';
     const isTrashed = !!project.deletedAt;
@@ -81,7 +90,9 @@ export const ProjectCard = ({
     // Every project has a slug now — the link is only meaningfully
     // shareable when the policy grants someone access to it
     const isSharedOut = project.sharePolicy === 'public' || project.sharePolicy === 'workspace';
-    const shareUrl = isSharedOut && project.shareSlug ? videoUrl(project.shareSlug) : null;
+    const shareUrl = isSharedOut
+        ? (shareUrlOverride ?? (project.shareSlug ? videoUrl(project.shareSlug) : null))
+        : null;
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -207,10 +218,16 @@ export const ProjectCard = ({
                     </button>
                 )}
 
-                {/* Duration Badge */}
-                <div className="absolute bottom-2 right-2 bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded">
-                    {formatDuration(project.durationMs ?? 0)}
-                </div>
+                {/* Duration Badge (or the host's replacement) */}
+                {badge !== undefined ? (
+                    <div className="absolute bottom-2 right-2 bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded flex items-center">
+                        {badge}
+                    </div>
+                ) : showDuration && (
+                    <div className="absolute bottom-2 right-2 bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded">
+                        {formatDuration(project.durationMs ?? 0)}
+                    </div>
+                )}
             </div>
 
             {/* Info */}

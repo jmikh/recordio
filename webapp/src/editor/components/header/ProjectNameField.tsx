@@ -7,6 +7,17 @@ const CHROME_WIDTH = 18;
 const MIN_WIDTH = 60;
 const MAX_WIDTH = 240;
 
+interface ProjectNameFieldProps {
+    /** Controlled name; default: the project store's name */
+    value?: string;
+    /** Commit handler; default: the project store's rename */
+    onCommit?: (name: string) => void;
+    placeholder?: string;
+    ariaLabel?: string;
+    /** Stable DOM id for e2e; default `project-name-input` */
+    inputId?: string;
+}
+
 /**
  * Project name in the editor header.
  *
@@ -15,10 +26,21 @@ const MAX_WIDTH = 240;
  * Clicking selects the whole name so typing replaces it.
  * The input stays mounted in both states so it keeps a stable accessible
  * handle (`#project-name-input`) for e2e.
+ *
+ * Without props it is bound to the project store; the screenshot editor
+ * (plans/screenshots) passes `value` / `onCommit` instead.
  */
-export const ProjectNameField = () => {
-    const projectName = useProjectName();
+export const ProjectNameField = ({
+    value,
+    onCommit,
+    placeholder = PLACEHOLDER,
+    ariaLabel = 'Project name',
+    inputId = 'project-name-input',
+}: ProjectNameFieldProps = {}) => {
+    const storeName = useProjectName();
     const updateProjectName = useProjectStore(s => s.updateProjectName);
+    const projectName = value ?? storeName;
+    const commit = onCommit ?? updateProjectName;
 
     const [localName, setLocalName] = useState(projectName);
     const [isEditing, setIsEditing] = useState(false);
@@ -61,10 +83,10 @@ export const ProjectNameField = () => {
         }
         // Clearing the field is a reset, not a rename to "" — fall back to the
         // placeholder so what we persist matches what the field shows.
-        const next = e.currentTarget.value.trim() || PLACEHOLDER;
+        const next = e.currentTarget.value.trim() || placeholder;
         setLocalName(next);
-        if (next !== projectName) updateProjectName(next);
-    }, [projectName, updateProjectName]);
+        if (next !== projectName) commit(next);
+    }, [projectName, commit, placeholder]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
@@ -79,9 +101,9 @@ export const ProjectNameField = () => {
         <div className="relative flex justify-center w-[240px]">
             <input
                 ref={inputRef}
-                id="project-name-input"
+                id={inputId}
                 type="text"
-                aria-label="Project name"
+                aria-label={ariaLabel}
                 value={localName}
                 style={{ width }}
                 onChange={(e) => setLocalName(e.target.value)}
@@ -95,7 +117,7 @@ export const ProjectNameField = () => {
                         ? 'text-text-highlighted cursor-text'
                         : 'text-text-main cursor-pointer hover:text-text-highlighted'
                 }`}
-                placeholder={PLACEHOLDER}
+                placeholder={placeholder}
             />
             {/* Off-screen twin: measures the text at the input's own typography */}
             <span
@@ -103,7 +125,7 @@ export const ProjectNameField = () => {
                 aria-hidden="true"
                 className="absolute left-0 top-0 invisible whitespace-pre text-sm pointer-events-none"
             >
-                {localName || PLACEHOLDER}
+                {localName || placeholder}
             </span>
         </div>
     );

@@ -29,6 +29,12 @@ export interface WorkspaceEntitlements {
      */
     projectCap: number | null;
     /**
+     * Live-screenshot cap per user in this workspace; null = uncapped.
+     * Separate from projectCap (screenshots are their own sub-product);
+     * enforced by /screenshot-create.
+     */
+    screenshotCap: number | null;
+    /**
      * Restore-from-trash is trial/pro; enforced by /project-restore
      * (revamp Step 4).
      */

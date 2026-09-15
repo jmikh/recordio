@@ -66,9 +66,23 @@
  *     CONTENT_COUNTDOWN_COMPLETE
  *     CONTENT_COUNTDOWN_CANCELLED
  *     CONTENT_PLAY_COUNTDOWN_SOUND
+ *
+ *   SCREENSHOTS (plans/screenshots) — background owns the session; the popup
+ *   only starts/cancels it and the content script exposes page primitives.
+ *     POPUP_CAPTURE_SCREENSHOT { mode }        Popup → Background
+ *     POPUP_CANCEL_SCREENSHOT                  Popup → Background
+ *     BACKGROUND_CONTENT_GET_PAGE_INFO         Background → Content → PageInfo
+ *     BACKGROUND_CONTENT_START_REGION_SELECT   Background → Content (show the drag overlay)
+ *     BACKGROUND_CONTENT_CANCEL_REGION_SELECT  Background/Popup → Content (broadcast)
+ *     BACKGROUND_CONTENT_FULLPAGE_PREPARE      Background → Content → FullPagePrepareResult
+ *     BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO    Background → Content → { scrollY, cancelled }
+ *     BACKGROUND_CONTENT_FULLPAGE_FINISH       Background → Content (restore the page)
+ *     CONTENT_REGION_SELECTED { rect, … }      Content → Background
+ *     CONTENT_REGION_CANCELLED                 Content → Background
+ *     CONTENT_SCREENSHOT_CANCELLED             Content → Background (Escape mid full-page)
  */
 
-import type { BaseEvent, Size } from '@shared/types';
+import type { BaseEvent, Rect, Size } from '@shared/types';
 
 
 export interface BaseMessage {
@@ -187,6 +201,32 @@ export const MSG_TYPES = {
     /** Background → Content (broadcast): close the blur picker UI. Sent before recording
      *  starts (window/desktop) or resumes so the toast/overlay never ends up in the video. */
     BACKGROUND_CONTENT_DISABLE_BLUR_MODE: 'BACKGROUND_CONTENT_DISABLE_BLUR_MODE',
+
+    // ── Screenshots (plans/screenshots) ──────────────────────────────────────
+    /** Popup → Background: capture the active tab
+     *  payload: { mode: ScreenshotMode }  response: { success, error? } */
+    POPUP_CAPTURE_SCREENSHOT: 'POPUP_CAPTURE_SCREENSHOT',
+    /** Popup → Background: abort the in-progress capture (full page) */
+    POPUP_CANCEL_SCREENSHOT: 'POPUP_CANCEL_SCREENSHOT',
+    /** Background → Content: page metadata for the capture  response: PageInfo */
+    BACKGROUND_CONTENT_GET_PAGE_INFO: 'BACKGROUND_CONTENT_GET_PAGE_INFO',
+    /** Background → Content: show the drag-to-select overlay */
+    BACKGROUND_CONTENT_START_REGION_SELECT: 'BACKGROUND_CONTENT_START_REGION_SELECT',
+    /** Background/Popup → Content (broadcast): remove the overlay if present */
+    BACKGROUND_CONTENT_CANCEL_REGION_SELECT: 'BACKGROUND_CONTENT_CANCEL_REGION_SELECT',
+    /** Background → Content: prepare the page for tiled capture  response: FullPagePrepareResult */
+    BACKGROUND_CONTENT_FULLPAGE_PREPARE: 'BACKGROUND_CONTENT_FULLPAGE_PREPARE',
+    /** Background → Content: scroll to a tile and settle
+     *  payload: FullPageScrollToPayload  response: FullPageScrollToResult */
+    BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO: 'BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO',
+    /** Background → Content: restore everything prepare() changed (always sent, also on error/cancel) */
+    BACKGROUND_CONTENT_FULLPAGE_FINISH: 'BACKGROUND_CONTENT_FULLPAGE_FINISH',
+    /** Content → Background: the user confirmed a region  payload: RegionSelectedPayload */
+    CONTENT_REGION_SELECTED: 'CONTENT_REGION_SELECTED',
+    /** Content → Background: the user pressed Escape on the region overlay */
+    CONTENT_REGION_CANCELLED: 'CONTENT_REGION_CANCELLED',
+    /** Content → Background: the user pressed Escape during a full-page capture */
+    CONTENT_SCREENSHOT_CANCELLED: 'CONTENT_SCREENSHOT_CANCELLED',
 } as const;
 
 export type MessageTypeName = typeof MSG_TYPES[keyof typeof MSG_TYPES];
@@ -197,7 +237,113 @@ export const STORAGE_KEYS = {
     RECORDING_STATE: 'recording_state',
     /** Stores { message: string } when a recording save fails, cleared after popup reads it */
     RECORDING_ERROR: 'recording_error',
+    /** ScreenshotState while a capture is in progress (lets a reopened popup show progress/cancel) */
+    SCREENSHOT_STATE: 'screenshot_state',
+    /** Stores { message: string } when a screenshot capture fails, cleared after popup reads it */
+    SCREENSHOT_ERROR: 'screenshot_error',
 } as const;
+
+// --- Screenshot Types ---
+
+export type ScreenshotMode = 'visible' | 'fullPage' | 'region';
+
+/** Mirrored to chrome.storage.session[SCREENSHOT_STATE] while a capture runs. */
+export interface ScreenshotState {
+    active: boolean;
+    mode: ScreenshotMode;
+    tabId: number;
+    /** Full page only — tiles captured so far / planned */
+    progress: { done: number; total: number } | null;
+}
+
+/** Response to BACKGROUND_CONTENT_GET_PAGE_INFO (also gathered via executeScript for visible mode). */
+export interface PageInfo {
+    url: string;
+    title: string;
+    /** Layout viewport in CSS px */
+    viewport: Size;
+    devicePixelRatio: number;
+    /** visualViewport.scale — 1 unless pinch-zoomed */
+    visualScale: number;
+    scrollX: number;
+    scrollY: number;
+}
+
+/** Content → Background after the drag overlay was removed and the page repainted. */
+export interface RegionSelectedPayload {
+    /** Selected rect in CSS px relative to the visual viewport */
+    rect: Rect;
+    /** Visual viewport size in CSS px */
+    viewport: Size;
+    devicePixelRatio: number;
+    visualScale: number;
+}
+
+/** An inner scroller the background tiles as its own strip (plans/full-page-capture-oneshot.md). */
+export interface FullPageStripInfo {
+    index: number;
+    /** Border box in CSS px: viewport x, document y (natural position at window scroll 0) */
+    box: Rect;
+    scrollHeight: number;
+    clientHeight: number;
+    /** Window scrollY that shows the whole box */
+    windowY: number;
+    /** Background inside the box, for the column below its expanded content */
+    insideColor?: string;
+}
+
+/** Background colour of a column beside/between strips (CSS px x-range) */
+export interface FullPageFill {
+    x0: number;
+    x1: number;
+    color: string;
+}
+
+export interface FullPagePrepareResult {
+    viewportWidth: number;
+    viewportHeight: number;
+    devicePixelRatio: number;
+    scrollX: number;
+    document: { scrollWidth: number; scrollHeight: number; scrollable: boolean };
+    /** Fixed-header band in CSS px (0 = none); decided once, drives the window step */
+    headerHeight: number;
+    strips: FullPageStripInfo[];
+    pageBackground: string;
+    fills: FullPageFill[];
+    /** Bottom-anchored fixed elements exist → the background runs a footer pass */
+    hasBottomFixed: boolean;
+    /** Pinch-zoomed (visualViewport.scale !== 1) — tiling math would be wrong */
+    pinchZoomed: boolean;
+    /** The DOM walk hit its node/time budget; classification may be incomplete */
+    walkBudgetHit: boolean;
+}
+
+export interface FullPageScrollToPayload {
+    phase: 'tile' | 'footer';
+    /** -1 = the window, otherwise an index into FullPagePrepareResult.strips */
+    strip: number;
+    windowY: number;
+    /** Strip element scrollTop (strip ≥ 0) */
+    scrollTop?: number;
+    /** Global counters, for the toast */
+    tileIndex: number;
+    tileCount: number;
+}
+
+export interface FullPageScrollToResult {
+    cancelled: boolean;
+    /** Actual window.scrollY after the scroll (the last tile is clamped by the browser) */
+    scrollY: number;
+    /** Actual element scrollTop (strip ≥ 0) */
+    scrollTop?: number;
+    /** Strip: the element's border box on screen, clipped to the viewport (CSS px) */
+    box?: Rect;
+    /** Live document height, for re-planning after the first scrolls */
+    documentHeight: number;
+    stripScrollHeight?: number;
+    /** Footer phase: on-screen rects of the bottom-anchored fixed elements */
+    footerRects?: Rect[];
+}
 
 // --- State Interfaces ---
 

@@ -5,6 +5,15 @@
  * Used during playback and export (not during editing — the selected item
  * is rendered via HTML/SVG overlay instead).
  *
+ * Two entry points:
+ *   - drawOverlays()    — video: picks the segments active at a time, applies the
+ *                         zoom-viewport transform, paints them back-to-front.
+ *   - drawOverlayItem() — one item, no time dimension. Used by drawOverlays and by
+ *                         the screenshot renderer (plans/screenshots). The CALLER
+ *                         owns the canvas transform; the paint context only carries
+ *                         the sizes the painters need for blur projection and
+ *                         effect/text scaling.
+ *
  * All coordinates are in OUTPUT pixels.
  */
 
@@ -25,6 +34,28 @@ export const TEXT_REF_HEIGHT = 1080;
 export const TEXT_REF_PADDING = 8;
 export const TEXT_REF_RADIUS = 6;
 
+/** Minimum pixelate cell size in canvas pixels (below this it's just a blur-less copy). */
+const MIN_PIXELATE_CELL = 2;
+
+/**
+ * What the per-item painters need beyond the item itself.
+ *
+ * Video passes outputSize + the zoom viewport and derives both scales from
+ * outputSize.height / 1080. Screenshots pass the crop rect as viewport and
+ * width-based scales so a tall full-page capture doesn't inflate shadows
+ * and text padding.
+ */
+export interface OverlayPaintContext {
+    /** Logical canvas size (video: output size; screenshot: crop size) */
+    outputSize: Size;
+    /** Region of output space currently mapped onto the canvas (video: zoom viewport; screenshot: crop rect) */
+    viewport: Rect;
+    /** Multiplier for shadow/glow parameters */
+    effectScale: number;
+    /** Multiplier for text background padding/radius */
+    textScale: number;
+}
+
 /**
  * Draws all overlay items for the given time.
  * @param ctx - Canvas 2D context
@@ -42,7 +73,8 @@ export function drawOverlays(
     viewport: Rect,
     editingItemId?: string | null
 ): void {
-    const effectScale = outputSize.height / REF_OUTPUT_HEIGHT;
+    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
+    const paint: OverlayPaintContext = { outputSize, viewport, effectScale: scale, textScale: scale };
 
     // Apply viewport transform: overlay coordinates are in output space,
     // so we scale + translate to project them through the zoom viewport.
@@ -73,39 +105,56 @@ export function drawOverlays(
         // Only skip text when being edited (rendered via HTML for inline editing).
         if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
 
-        drawOverlayItem(ctx, item, outputSize, effectScale, viewport);
+        drawOverlayItem(ctx, item, paint);
     }
 
     ctx.restore();
 }
 
-function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, outputSize: Size, effectScale: number, viewport: Rect): void {
+/**
+ * Draws a single overlay item. The caller must already have applied the
+ * output→canvas transform (scale by outputSize/viewport, translate by
+ * -viewport). Blur/pixelate reset the transform internally and project
+ * through `paint.viewport` themselves, because ctx.filter and drawImage
+ * self-copies are ambiguous under a non-identity CTM.
+ */
+export function drawOverlayItem(ctx: CanvasRenderingContext2D, item: OverlayItem, paint: OverlayPaintContext): void {
     switch (item.type) {
-        case 'blur': return drawBlur(ctx, item, outputSize, viewport);
-        case 'text': return drawText(ctx, item, outputSize);
-        case 'arrow': return drawArrow(ctx, item, effectScale);
-        case 'border': return drawBorder(ctx, item, effectScale);
+        case 'blur': return item.mode === 'pixelate'
+            ? drawPixelate(ctx, item, paint)
+            : drawBlur(ctx, item, paint);
+        case 'text': return drawText(ctx, item, paint.textScale);
+        case 'arrow': return drawArrow(ctx, item, paint.effectScale);
+        case 'border': return drawBorder(ctx, item, paint.effectScale);
     }
 }
 
 // ============================================================================
-// BLUR
+// BLUR / PIXELATE
 // ============================================================================
 
-function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, outputSize: Size, viewport: Rect): void {
-    const { rectPx, blurRadiusPx, borderRadiusPx } = item;
+/** Projects an output-space rect into raw canvas pixel space through the viewport. */
+function projectRect(rectPx: Rect, paint: OverlayPaintContext) {
+    const { outputSize, viewport } = paint;
+    const scaleX = outputSize.width / viewport.width;
+    const scaleY = outputSize.height / viewport.height;
+    return {
+        scaleX,
+        scaleY,
+        canvasX: (rectPx.x - viewport.x) * scaleX,
+        canvasY: (rectPx.y - viewport.y) * scaleY,
+        canvasW: rectPx.width * scaleX,
+        canvasH: rectPx.height * scaleY,
+    };
+}
+
+function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, paint: OverlayPaintContext): void {
+    const { blurRadiusPx, borderRadiusPx } = item;
 
     // Work entirely in canvas pixel space to avoid CTM/filter ambiguity.
     // The parent transform is scale(sx,sy) + translate(-vp.x,-vp.y).
     // We reset the transform and manually project all coordinates.
-    const scaleX = outputSize.width / viewport.width;
-    const scaleY = outputSize.height / viewport.height;
-
-    // Project the overlay rect from output space to canvas pixel space
-    const canvasX = (rectPx.x - viewport.x) * scaleX;
-    const canvasY = (rectPx.y - viewport.y) * scaleY;
-    const canvasW = rectPx.width * scaleX;
-    const canvasH = rectPx.height * scaleY;
+    const { scaleX, canvasX, canvasY, canvasW, canvasH } = projectRect(item.rectPx, paint);
 
     // Scale blur radius by zoom so blur stays equally effective at all zoom levels.
     // When zoomed in 2×, content pixels double, so blur kernel must double too.
@@ -138,19 +187,64 @@ function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, outputSi
     ctx.restore();
 }
 
+/** Scratch canvas for pixelate downsampling — reused across calls (never displayed). */
+let scratchCanvas: OffscreenCanvas | HTMLCanvasElement | null = null;
+
+function getScratchCanvas(width: number, height: number): OffscreenCanvas | HTMLCanvasElement {
+    if (!scratchCanvas) {
+        scratchCanvas = typeof OffscreenCanvas !== 'undefined'
+            ? new OffscreenCanvas(width, height)
+            : document.createElement('canvas');
+    }
+    if (scratchCanvas.width !== width) scratchCanvas.width = width;
+    if (scratchCanvas.height !== height) scratchCanvas.height = height;
+    return scratchCanvas;
+}
+
+/**
+ * Pixelate: downsample the region to (size / cell) with smoothing, then draw it
+ * back at full size with smoothing OFF so each source cell becomes a flat block.
+ * Unlike ctx.filter blur this works on every canvas implementation (Safari < 18
+ * has no ctx.filter), which is why screenshots default new items to it there.
+ */
+function drawPixelate(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, paint: OverlayPaintContext): void {
+    const { blurRadiusPx, borderRadiusPx } = item;
+    const { scaleX, canvasX, canvasY, canvasW, canvasH } = projectRect(item.rectPx, paint);
+    if (canvasW < 1 || canvasH < 1) return;
+
+    const cell = Math.max(MIN_PIXELATE_CELL, blurRadiusPx * scaleX);
+    const smallW = Math.max(1, Math.ceil(canvasW / cell));
+    const smallH = Math.max(1, Math.ceil(canvasH / cell));
+
+    const scratch = getScratchCanvas(smallW, smallH);
+    const sctx = scratch.getContext('2d') as CanvasRenderingContext2D | null;
+    if (!sctx) return;
+    sctx.imageSmoothingEnabled = true;
+    sctx.clearRect(0, 0, smallW, smallH);
+    sctx.drawImage(ctx.canvas, canvasX, canvasY, canvasW, canvasH, 0, 0, smallW, smallH);
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const scaledRadius = borderRadiusPx.map(r => r * scaleX) as [number, number, number, number];
+    roundRectPath(ctx, canvasX, canvasY, canvasW, canvasH, scaledRadius);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(scratch, 0, 0, smallW, smallH, canvasX, canvasY, canvasW, canvasH);
+    ctx.restore();
+}
+
 // ============================================================================
 // TEXT
 // ============================================================================
 
-function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, outputSize: Size): void {
+function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, textScale: number): void {
     const { topLeft, widthPx, text, fontSizePx, fontFamily, fontWeight, color } = item;
 
     ctx.save();
 
     // Painter-derived constants (not stored per-item)
-    const scale = outputSize.height / TEXT_REF_HEIGHT;
-    const pad = Math.round(TEXT_REF_PADDING * scale);
-    const bgRadius = Math.round(TEXT_REF_RADIUS * scale);
+    const pad = Math.round(TEXT_REF_PADDING * textScale);
+    const bgRadius = Math.round(TEXT_REF_RADIUS * textScale);
 
     // Font
     const fontString = `${fontWeight} ${fontSizePx}px ${fontFamily}, sans-serif`;
@@ -180,8 +274,12 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, outputSi
     ctx.restore();
 }
 
-/** Word-wrap text into lines that fit within maxWidth, with character-level breaking for long words. */
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+/**
+ * Word-wrap text into lines that fit within maxWidth, with character-level
+ * breaking for long words. `ctx.font` must already be set. Exported so the
+ * screenshot editor can measure a text item's height for hit-testing.
+ */
+export function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
@@ -199,7 +297,7 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 
         // If current word alone exceeds maxWidth, break it character by character
         if (ctx.measureText(currentLine).width > maxWidth) {
-            let remaining = currentLine;
+            const remaining = currentLine;
             currentLine = '';
             for (const char of remaining) {
                 const test = currentLine + char;
@@ -220,24 +318,28 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 }
 
 // ============================================================================
-// ARROW
+// ARROW / LINE
 // ============================================================================
 
-function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem, effectScale: number): void {
-    const { tail, head, strokeWidthPx, color } = item;
-
-    ctx.save();
-
+function applyEffect(ctx: CanvasRenderingContext2D, effect: ArrowOverlayItem['effect'], color: string, effectScale: number): void {
     // Shadow / Glow (derived from effect enum, matching camera painter pattern)
-    if (item.effect === 'shadow') {
+    if (effect === 'shadow') {
         ctx.shadowColor = SHADOW_COLOR;
         ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
-    } else if (item.effect === 'glow') {
+    } else if (effect === 'glow') {
         ctx.shadowColor = color;
         ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
     }
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem, effectScale: number): void {
+    const { tail, head, strokeWidthPx, color } = item;
+    const hasHead = item.headStyle !== 'none';
+
+    ctx.save();
+    applyEffect(ctx, item.effect, color, effectScale);
 
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
@@ -253,53 +355,55 @@ function drawArrow(ctx: CanvasRenderingContext2D, item: ArrowOverlayItem, effect
     // Arrowhead size (fixed scale, no longer stored per-item)
     const headSize = strokeWidthPx * 4 * HEAD_SCALE;
 
-    // Draw shaft
+    // Draw shaft — stops short of the tip when there's a head so the stroke
+    // cap doesn't poke out of the triangle; a plain line runs all the way.
+    const shaftEndX = hasHead ? head.x - Math.cos(angle) * headSize * 0.7 : head.x;
+    const shaftEndY = hasHead ? head.y - Math.sin(angle) * headSize * 0.7 : head.y;
     ctx.beginPath();
     ctx.moveTo(tail.x, tail.y);
-    ctx.lineTo(head.x - Math.cos(angle) * headSize * 0.7, head.y - Math.sin(angle) * headSize * 0.7);
+    ctx.lineTo(shaftEndX, shaftEndY);
     ctx.stroke();
 
     // Draw arrowhead
-    ctx.beginPath();
-    ctx.moveTo(head.x, head.y);
-    ctx.lineTo(
-        head.x - headSize * Math.cos(angle - Math.PI / 6),
-        head.y - headSize * Math.sin(angle - Math.PI / 6)
-    );
-    ctx.lineTo(
-        head.x - headSize * Math.cos(angle + Math.PI / 6),
-        head.y - headSize * Math.sin(angle + Math.PI / 6)
-    );
-    ctx.closePath();
-    ctx.fill();
+    if (hasHead) {
+        ctx.beginPath();
+        ctx.moveTo(head.x, head.y);
+        ctx.lineTo(
+            head.x - headSize * Math.cos(angle - Math.PI / 6),
+            head.y - headSize * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+            head.x - headSize * Math.cos(angle + Math.PI / 6),
+            head.y - headSize * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fill();
+    }
 
     ctx.restore();
 }
 
 // ============================================================================
-// BORDER
+// BORDER (rect / ellipse)
 // ============================================================================
+
+function ellipsePath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y + h / 2, Math.max(0, w / 2), Math.max(0, h / 2), 0, 0, Math.PI * 2);
+}
 
 function drawBorder(ctx: CanvasRenderingContext2D, item: BorderOverlayItem, effectScale: number): void {
     const { rectPx, borderWidthPx, color, borderRadiusPx } = item;
+    const isEllipse = item.shape === 'ellipse';
 
     ctx.save();
-
-    // Shadow / Glow (derived from effect enum, matching camera painter pattern)
-    if (item.effect === 'shadow') {
-        ctx.shadowColor = SHADOW_COLOR;
-        ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
-    } else if (item.effect === 'glow') {
-        ctx.shadowColor = color;
-        ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
-    }
+    applyEffect(ctx, item.effect, color, effectScale);
 
     // Fill
     if (item.fillColor) {
         ctx.fillStyle = item.fillColor;
-        roundRectPath(ctx, rectPx.x, rectPx.y, rectPx.width, rectPx.height, borderRadiusPx);
+        if (isEllipse) ellipsePath(ctx, rectPx.x, rectPx.y, rectPx.width, rectPx.height);
+        else roundRectPath(ctx, rectPx.x, rectPx.y, rectPx.width, rectPx.height, borderRadiusPx);
         ctx.fill();
     }
 
@@ -312,7 +416,8 @@ function drawBorder(ctx: CanvasRenderingContext2D, item: BorderOverlayItem, effe
 
     ctx.strokeStyle = color;
     ctx.lineWidth = borderWidthPx;
-    roundRectPath(ctx, insetX, insetY, insetW, insetH, borderRadiusPx);
+    if (isEllipse) ellipsePath(ctx, insetX, insetY, insetW, insetH);
+    else roundRectPath(ctx, insetX, insetY, insetW, insetH, borderRadiusPx);
     ctx.stroke();
 
     ctx.restore();

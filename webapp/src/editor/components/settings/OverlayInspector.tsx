@@ -8,7 +8,12 @@ import { LuArrowUpRight, LuType } from 'react-icons/lu';
 import { TbBlur, TbBorderOuter } from 'react-icons/tb';
 import type { OverlaySegment, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '@shared/types/overlay';
 import type { OverlaySettings } from '@shared/types/settings';
-import type { Size } from '@shared/types';
+import type { AnnotationDefaults } from '@shared/types/screenshot';
+import { createDefaultItem } from '../../overlay/defaultItems';
+
+// Default item factory lives in ../../overlay/defaultItems (shared with the
+// screenshot editor); re-exported so existing imports keep working
+export { createDefaultItem };
 
 const OVERLAY_TYPE_LABELS: Record<OverlayItemType, string> = {
     blur: 'Blur',
@@ -22,67 +27,6 @@ const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
     text: <LuType className="icon-sm" />,
     arrow: <LuArrowUpRight className="icon-sm" />,
     border: <TbBorderOuter className="icon-sm" />,
-};
-
-// ============================================================================
-// Default item factory — reads from settings defaults
-// ============================================================================
-
-// Hardcoded fallbacks for projects without saved defaults
-const BLUR_FALLBACK = { blurRadiusPx: 20 };
-const TEXT_FALLBACK = { color: '#454545', backgroundColor: '#ffdb57', fontSizePx: 0 };
-const ARROW_FALLBACK = { color: '#7B61FF', strokeWidthPx: 4 };
-const BORDER_FALLBACK = { color: '#7B61FF', borderWidthPx: 4 };
-
-export const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySettings: OverlaySettings): OverlayItem => {
-    const id = crypto.randomUUID();
-    const { width: W, height: H } = outputSize;
-
-    switch (type) {
-        case 'blur': {
-            const d = overlaySettings.blurDefaults ?? BLUR_FALLBACK;
-            const w = Math.round(W * 0.2);
-            const h = Math.round(H * 0.15);
-            return {
-                id, type: 'blur',
-                rectPx: { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), width: w, height: h },
-                blurRadiusPx: d.blurRadiusPx,
-                borderRadiusPx: [0, 0, 0, 0],
-            };
-        }
-         case 'text': {
-            const d = overlaySettings.textDefaults ?? TEXT_FALLBACK;
-            const fontSize = d.fontSizePx > 0 ? d.fontSizePx : Math.round(Math.min(W, H) * 0.025);
-            return {
-                id, type: 'text', text: 'Text',
-                topLeft: { x: Math.round(W * 0.3), y: Math.round(H * 0.45) },
-                widthPx: Math.round(W * 0.2),
-                fontSizePx: fontSize, fontFamily: 'Inter', fontWeight: 400,
-                color: d.color, backgroundColor: d.backgroundColor,
-            };
-        }
-        case 'arrow': {
-            const d = overlaySettings.arrowDefaults ?? ARROW_FALLBACK;
-            return {
-                id, type: 'arrow',
-                tail: { x: Math.round(W * 0.3), y: Math.round(H * 0.6) },
-                head: { x: Math.round(W * 0.6), y: Math.round(H * 0.4) },
-                color: d.color, strokeWidthPx: d.strokeWidthPx,
-                effect: 'none',
-            };
-        }
-        case 'border': {
-            const bw = Math.round(W * 0.3);
-            const bh = Math.round(H * 0.25);
-            const d = overlaySettings.borderDefaults ?? BORDER_FALLBACK;
-            return {
-                id, type: 'border',
-                rectPx: { x: Math.round((W - bw) / 2), y: Math.round((H - bh) / 2), width: bw, height: bh },
-                color: d.color, borderWidthPx: d.borderWidthPx, borderRadiusPx: [8, 8, 8, 8],
-                effect: 'none',
-            };
-        }
-    }
 };
 
 // ============================================================================
@@ -176,21 +120,24 @@ export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block })
 
 // ============================================================================
 // ITEM SETTINGS — type-specific property controls
+// Store-free; also hosted by the screenshot inspector (plans/screenshots).
 // ============================================================================
 
-interface OverlayItemSettingsProps {
-    block: OverlaySegment;
+export interface OverlayItemSettingsProps {
+    /** Video only — the owning segment (unused by the controls themselves) */
+    block?: OverlaySegment;
     item: OverlayItem;
-    overlaySettings: OverlaySettings;
+    overlaySettings: AnnotationDefaults;
     updateItem: (updates: Partial<OverlayItem>) => void;
-    updateSettings: (s: any) => void;
+    /** Video only — reserved for apply-to-all defaults */
+    updateSettings?: (s: any) => void;
     startInteraction: () => void;
     endInteraction: () => void;
     batchAction: (fn: () => void) => void;
 }
 
-const OverlayItemSettings: React.FC<OverlayItemSettingsProps> = ({
-    block, item, overlaySettings, updateItem, updateSettings,
+export const OverlayItemSettings: React.FC<OverlayItemSettingsProps> = ({
+    item, updateItem,
     startInteraction, endInteraction, batchAction,
 }) => {
     // Slider row: label left, value right, slider below

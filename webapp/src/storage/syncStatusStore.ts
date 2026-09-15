@@ -14,6 +14,8 @@ export interface SyncState {
     mediaUploadError: { projectId: string; projectName?: string; message: string; onRetry: () => void } | null;
     /** Set when another device wrote a newer version */
     conflict: { projectId: string } | null;
+    /** Screenshot counterpart of `conflict` (plans/screenshots) — read by the screenshot editor's modal */
+    screenshotConflict: { screenshotId: string } | null;
     /** Path to navigate to after conflict resolution (set when leaving editor mid-conflict) */
     pendingNavigation: string | null;
 }
@@ -30,6 +32,8 @@ interface SyncStatusStore extends SyncState {
     setMediaUploadError: (err: SyncState['mediaUploadError']) => void;
     setConflict: (conflict: SyncState['conflict']) => void;
     clearConflict: () => void;
+    setScreenshotConflict: (conflict: SyncState['screenshotConflict']) => void;
+    clearScreenshotConflict: () => void;
     setPendingNavigation: (path: string | null) => void;
 }
 
@@ -42,6 +46,7 @@ export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
     error: null,
     mediaUploadError: null,
     conflict: null,
+    screenshotConflict: null,
     pendingNavigation: null,
 
     setSyncing: () => set({ status: 'syncing', error: null }),
@@ -55,5 +60,7 @@ export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
     setMediaUploadError: (err) => set({ mediaUploadError: err }),
     setConflict: (conflict) => set({ conflict }),
     clearConflict: () => set({ conflict: null, pendingNavigation: null }),
+    setScreenshotConflict: (screenshotConflict) => set({ screenshotConflict }),
+    clearScreenshotConflict: () => set({ screenshotConflict: null }),
     setPendingNavigation: (path) => set({ pendingNavigation: path }),
 }));
