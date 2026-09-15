@@ -17,7 +17,8 @@ import { useUserStore } from '../auth/useUserStore';
 import { ScreenshotStorage } from '../screenshot/api/screenshotStorage';
 import { downloadBlob, exportFileName } from '../screenshot/export/exportScreenshot';
 import { screenshotUrl } from '../lib/screenshotUrls';
-import { trackScreenshotViewed } from '../analytics';
+import { captureError } from '../lib/sentry';
+import { trackScreenshotViewed, trackScreenshotViewFailed, trackScreenshotViewDownloaded } from '../analytics';
 
 export function ScreenshotViewPage() {
     const [data, setData] = useState<SharedScreenshotGetResponse | null>(null);
@@ -50,11 +51,21 @@ export function ScreenshotViewPage() {
             })
             .catch(err => {
                 if (cancelled) return;
-                if (err instanceof FunctionsHttpError && err.context?.status === 403) {
+                const status = err instanceof FunctionsHttpError ? err.context?.status ?? null : null;
+                if (status === 403) {
                     setAuthRequired(true);
-                } else {
-                    setError('Screenshot not found or has been removed');
+                    return;
                 }
+                // 404 is a deleted/unknown slug — not a bug. Anything else
+                // (5xx, network, parse) is, and would otherwise read as "not found".
+                if (status !== 404) captureError(err, { flow: 'screenshot_view', phase: 'load', extra: { slug, status } });
+                trackScreenshotViewFailed({
+                    slug,
+                    error: err instanceof Error ? err.message : String(err),
+                    status,
+                    is_offline: !navigator.onLine,
+                });
+                setError('Screenshot not found or has been removed');
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
@@ -62,20 +73,27 @@ export function ScreenshotViewPage() {
 
     const copyLink = async () => {
         if (!slug) return;
-        await navigator.clipboard.writeText(screenshotUrl(slug));
-        setLinkCopied(true);
-        setTimeout(() => setLinkCopied(false), 2000);
+        try {
+            await navigator.clipboard.writeText(screenshotUrl(slug));
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        } catch (err) {
+            captureError(err, { flow: 'screenshot_view', phase: 'copy_link', extra: { slug } });
+        }
     };
 
     const download = async () => {
-        if (!data?.imageUrl || downloading) return;
+        if (!data?.imageUrl || !slug || downloading) return;
         setDownloading(true);
         try {
             const response = await fetch(data.imageUrl);
             if (!response.ok) throw new Error(`Download failed: ${response.status}`);
             downloadBlob(await response.blob(), exportFileName(data.name, 'png'));
-        } catch {
+            trackScreenshotViewDownloaded({ slug, success: true });
+        } catch (err) {
             // The presigned URL may have expired — a reload fetches a fresh one
+            captureError(err, { flow: 'screenshot_view', phase: 'download', extra: { slug } });
+            trackScreenshotViewDownloaded({ slug, success: false, error: err instanceof Error ? err.message : String(err) });
             window.open(data.imageUrl, '_blank');
         } finally {
             setDownloading(false);

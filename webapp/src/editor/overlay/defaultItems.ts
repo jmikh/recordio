@@ -10,7 +10,7 @@ import type { AnnotationDefaults } from '@shared/types/screenshot';
 
 // Hardcoded fallbacks for projects without saved defaults
 const BLUR_FALLBACK = { blurRadiusPx: 20 };
-const TEXT_FALLBACK = { color: '#454545', backgroundColor: '#ffdb57', fontSizePx: 0 };
+const TEXT_FALLBACK = { color: '#454545', backgroundColor: '#ffdb5700', fontSizePx: 0 };
 const ARROW_FALLBACK = { color: '#7B61FF', strokeWidthPx: 4 };
 const BORDER_FALLBACK = { color: '#7B61FF', borderWidthPx: 4 };
 
@@ -26,8 +26,8 @@ export const createDefaultItemInRect = (type: OverlayItemType, area: Rect, defau
     switch (type) {
         case 'blur': {
             const d = defaults.blurDefaults ?? BLUR_FALLBACK;
-            const w = Math.round(W * 0.2);
-            const h = Math.round(H * 0.15);
+            const w = Math.round(W * 0.15);
+            const h = Math.round(H * 0.12);
             return {
                 id, type: 'blur',
                 rectPx: { x: X + Math.round((W - w) / 2), y: Y + Math.round((H - h) / 2), width: w, height: h },
@@ -57,8 +57,8 @@ export const createDefaultItemInRect = (type: OverlayItemType, area: Rect, defau
             };
         }
         case 'border': {
-            const bw = Math.round(W * 0.3);
-            const bh = Math.round(H * 0.25);
+            const bw = Math.round(W * 0.15);
+            const bh = Math.round(H * 0.125);
             const d = defaults.borderDefaults ?? BORDER_FALLBACK;
             return {
                 id, type: 'border',

@@ -1,4 +1,4 @@
-import { LuBug, LuImage, LuLayoutGrid, LuPlus, LuSettings, LuShare2, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
+import { LuBug, LuLayoutGrid, LuPlus, LuSettings, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
 import { Button, StatusBadge, LogoLink, SidebarNav, SidebarNavItem, type StatusBadgeVariant } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
@@ -14,15 +14,14 @@ const PLAN_BADGE: Record<WorkspaceEntitlementsState, { label: string; variant: S
     pro: { label: 'Pro', variant: 'primary' },
 };
 
-export type DashboardView = 'all' | 'screenshots' | 'workspace' | 'published' | 'trash' | 'settings' | 'personal';
+export type DashboardView = 'all' | 'workspace' | 'trash' | 'settings' | 'personal';
 
 interface DashboardSidebarProps {
     activeView: DashboardView;
     onViewChange: (view: DashboardView) => void;
-    projectCount: number;
-    /** Screenshots the caller can see (plans/screenshots) */
-    screenshotCount: number;
-    /** Videos shared within the workspace or publicly */
+    /** Videos + screenshots owned by or shared directly with the caller */
+    yoursCount: number;
+    /** Videos + screenshots shared within the workspace or publicly */
     workspaceCount: number;
     /** The caller's own live projects — the set the free cap counts (Step 4) */
     ownedProjectCount: number;
@@ -32,7 +31,6 @@ interface DashboardSidebarProps {
     ownedScreenshotCount: number;
     screenshotCap: number | null;
     trashCount: number;
-    publishedCount: number;
     onRecord: () => void;
     isAuthenticated: boolean;
     onOpenSupport: () => void;
@@ -91,15 +89,13 @@ function UsageMeter({ used, cap, noun, onOpenBilling }: { used: number; cap: num
 export function DashboardSidebar({
     activeView,
     onViewChange,
-    projectCount,
-    screenshotCount,
+    yoursCount,
     workspaceCount,
     ownedProjectCount,
     projectCap,
     ownedScreenshotCount,
     screenshotCap,
     trashCount,
-    publishedCount,
     onRecord,
     isAuthenticated,
     onOpenSupport,
@@ -116,10 +112,8 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
 
     const libraryItems: NavItem[] = [
-        { icon: LuLayoutGrid, label: 'Your Videos', view: 'all', count: projectCount },
-        { icon: LuImage, label: 'Screenshots', view: 'screenshots', count: screenshotCount },
+        { icon: LuLayoutGrid, label: 'Yours', view: 'all', count: yoursCount },
         { icon: LuUsers, label: 'Workspace', view: 'workspace', count: workspaceCount },
-        { icon: LuShare2, label: 'Published', view: 'published', count: publishedCount },
         { icon: LuTrash2, label: 'Trash', view: 'trash', count: trashCount },
     ];
 

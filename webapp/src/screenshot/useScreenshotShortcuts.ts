@@ -1,7 +1,8 @@
 /**
  * Keyboard shortcuts for the screenshot editor: tool letters, Delete,
  * Escape (exit text edit → cancel crop → deselect), Enter (apply crop),
- * ⌘Z / ⇧⌘Z. Ignored while typing in an input or contentEditable.
+ * ⌘Z / ⇧⌘Z, ⌘+ / ⌘− / ⌘0 (view zoom). Ignored while typing in an input
+ * or contentEditable.
  */
 import { useEffect } from 'react';
 import { useScreenshotStore } from './store/useScreenshotStore';
@@ -31,6 +32,13 @@ export function useScreenshotShortcuts(): void {
                 const temporal = useScreenshotStore.temporal.getState();
                 if (e.shiftKey) temporal.redo(); else temporal.undo();
                 return;
+            }
+            if (meta && !e.shiftKey && !e.altKey) {
+                switch (e.key) {
+                    case '=': case '+': e.preventDefault(); ui.zoomIn(); return;
+                    case '-': e.preventDefault(); ui.zoomOut(); return;
+                    case '0': e.preventDefault(); ui.resetZoom(); return;
+                }
             }
             if (meta || e.altKey) return;
 

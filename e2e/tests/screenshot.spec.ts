@@ -71,9 +71,9 @@ test('share dialog shows the owner controls and publishes to the public page', a
     await anon.close();
 });
 
-test('dashboard lists the screenshot in its own section and opens the editor', async ({ page }) => {
+test('dashboard lists the screenshot under the Screenshots tab and opens the editor', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Screenshots' }).click();
+    await page.getByRole('tab', { name: 'Screenshots' }).click();
     await page.getByText(seeded.name).first().click();
     await expect(page).toHaveURL(/\/screenshot\/[^/]+\/edit/);
     await expect(page.locator('#screenshot-name-input')).toHaveValue(seeded.name, { timeout: 20_000 });

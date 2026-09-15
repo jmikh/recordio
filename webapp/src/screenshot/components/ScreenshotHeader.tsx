@@ -15,6 +15,7 @@ import { captureError } from '../../lib/sentry';
 import { ScreenshotService } from '../screenshotService';
 import { useScreenshotHistory, useScreenshotStore } from '../store/useScreenshotStore';
 import { useScreenshotMetaStore } from '../store/useScreenshotMetaStore';
+import { navigate } from '../../lib/navigate';
 
 function SaveStatusBadge() {
     const status = useSyncStatusStore(s => s.status);
@@ -51,7 +52,14 @@ export function ScreenshotHeader({ children }: { children?: ReactNode }) {
     return (
         <header className="h-14 shrink-0 px-3 flex items-center justify-between relative bg-surface border-b border-border select-none">
             <div className="flex items-center gap-3">
-                <LogoLink imgClassName="h-7" />
+                <Button
+                    variant="ghost"
+                    onClick={() => navigate('/')}
+                    aria-label="Go to dashboard"
+                    className="w-fit"
+                >
+                    <LogoLink imgClassName="h-7" />
+                </Button>
                 <div className="h-4 w-px bg-border" />
                 <div className="flex items-center gap-1">
                     <Button variant="ghost" icon={LuUndo2} onClick={() => undo()} disabled={!canUndo} aria-label="Undo" title="Undo (Cmd+Z)" />

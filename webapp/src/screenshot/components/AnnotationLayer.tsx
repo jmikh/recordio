@@ -56,6 +56,7 @@ export function AnnotationLayer({ mapper, view, previewItemRef }: AnnotationLaye
                     isEditing={isEditingText && item.type === 'text'}
                     onEnterEdit={enterTextEdit}
                     onExitEdit={exitTextEdit}
+                    hideLinkToggle
                 />
             </div>
         </DisplayMapperProvider>

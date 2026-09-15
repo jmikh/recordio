@@ -29,10 +29,13 @@ export interface OverlayItemEditorProps {
     isEditing: boolean;
     onEnterEdit: () => void;
     onExitEdit: () => void;
+    /** Hide the corner link/unlink toggle (corners always edit together) */
+    hideLinkToggle?: boolean;
 }
 
 export const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
     item: storeItem, updateItem, batcher, previewItemRef, textScale, constraintBounds, isEditing, onEnterEdit, onExitEdit,
+    hideLinkToggle = false,
 }) => {
     const { startInteraction, endInteraction, batchAction } = batcher;
     const displayMapper = useDisplayMapper();
@@ -109,7 +112,7 @@ export const OverlayItemEditor: React.FC<OverlayItemEditorProps> = ({
                     minSize={minDim * 0.04}
                     constraintBounds={constraintBounds}
                     hideCornerPreview={item.type === 'border'}
-                    hideLinkToggle={item.type === 'blur'}
+                    hideLinkToggle={hideLinkToggle || item.type === 'blur'}
                     onChange={handleRectChange}
                     onCommit={handleRectCommit}
                     onDragStart={handleStartDrag}

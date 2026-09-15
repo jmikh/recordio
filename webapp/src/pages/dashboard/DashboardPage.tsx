@@ -12,7 +12,7 @@ import { ScreenshotStorage } from '../../screenshot/api/screenshotStorage';
 import { useScreenshotMetaStore } from '../../screenshot/store/useScreenshotMetaStore';
 import { ScreenshotShareModal } from '../../screenshot/components/ScreenshotShareModal';
 import { screenshotEditPath, screenshotUrl, screenshotViewPath } from '../../lib/screenshotUrls';
-import { DashboardHeader, type FilterTab, type SortOrder } from './DashboardHeader';
+import { DashboardHeader, type ContentKind, type SortOrder } from './DashboardHeader';
 import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
 import { PersonalSettingsPage } from '../settings/personal/PersonalSettingsPage';
 import { usePersonalDefaultsStore } from '../settings/personal/usePersonalDefaultsStore';
@@ -104,29 +104,23 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         [allProjects, userId],
     );
 
-    // Screenshots (plans/screenshots): own + shared to the workspace; own trashed
-    const visibleScreenshots = useMemo(
-        () => allScreenshots
-            .filter(s => !s.deletedAt && (s.ownerId === userId || s.sharePolicy === 'workspace' || s.sharePolicy === 'public'))
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-        [allScreenshots, userId],
+    // Screenshots (plans/screenshots) split the same way as videos:
+    // Yours = own; Workspace = shared to the workspace or publicly; Trash = own trashed
+    const screenshots = useMemo(() => allScreenshots.filter(s => !s.deletedAt), [allScreenshots]);
+    const yourScreenshots = useMemo(
+        () => screenshots.filter(s => s.ownerId === userId),
+        [screenshots, userId],
     );
-    const ownedScreenshotCount = useMemo(
-        () => allScreenshots.filter(s => !s.deletedAt && s.ownerId === userId).length,
-        [allScreenshots, userId],
+    const workspaceScreenshots = useMemo(
+        () => screenshots.filter(s => s.sharePolicy === 'workspace' || s.sharePolicy === 'public'),
+        [screenshots],
     );
+    // The free screenshot cap counts the caller's own live screenshots
+    const ownedScreenshotCount = yourScreenshots.length;
     const trashScreenshots = useMemo(
         () => allScreenshots.filter(s => !!s.deletedAt && s.ownerId === userId),
         [allScreenshots, userId],
     );
-    /** Trash shows both kinds, most recently deleted first */
-    const trashItems = useMemo(() => {
-        const items: ({ kind: 'project'; item: ProjectListItem } | { kind: 'screenshot'; item: ScreenshotListItem })[] = [
-            ...trashProjects.map(item => ({ kind: 'project' as const, item })),
-            ...trashScreenshots.map(item => ({ kind: 'screenshot' as const, item })),
-        ];
-        return items.sort((a, b) => new Date(b.item.deletedAt!).getTime() - new Date(a.item.deletedAt!).getTime());
-    }, [trashProjects, trashScreenshots]);
 
     const isAuthenticated = !!userId;
     const [memberCount, setMemberCount] = useState<number | null>(null);
@@ -150,7 +144,8 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         return 'last_created';
     });
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+    // Videos / Screenshots selector — shared by Yours, Workspace and Trash
+    const [activeKind, setActiveKind] = useState<ContentKind>('videos');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const selectMode = selectedIds.size > 0;
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -250,33 +245,37 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         return () => { ctrl.cancelled = true; };
     }, [isAuthenticated, workspaceId]);
 
-    // View-filtered base list
+    // View-filtered base lists — one per kind so the tab counts stay accurate
+    const isTrash = activeView === 'trash';
     const viewProjects = useMemo(() => {
-        if (activeView === 'workspace') {
-            return workspaceProjects;
-        }
-        if (activeView === 'published') {
-            return projects.filter(p => p.shareSlug);
-        }
+        if (isTrash) return trashProjects;
+        if (activeView === 'workspace') return workspaceProjects;
         return yourProjects;
-    }, [projects, yourProjects, workspaceProjects, activeView]);
+    }, [activeView, isTrash, yourProjects, workspaceProjects, trashProjects]);
+    const viewScreenshots = useMemo(() => {
+        if (isTrash) return trashScreenshots;
+        if (activeView === 'workspace') return workspaceScreenshots;
+        return yourScreenshots;
+    }, [activeView, isTrash, yourScreenshots, workspaceScreenshots, trashScreenshots]);
 
-    // Data pipeline: search → filter → sort → group
-    const searchFiltered = useMemo(() => {
-        if (!searchQuery.trim()) return viewProjects;
-        const q = searchQuery.toLowerCase();
-        return viewProjects.filter(p => p.name.toLowerCase().includes(q));
-    }, [viewProjects, searchQuery]);
+    // Data pipeline: search → sort (trash is always most recently deleted first)
+    const query = searchQuery.trim().toLowerCase();
+    const hasSearch = query.length > 0;
+    const searchedProjects = useMemo(
+        () => query ? viewProjects.filter(p => p.name.toLowerCase().includes(query)) : viewProjects,
+        [viewProjects, query],
+    );
+    const searchedScreenshots = useMemo(
+        () => query ? viewScreenshots.filter(s => s.name.toLowerCase().includes(query)) : viewScreenshots,
+        [viewScreenshots, query],
+    );
 
-    const tabFiltered = useMemo(() => {
-        if (activeFilter === 'under_1min') {
-            return searchFiltered.filter(p => (p.durationMs ?? 0) < 60000);
-        }
-        return searchFiltered;
-    }, [searchFiltered, activeFilter]);
+    const byDeletedAt = <T extends { deletedAt: string | null }>(a: T, b: T) =>
+        new Date(b.deletedAt!).getTime() - new Date(a.deletedAt!).getTime();
 
     const sortedProjects = useMemo(() => {
-        const sorted = [...tabFiltered];
+        const sorted = [...searchedProjects];
+        if (isTrash) return sorted.sort(byDeletedAt);
         switch (sortOrder) {
             case 'last_created':
                 sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -292,17 +291,17 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 break;
         }
         return sorted;
-    }, [tabFiltered, sortOrder]);
+    }, [searchedProjects, sortOrder, isTrash]);
 
-    // Counts for header
-    const under1MinCount = useMemo(() => {
-        const base = searchQuery.trim()
-            ? viewProjects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-            : viewProjects;
-        return base.filter(p => (p.durationMs ?? 0) < 60000).length;
-    }, [viewProjects, searchQuery]);
-
-    const sharedCount = useMemo(() => projects.filter(p => p.isShared).length, [projects]);
+    // Screenshots have no duration: the duration sorts fall back to creation time
+    const sortedScreenshots = useMemo(() => {
+        const sorted = [...searchedScreenshots];
+        if (isTrash) return sorted.sort(byDeletedAt);
+        if (sortOrder === 'last_updated') {
+            return sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        }
+        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }, [searchedScreenshots, sortOrder, isTrash]);
 
     // The free-plan cap counts the CALLER's projects, not the workspace's
     const ownedProjectCount = useMemo(
@@ -555,15 +554,13 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 <DashboardSidebar
                     activeView={settingsPage === 'personal' ? 'personal' : showSettings ? 'settings' : activeView}
                     onViewChange={handleViewChange}
-                    projectCount={yourProjects.length}
-                    screenshotCount={visibleScreenshots.length}
-                    workspaceCount={workspaceProjects.length}
+                    yoursCount={yourProjects.length + yourScreenshots.length}
+                    workspaceCount={workspaceProjects.length + workspaceScreenshots.length}
                     ownedProjectCount={ownedProjectCount}
                     projectCap={entitlements.projectCap}
                     ownedScreenshotCount={ownedScreenshotCount}
                     screenshotCap={entitlements.screenshotCap}
-                    trashCount={trashItems.length}
-                    publishedCount={sharedCount}
+                    trashCount={trashProjects.length + trashScreenshots.length}
                     onRecord={handleRecord}
                     isAuthenticated={isAuthenticated}
                     onOpenSupport={() => setIsSupportModalOpen(true)}
@@ -605,133 +602,142 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                         <main className="flex-1 overflow-y-auto p-8">
                             <WorkspaceSettingsPage />
                         </main>
-                    ) : activeView === 'screenshots' ? (
-                        <ScreenshotsView
-                            items={visibleScreenshots}
-                            loading={screenshotsLoading}
-                            userId={userId}
-                            onOpen={handleOpenScreenshot}
-                            onRename={handleRenameScreenshot}
-                            onDelete={handleDeleteScreenshot}
-                            onShare={item => void handleScreenshotShareSettings(item)}
-                        />
-                    ) : activeView !== 'trash' ? (
+                    ) : (
                         <>
                             <DashboardHeader
                                 searchQuery={searchQuery}
                                 onSearchChange={setSearchQuery}
-                                activeFilter={activeFilter}
-                                onFilterChange={setActiveFilter}
-                                totalCount={searchFiltered.length}
-                                under1MinCount={under1MinCount}
+                                activeKind={activeKind}
+                                onKindChange={setActiveKind}
+                                videoCount={searchedProjects.length}
+                                screenshotCount={searchedScreenshots.length}
                                 sortOrder={sortOrder}
                                 onSortChange={setSortOrder}
+                                showSort={!isTrash}
                             />
 
-                        {/* Project Grid */}
-                        <main className="flex-1 overflow-y-auto p-6">
-                            {loading ? (
-                                <div className="flex items-center justify-center h-64">
-                                    <div className="text-text-muted">Loading projects...</div>
-                                </div>
-                            ) : sortedProjects.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                    <p className="text-sm text-text-muted">
-                                        {searchQuery.trim() || activeFilter !== 'all'
-                                            ? 'No recordings match your search.'
-                                            : <>Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.</>
-                                        }
+                            <main className="flex-1 overflow-y-auto p-6">
+                                {isTrash && (
+                                    <p className="text-sm text-text-muted mb-6">
+                                        Videos and screenshots in trash are permanently deleted after 30 days.
                                     </p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-                                    {sortedProjects.map((item: ProjectListItem) => (
-                                        <ProjectCard
-                                            key={item.id}
-                                            variant="grid"
-                                            project={{
-                                                id: item.id,
-                                                name: item.name,
-                                                thumbnail: item.thumbnail,
-                                                createdAt: item.createdAt,
-                                                updatedAt: item.updatedAt,
-                                                durationMs: item.durationMs,
-                                                shareSlug: item.shareSlug,
-                                                sharePolicy: item.sharePolicy,
-                                                sharedWithMe: !!item.editorRole && item.ownerId !== userId,
-                                            }}
-                                            onOpen={() => handleOpen(item)}
-                                            selectMode={selectMode}
-                                            selected={selectedIds.has(item.id)}
-                                            onSelect={() => toggleSelect(item.id)}
-                                            onRename={handleRename}
-                                            onDelete={handleDelete}
-                                            onShare={item.ownerId === userId
-                                                ? () => void handleShareSettings(item)
-                                                : undefined}
-                                            showUpdatedAt={sortOrder === 'last_updated'}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </main>
-                    </>
-                ) : (
-                    /* Trash View */
-                    <main className="flex-1 overflow-y-auto p-6">
-                        <div className="mb-6">
-                            <h1 className="heading-2">Trash</h1>
-                            <p className="text-sm text-text-muted mt-1">
-                                Videos and screenshots in trash are permanently deleted after 30 days.
-                            </p>
-                        </div>
-                        {loading || screenshotsLoading ? (
-                            <div className="flex items-center justify-center h-64">
-                                <div className="text-text-muted">Loading...</div>
-                            </div>
-                        ) : trashItems.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-3">
-                                <LuTrash2 size={40} className="text-text-muted/50" />
-                                <p className="text-sm text-text-muted">Trash is empty</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-                                {trashItems.map(entry => entry.kind === 'project' ? (
-                                    <ProjectCard
-                                        key={`project-${entry.item.id}`}
-                                        variant="grid"
-                                        project={{
-                                            id: entry.item.id,
-                                            name: entry.item.name,
-                                            thumbnail: entry.item.thumbnail,
-                                            createdAt: entry.item.createdAt,
-                                            durationMs: entry.item.durationMs,
-                                            deletedAt: entry.item.deletedAt,
-                                        }}
-                                        onOpen={() => {}}
-                                        onRestore={() => handleRestore(entry.item.id)}
+                                )}
+                                {activeKind === 'screenshots' && !isTrash ? (
+                                    <ScreenshotsView
+                                        items={sortedScreenshots}
+                                        loading={screenshotsLoading}
+                                        filtered={hasSearch}
+                                        userId={userId}
+                                        showUpdatedAt={sortOrder === 'last_updated'}
+                                        onOpen={handleOpenScreenshot}
+                                        onRename={handleRenameScreenshot}
+                                        onDelete={handleDeleteScreenshot}
+                                        onShare={item => void handleScreenshotShareSettings(item)}
                                     />
+                                ) : activeKind === 'screenshots' ? (
+                                    /* Trash — screenshots */
+                                    screenshotsLoading ? (
+                                        <div className="flex items-center justify-center h-64">
+                                            <div className="text-text-muted">Loading screenshots...</div>
+                                        </div>
+                                    ) : sortedScreenshots.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                            <LuTrash2 size={40} className="text-text-muted/50" />
+                                            <p className="text-sm text-text-muted">
+                                                {hasSearch ? 'No screenshots match your search.' : 'No screenshots in trash'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+                                            {sortedScreenshots.map(item => (
+                                                <ProjectCard
+                                                    key={item.id}
+                                                    variant="grid"
+                                                    project={{
+                                                        id: item.id,
+                                                        name: item.name,
+                                                        thumbnail: item.thumbnail,
+                                                        createdAt: item.createdAt,
+                                                        deletedAt: item.deletedAt,
+                                                    }}
+                                                    shareUrl={screenshotUrl(item.slug)}
+                                                    badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
+                                                    onOpen={() => {}}
+                                                    onRestore={() => handleRestoreScreenshot(item.id)}
+                                                />
+                                            ))}
+                                        </div>
+                                    )
+                                ) : loading ? (
+                                    <div className="flex items-center justify-center h-64">
+                                        <div className="text-text-muted">Loading projects...</div>
+                                    </div>
+                                ) : sortedProjects.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                        {isTrash && <LuTrash2 size={40} className="text-text-muted/50" />}
+                                        <p className="text-sm text-text-muted">
+                                            {hasSearch
+                                                ? 'No recordings match your search.'
+                                                : isTrash
+                                                    ? 'No videos in trash'
+                                                    : <>Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to start a new project.</>
+                                            }
+                                        </p>
+                                    </div>
+                                ) : isTrash ? (
+                                    /* Trash — videos */
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+                                        {sortedProjects.map(item => (
+                                            <ProjectCard
+                                                key={item.id}
+                                                variant="grid"
+                                                project={{
+                                                    id: item.id,
+                                                    name: item.name,
+                                                    thumbnail: item.thumbnail,
+                                                    createdAt: item.createdAt,
+                                                    durationMs: item.durationMs,
+                                                    deletedAt: item.deletedAt,
+                                                }}
+                                                onOpen={() => {}}
+                                                onRestore={() => handleRestore(item.id)}
+                                            />
+                                        ))}
+                                    </div>
                                 ) : (
-                                    <ProjectCard
-                                        key={`screenshot-${entry.item.id}`}
-                                        variant="grid"
-                                        project={{
-                                            id: entry.item.id,
-                                            name: entry.item.name,
-                                            thumbnail: entry.item.thumbnail,
-                                            createdAt: entry.item.createdAt,
-                                            deletedAt: entry.item.deletedAt,
-                                        }}
-                                        shareUrl={screenshotUrl(entry.item.slug)}
-                                        badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
-                                        onOpen={() => {}}
-                                        onRestore={() => handleRestoreScreenshot(entry.item.id)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </main>
-                )}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+                                        {sortedProjects.map((item: ProjectListItem) => (
+                                            <ProjectCard
+                                                key={item.id}
+                                                variant="grid"
+                                                project={{
+                                                    id: item.id,
+                                                    name: item.name,
+                                                    thumbnail: item.thumbnail,
+                                                    createdAt: item.createdAt,
+                                                    updatedAt: item.updatedAt,
+                                                    durationMs: item.durationMs,
+                                                    shareSlug: item.shareSlug,
+                                                    sharePolicy: item.sharePolicy,
+                                                    sharedWithMe: !!item.editorRole && item.ownerId !== userId,
+                                                }}
+                                                onOpen={() => handleOpen(item)}
+                                                selectMode={selectMode}
+                                                selected={selectedIds.has(item.id)}
+                                                onSelect={() => toggleSelect(item.id)}
+                                                onRename={handleRename}
+                                                onDelete={handleDelete}
+                                                onShare={item.ownerId === userId
+                                                    ? () => void handleShareSettings(item)
+                                                    : undefined}
+                                                showUpdatedAt={sortOrder === 'last_updated'}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </main>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -746,7 +752,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                         <Button
                             variant="ghost"
                             onClick={() => {
-                                const allIds = tabFiltered.map(p => p.id);
+                                const allIds = sortedProjects.map(p => p.id);
                                 if (selectedIds.size === allIds.length) {
                                     setSelectedIds(new Set());
                                 } else {
@@ -754,7 +760,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                 }
                             }}
                         >
-                            {selectedIds.size === tabFiltered.length ? 'Deselect All' : 'Select All'}
+                            {selectedIds.size === sortedProjects.length ? 'Deselect All' : 'Select All'}
                         </Button>
                         <Button
                             variant="destructive"

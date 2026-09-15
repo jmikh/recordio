@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ColorSettings } from './ColorSettings';
 import { Button } from '@shared/components';
@@ -35,19 +35,39 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
 
     const toggleColorPopover = () => {
         if (!showColorPopover) {
-            if (buttonRef.current) {
-                const rect = buttonRef.current.getBoundingClientRect();
-                setPopoverPos({
-                    top: rect.top,
-                    left: rect.right + 8
-                });
-            }
             onPopoverOpen?.();
         } else {
             onPopoverClose?.();
         }
         setShowColorPopover(!showColorPopover);
     };
+
+    // Position the popover once it's mounted: prefer the right side of the
+    // button, flip to the left when there's no room (e.g. the screenshot
+    // editor's inspector sits on the right edge), and keep it inside the
+    // viewport vertically.
+    useLayoutEffect(() => {
+        if (!showColorPopover) return;
+        const button = buttonRef.current;
+        const popover = popoverRef.current;
+        if (!button || !popover) return;
+
+        const rect = button.getBoundingClientRect();
+        // offset* ignores the entry animation's scale transform
+        const width = popover.offsetWidth;
+        const height = popover.offsetHeight;
+        const margin = 8;
+
+        const fitsRight = rect.right + margin + width <= window.innerWidth;
+        const left = fitsRight
+            ? rect.right + margin
+            : Math.max(margin, rect.left - margin - width);
+
+        const maxTop = Math.max(margin, window.innerHeight - height - margin);
+        const top = Math.min(Math.max(margin, rect.top), maxTop);
+
+        setPopoverPos({ top, left });
+    }, [showColorPopover]);
 
     // Close popover when clicking outside
     useEffect(() => {
@@ -94,7 +114,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
             {showColorPopover && createPortal(
                 <div
                     ref={popoverRef}
-                    className="fixed z-[9999] bg-surface-raised rounded-lg border border-border shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+                    className="fixed z-[9999] bg-surface-raised rounded-lg border border-border shadow-2xl"
                     style={{
                         top: popoverPos.top,
                         left: popoverPos.left,

@@ -6,6 +6,7 @@
  */
 import type { ScreenshotDoc } from '@shared/types/screenshot';
 import { captureError } from '../lib/sentry';
+import { trackScreenshotPublishFailed } from '../analytics';
 import { ScreenshotService } from './screenshotService';
 import { useScreenshotMetaStore } from './store/useScreenshotMetaStore';
 import { renderToPngBlob } from './render/renderScreenshot';
@@ -40,6 +41,11 @@ export async function publishRenderIfNeeded(image: CanvasImageSource, doc: Scree
         return true;
     } catch (err) {
         captureError(err, { flow: 'screenshot_publish', extra: { screenshotId: doc.id } });
+        trackScreenshotPublishFailed({
+            screenshot_id: doc.id,
+            error: err instanceof Error ? err.message : String(err),
+            is_offline: !navigator.onLine,
+        });
         return false;
     } finally {
         inFlight.delete(doc.id);

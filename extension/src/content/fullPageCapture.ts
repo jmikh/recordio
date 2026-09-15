@@ -9,12 +9,19 @@
  *               lazy images eager + pre-scroll, classify positioned elements
  *               (sticky → relative for the whole session; the fixed header
  *               band height), find inner scrollers, sample fill colours,
- *               show the toast, arm Escape.
+ *               arm Escape.
  *   scrollTo()  scroll the window and/or a strip element, re-walk for
  *               elements that appeared, apply this tile's hide state, settle,
- *               hide the toast, report actual positions and the strip's box.
+ *               report actual positions and the strip's box.
+ *   waitForGrowth()  at the bottom of a strip: sit still until lazy loaders /
+ *               infinite feeds stop extending the content (bounded), so the
+ *               background can extend the plan instead of stopping early.
  *   finish()    restore everything, idempotent — the background always
  *               sends it, also on error/cancel, and Escape calls it directly.
+ *
+ * Nothing is drawn on the page: progress lives in the extension popup, which
+ * stays open for the whole capture (the popup is not part of the tab, so it
+ * never lands in a captureVisibleTab).
  *
  * Only `opacity: 0` ever hides anything: it composites the subtree and no
  * descendant rule can undo it (`visibility` is inherited and pages override
@@ -29,9 +36,10 @@ import {
     type FullPageScrollToPayload,
     type FullPageScrollToResult,
     type FullPageStripInfo,
+    type FullPageWaitForGrowthPayload,
+    type FullPageWaitForGrowthResult,
 } from '../shared/messageTypes';
 import { MAX_INNER_SCROLLERS, effectiveHeaderHeight, overlapFor } from '../shared/fullPagePlan';
-import { createCaptureToast, type CaptureToast } from './captureToast';
 import { afterRepaint, raf, settle, sleep } from './fullPage/captureTiming';
 import { StyleStack } from './fullPage/styleStack';
 import { walkComposed } from './fullPage/domWalk';
@@ -45,7 +53,16 @@ const MAX_PRESCROLL_STEPS = 40;
 /** Per-tile walk budget (Reddit: tens of thousands of nodes across ~1 700 shadow roots) */
 const MAX_WALK_NODES = 40000;
 const MAX_WALK_MS = 250;
-const SETTLE_MS = 150;
+/**
+ * Pause after each scroll before the tile is captured, so scroll-driven
+ * loaders (lazy images, feed pagination) have rendered. Largely free: the
+ * background spaces captureVisibleTab calls ≥510 ms apart anyway, so most
+ * of this overlaps that wait instead of adding to it.
+ */
+const SETTLE_MS = 400;
+/** waitForGrowth: poll interval and total budget per strip bottom */
+const GROWTH_POLL_MS = 200;
+const GROWTH_MAX_WAIT_MS = 1500;
 /** Absolutely-positioned overlays pinned to a strip's frame smaller than this are hidden */
 const INNER_ABSOLUTE_MAX_AREA = 5000;
 
@@ -71,7 +88,6 @@ export class FullPageSession {
     private active = false;
     private cancelled = false;
     private styleEl: HTMLStyleElement | null = null;
-    private toast: CaptureToast | null = null;
     /** Session-long changes (sticky → relative, background-attachment, strip scroll behaviour) */
     private readonly styles = new StyleStack();
     /** This tile's hides; reset at the start of every tile */
@@ -180,7 +196,6 @@ export class FullPageSession {
             };
         });
 
-        this.toast = createCaptureToast('Capturing full page…  ·  [Esc] cancel');
         document.addEventListener('keydown', this.onKeyDown, true);
 
         return {
@@ -204,11 +219,6 @@ export class FullPageSession {
         const bail = (): FullPageScrollToResult => ({ cancelled: true, scrollY: window.scrollY, documentHeight: scroller.scrollHeight });
         if (!this.active || this.cancelled) return bail();
 
-        this.toast?.setText(p.phase === 'footer'
-            ? 'Capturing full page… finishing  ·  [Esc] cancel'
-            : `Capturing full page… ${p.tileIndex + 1}/${p.tileCount}  ·  [Esc] cancel`);
-        this.toast?.setVisible(true);
-
         await this.scrollWindowTo(p.windowY);
         const stripEl = p.strip >= 0 ? this.strips[p.strip] ?? null : null;
         if (stripEl && p.scrollTop !== undefined) await this.scrollElementTo(stripEl, p.scrollTop);
@@ -219,8 +229,7 @@ export class FullPageSession {
 
         await settle(SETTLE_MS);
         if (this.cancelled) return bail();
-        this.toast?.setVisible(false);
-        await afterRepaint();
+        await afterRepaint(); // the opacity hides above must be composited before the capture
         if (this.cancelled) return bail();
 
         const { width: vw, height: vh } = this.viewport;
@@ -236,6 +245,36 @@ export class FullPageSession {
                 .filter((r) => r.width > 0 && r.height > 0);
         }
         return result;
+    }
+
+    /**
+     * Called when the background has reached the bottom of the planned
+     * content. Polls the scroll height until two consecutive reads agree (the
+     * loader is done) or the budget runs out (still growing — the caller
+     * decides whether to keep going, bounded by MAX_PAGE_HEIGHT_CSS).
+     */
+    async waitForGrowth(p: FullPageWaitForGrowthPayload): Promise<FullPageWaitForGrowthResult> {
+        const scroller = document.scrollingElement ?? document.documentElement;
+        const stripEl = p.strip >= 0 ? this.strips[p.strip] ?? null : null;
+        const measure = () => (stripEl ?? scroller).scrollHeight;
+        const result = (stillGrowing: boolean): FullPageWaitForGrowthResult => ({
+            cancelled: !this.active || this.cancelled,
+            documentHeight: scroller.scrollHeight,
+            ...(stripEl ? { stripScrollHeight: stripEl.scrollHeight } : {}),
+            stillGrowing,
+        });
+        if (!this.active || this.cancelled) return result(false);
+
+        let last = measure();
+        const deadline = Date.now() + GROWTH_MAX_WAIT_MS;
+        while (Date.now() < deadline) {
+            await sleep(GROWTH_POLL_MS);
+            if (this.cancelled) return result(false);
+            const next = measure();
+            if (next === last) return result(false);
+            last = next;
+        }
+        return result(true);
     }
 
     finish(): void {
@@ -262,8 +301,6 @@ export class FullPageSession {
 
         this.styleEl?.remove();
         this.styleEl = null;
-        this.toast?.remove();
-        this.toast = null;
 
         window.scrollTo({ left: this.originalScroll.x, top: this.originalScroll.y, behavior: 'instant' as ScrollBehavior });
     }

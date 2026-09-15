@@ -6,11 +6,13 @@
  * the session (see background/screenshotCapture.ts):
  *   - Visible area: awaited here — the row shows "Capturing…" and the popup
  *     closes when the import tab takes focus.
- *   - Full page / Select area: acked immediately; the popup closes itself so
- *     the user can see the page.
- *
- * While a full-page capture runs, a reopened popup renders CapturingView
- * (progress from chrome.storage.session + Cancel).
+ *   - Select area: acked immediately; the popup closes itself so the user
+ *     can drag on the page.
+ *   - Full page: acked immediately; the popup STAYS OPEN and flips to
+ *     CapturingView (progress from chrome.storage.session + Cancel) — that is
+ *     the only progress UI, nothing is drawn on the page or the icon badge.
+ *     The popup is not part of the tab, so it never lands in the capture. If
+ *     the user dismisses it, reopening shows the same view.
  */
 
 import { useEffect, useState } from 'react';
@@ -47,9 +49,11 @@ export function ImageCaptureView() {
                 setBusy(null);
                 return;
             }
-            // Visible: the import tab is opening and will steal focus. Region /
-            // full page: get out of the way so the user can see the page.
-            if (mode !== 'visible') window.close();
+            // Visible: the import tab is opening and will steal focus. Region:
+            // get out of the way so the user can drag on the page. Full page:
+            // stay open — PopupApp swaps in CapturingView once the background
+            // writes SCREENSHOT_STATE.
+            if (mode === 'region') window.close();
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : 'Unexpected error');
             setBusy(null);
@@ -109,9 +113,11 @@ export function CapturingView({ state }: { state: ScreenshotState }) {
 
     return (
         <div className="flex flex-col gap-3 p-3">
-            <p role="status" className="text-sm text-text-main">
-                {MODE_LABELS[state.mode]}
-                {progress && progress.total > 0 && ` ${progress.done}/${progress.total}`}
+            <p role="status" className="text-sm text-text-main flex items-center justify-between gap-2">
+                <span>{MODE_LABELS[state.mode]}</span>
+                {progress && progress.total > 0 && (
+                    <span className="text-text-muted tabular-nums">{pct}%</span>
+                )}
             </p>
             {progress && (
                 <div className="h-1.5 rounded-full overflow-hidden bg-border" aria-hidden="true">

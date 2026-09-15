@@ -76,6 +76,7 @@
  *     BACKGROUND_CONTENT_CANCEL_REGION_SELECT  Background/Popup → Content (broadcast)
  *     BACKGROUND_CONTENT_FULLPAGE_PREPARE      Background → Content → FullPagePrepareResult
  *     BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO    Background → Content → { scrollY, cancelled }
+ *     BACKGROUND_CONTENT_FULLPAGE_WAIT_FOR_GROWTH  Background → Content → { documentHeight, … }
  *     BACKGROUND_CONTENT_FULLPAGE_FINISH       Background → Content (restore the page)
  *     CONTENT_REGION_SELECTED { rect, … }      Content → Background
  *     CONTENT_REGION_CANCELLED                 Content → Background
@@ -219,6 +220,9 @@ export const MSG_TYPES = {
     /** Background → Content: scroll to a tile and settle
      *  payload: FullPageScrollToPayload  response: FullPageScrollToResult */
     BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO: 'BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO',
+    /** Background → Content: at the bottom of a strip, wait for lazy/infinite content to stop arriving
+     *  payload: FullPageWaitForGrowthPayload  response: FullPageWaitForGrowthResult */
+    BACKGROUND_CONTENT_FULLPAGE_WAIT_FOR_GROWTH: 'BACKGROUND_CONTENT_FULLPAGE_WAIT_FOR_GROWTH',
     /** Background → Content: restore everything prepare() changed (always sent, also on error/cancel) */
     BACKGROUND_CONTENT_FULLPAGE_FINISH: 'BACKGROUND_CONTENT_FULLPAGE_FINISH',
     /** Content → Background: the user confirmed a region  payload: RegionSelectedPayload */
@@ -325,9 +329,23 @@ export interface FullPageScrollToPayload {
     windowY: number;
     /** Strip element scrollTop (strip ≥ 0) */
     scrollTop?: number;
-    /** Global counters, for the toast */
+    /** Index within this strip — the window's tile 0 is the only one that keeps the fixed header */
     tileIndex: number;
-    tileCount: number;
+}
+
+/** Ask the page to sit still until lazy loaders / infinite feeds stop extending the content. */
+export interface FullPageWaitForGrowthPayload {
+    /** -1 = the window document, otherwise an index into FullPagePrepareResult.strips */
+    strip: number;
+}
+
+export interface FullPageWaitForGrowthResult {
+    cancelled: boolean;
+    /** Height once it stopped changing (or the growth-wait budget ran out) */
+    documentHeight: number;
+    stripScrollHeight?: number;
+    /** The height was still climbing when the budget ran out */
+    stillGrowing: boolean;
 }
 
 export interface FullPageScrollToResult {

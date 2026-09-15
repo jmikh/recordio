@@ -17,6 +17,13 @@ export const MAX_DIM = 32767;
 /** ≈320 MB RGBA transient in the service worker — revert to 64e6 if Sentry shows OOMs */
 export const MAX_PIXELS = 80e6;
 export const MAX_INNER_SCROLLERS = 3;
+/**
+ * Hard ceiling on how much of a document / inner scroller is captured (css px).
+ * Growth found at the bottom of a strip is adopted up to this height, so an
+ * infinite feed still terminates. Beyond ~14 000 css px a 2× page is already
+ * being downscaled by MAX_PIXELS, so more rows buy nothing.
+ */
+export const MAX_PAGE_HEIGHT_CSS = 20000;
 
 /** How close to the viewport edge a fixed element must sit to count as a header / bottom bar */
 const EDGE_PX = 20;

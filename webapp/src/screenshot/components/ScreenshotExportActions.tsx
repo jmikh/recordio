@@ -1,22 +1,23 @@
 /**
- * Header actions: Copy image, Download (PNG / PDF). Rendered by the
+ * Header actions: Copy image, Download (PNG / PDF / A4 PDF). Rendered by the
  * editor inside ScreenshotHeader once the source image is decoded.
  */
 import { useState } from 'react';
-import { LuCopy, LuDownload } from 'react-icons/lu';
+import { LuCopy } from 'react-icons/lu';
 import { Button, Dropdown, type DropdownOption } from '@shared/components';
 import { useToast } from '../../components/Toast';
 import { captureError } from '../../lib/sentry';
 import { trackScreenshotExported } from '../../analytics';
 import { useScreenshotStore } from '../store/useScreenshotStore';
 import { useScreenshotMetaStore } from '../store/useScreenshotMetaStore';
-import { clipboardImageSupported, copyImageToClipboard, downloadPdf, downloadPng } from '../export/exportScreenshot';
+import { clipboardImageSupported, copyImageToClipboard, downloadPdf, downloadPdfA4, downloadPng } from '../export/exportScreenshot';
 
-type DownloadFormat = 'png' | 'pdf';
+type DownloadFormat = 'png' | 'pdf' | 'pdf-a4';
 
 const DOWNLOAD_OPTIONS: DropdownOption<DownloadFormat | ''>[] = [
     { value: 'png', label: 'PNG image' },
     { value: 'pdf', label: 'PDF document' },
+    { value: 'pdf-a4', label: 'PDF (A4 pages)' },
 ];
 
 export function ScreenshotExportActions({ image }: { image: HTMLImageElement }) {
@@ -36,8 +37,10 @@ export function ScreenshotExportActions({ image }: { image: HTMLImageElement }) 
                 addToast({ type: 'success', title: 'Image copied to clipboard' });
             } else if (kind === 'png') {
                 await downloadPng(image, doc, name);
-            } else {
+            } else if (kind === 'pdf') {
                 await downloadPdf(image, doc, name);
+            } else {
+                await downloadPdfA4(image, doc, name);
             }
             trackScreenshotExported({ format: kind, screenshot_id: meta?.id ?? doc.id, success: true });
         } catch (err) {
@@ -48,7 +51,7 @@ export function ScreenshotExportActions({ image }: { image: HTMLImageElement }) 
             });
             addToast({
                 type: 'error',
-                title: kind === 'copy' ? 'Could not copy the image' : `Could not export the ${kind.toUpperCase()}`,
+                title: kind === 'copy' ? 'Could not copy the image' : `Could not export the ${kind === 'png' ? 'PNG' : 'PDF'}`,
                 message: kind === 'copy' ? 'Try "Download" → PNG instead.' : undefined,
             });
         } finally {
@@ -66,12 +69,11 @@ export function ScreenshotExportActions({ image }: { image: HTMLImageElement }) 
             <Dropdown<DownloadFormat | ''>
                 options={DOWNLOAD_OPTIONS}
                 value=""
-                placeholder={busy === 'png' || busy === 'pdf' ? 'Exporting…' : 'Download'}
+                placeholder={busy !== null && busy !== 'copy' ? 'Exporting…' : 'Download'}
                 onChange={format => { if (format) void run(format); }}
                 fullWidth={false}
                 ariaLabel="Download"
                 disabled={busy !== null}
-                suffix={<LuDownload className="icon-sm text-text-muted" />}
             />
         </>
     );

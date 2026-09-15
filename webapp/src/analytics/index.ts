@@ -253,8 +253,22 @@ export function trackScreenshotViewed(params: { slug: string; published: boolean
     trackEvent('screenshot_view_page_loaded', params);
 }
 
+export function trackScreenshotViewFailed(params: { slug: string; error: string; status: number | null; is_offline: boolean }) {
+    trackEvent('screenshot_view_page_failed', params);
+}
+
+/** Download from the public /screenshot/{slug} page (client-side fetch of the presigned render). */
+export function trackScreenshotViewDownloaded(params: { slug: string; success: boolean; error?: string }) {
+    trackEvent('screenshot_view_downloaded', params);
+}
+
+/** Publishing the flattened render the public page serves failed (client-side render or upload). */
+export function trackScreenshotPublishFailed(params: { screenshot_id: string; error: string; is_offline: boolean }) {
+    trackEvent('screenshot_publish_failed', params);
+}
+
 export function trackScreenshotExported(params: {
-    format: 'png' | 'pdf' | 'copy';
+    format: 'png' | 'pdf' | 'pdf-a4' | 'copy';
     screenshot_id: string;
     success: boolean;
     error?: string;

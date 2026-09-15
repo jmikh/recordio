@@ -175,6 +175,21 @@ export function trackRecordingError(props: {
 
 export type ScreenshotCaptureMode = 'visible' | 'fullPage' | 'region';
 
+/** Who ended the capture: popup Cancel, Escape on the page, or the tab going away. */
+export type ScreenshotCancelSource = 'popup' | 'page' | 'tab_closed';
+
+export function trackScreenshotStarted(props: { mode: ScreenshotCaptureMode }) {
+    track('screenshot_started', props);
+}
+
+export function trackScreenshotCanceled(props: {
+    mode: ScreenshotCaptureMode;
+    elapsed_ms: number;
+    source: ScreenshotCancelSource;
+}) {
+    track('screenshot_canceled', props);
+}
+
 export function trackScreenshotCaptured(props: {
     mode: ScreenshotCaptureMode;
     width: number;

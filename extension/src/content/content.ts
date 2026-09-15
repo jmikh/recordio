@@ -16,14 +16,14 @@
  */
 
 
-import { initSentry } from '../utils/sentry';
+import { initSentry, captureException } from '../utils/sentry';
 import { MSG_TYPES, type BaseMessage } from '../shared/messageTypes';
 import { EventRecorder } from './eventRecorder';
 import { showCountdown } from './countdownOverlay';
 import { BlurManager } from './blurManager';
 import { showRegionSelect } from './regionSelectOverlay';
 import { FullPageSession } from './fullPageCapture';
-import type { FullPageScrollToPayload, PageInfo } from '../shared/messageTypes';
+import type { FullPageScrollToPayload, FullPageWaitForGrowthPayload, PageInfo } from '../shared/messageTypes';
 
 // Initialize Sentry for error tracking
 initSentry('content');
@@ -74,6 +74,18 @@ const blurManager = new BlurManager();
 let hideRegionSelect: (() => void) | null = null;
 const fullPage = new FullPageSession(() => blurManager.disable());
 
+/**
+ * Content scripts run without Sentry's global handlers (they would clash
+ * with the host page's), so screenshot failures are captured explicitly
+ * here — the stack lives in this context — and only the message crosses
+ * to the background.
+ */
+function reportContentError(err: unknown): string {
+    const error = err instanceof Error ? err : new Error(String(err));
+    captureException(error);
+    return error.message;
+}
+
 function getPageInfo(): PageInfo {
     return {
         url: location.href,
@@ -96,19 +108,24 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, send
             return;
 
         case MSG_TYPES.BACKGROUND_CONTENT_START_REGION_SELECT:
-            blurManager.disable();
-            hideRegionSelect?.();
-            hideRegionSelect = showRegionSelect(
-                (selection) => {
-                    hideRegionSelect = null;
-                    chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_SELECTED, payload: selection }).catch(() => {});
-                },
-                () => {
-                    hideRegionSelect = null;
-                    chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_CANCELLED }).catch(() => {});
-                },
-            );
-            sendResponse({ ok: true });
+            try {
+                blurManager.disable();
+                hideRegionSelect?.();
+                hideRegionSelect = showRegionSelect(
+                    (selection) => {
+                        hideRegionSelect = null;
+                        chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_SELECTED, payload: selection }).catch(() => {});
+                    },
+                    () => {
+                        hideRegionSelect = null;
+                        chrome.runtime.sendMessage({ type: MSG_TYPES.CONTENT_REGION_CANCELLED }).catch(() => {});
+                    },
+                );
+                sendResponse({ ok: true });
+            } catch (err) {
+                hideRegionSelect = null;
+                sendResponse({ error: reportContentError(err) });
+            }
             return;
 
         case MSG_TYPES.BACKGROUND_CONTENT_CANCEL_REGION_SELECT:
@@ -119,16 +136,25 @@ const handleMessage = (message: any, _sender: chrome.runtime.MessageSender, send
             }
             return;
 
+        // A user cancel resolves with `cancelled: true`; a rejection is a real
+        // bug, reported here (with its stack) and surfaced to the background
+        // as `{ error }` so it fails the capture instead of looking like a cancel.
         case MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_PREPARE:
             fullPage.prepare().then(sendResponse, (err) => {
                 fullPage.finish();
-                sendResponse({ error: err instanceof Error ? err.message : String(err) });
+                sendResponse({ error: reportContentError(err) });
             });
             return true;
 
         case MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO:
-            fullPage.scrollTo(message.payload as FullPageScrollToPayload).then(sendResponse, () => {
-                sendResponse({ cancelled: true, scrollY: window.scrollY, documentHeight: document.documentElement.scrollHeight });
+            fullPage.scrollTo(message.payload as FullPageScrollToPayload).then(sendResponse, (err) => {
+                sendResponse({ error: reportContentError(err) });
+            });
+            return true;
+
+        case MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_WAIT_FOR_GROWTH:
+            fullPage.waitForGrowth(message.payload as FullPageWaitForGrowthPayload).then(sendResponse, (err) => {
+                sendResponse({ error: reportContentError(err) });
             });
             return true;
 

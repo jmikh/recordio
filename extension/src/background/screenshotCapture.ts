@@ -27,6 +27,7 @@ import {
     type FullPagePrepareResult,
     type FullPageScrollToPayload,
     type FullPageScrollToResult,
+    type FullPageWaitForGrowthResult,
     type PageInfo,
     type RegionSelectedPayload,
     type ScreenshotMode,
@@ -34,8 +35,9 @@ import {
 } from '../shared/messageTypes';
 import { ProjectStorage } from '../storage/projectStorage';
 import { captureException } from '../utils/sentry';
-import { trackScreenshotCaptured, trackScreenshotError } from '../utils/mixpanel';
+import { trackScreenshotStarted, trackScreenshotCaptured, trackScreenshotCanceled, trackScreenshotError, type ScreenshotCancelSource } from '../utils/mixpanel';
 import {
+    MAX_PAGE_HEIGHT_CSS,
     allocateTileBudget,
     computeCanvasLayout,
     footerOp,
@@ -51,7 +53,6 @@ import { FullPageStitcher } from './fullPageStitcher';
 /** chrome.tabs.MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND === 2 → ≥500 ms apart, with margin */
 const CAPTURE_MIN_INTERVAL_MS = 510;
 const ERROR_BADGE_COLOR = '#FF6B35';
-const PROGRESS_BADGE_COLOR = '#f2b036';
 
 const ERROR_MESSAGES: Record<string, string> = {
     'Cannot access contents of the page': 'Chrome does not allow capturing this page.',
@@ -69,9 +70,22 @@ export interface ScreenshotSession {
     windowId: number;
     startedAt: number;
     cancelled: boolean;
+    /** Set by whichever cancel path fired first; reported on `screenshot_canceled`. */
+    cancelSource?: ScreenshotCancelSource;
 }
 
 let session: ScreenshotSession | null = null;
+
+/**
+ * A failure the content script already sent to Sentry with its own stack.
+ * `failScreenshot` skips the duplicate capture and only records the event.
+ */
+export class ContentScriptError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ContentScriptError';
+    }
+}
 
 /** The active capture session, if any (steps 4–5 read this from their message handlers). */
 export function getScreenshotSession(): ScreenshotSession | null {
@@ -94,17 +108,15 @@ async function setScreenshotState(state: ScreenshotState | null): Promise<void> 
 export function resetScreenshotStateOnStartup(): void {
     session = null;
     void setScreenshotState(null);
+    // Older builds mirrored progress to the badge; clear one left over from an update mid-capture
     void chrome.action.getBadgeText({}).then((text) => {
         if (text.endsWith('%')) chrome.action.setBadgeText({ text: '' });
     });
 }
 
+/** Progress is only mirrored to session storage — the popup (kept open for full page) renders it. */
 async function updateScreenshotProgress(done: number, total: number): Promise<void> {
     if (!session) return;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    chrome.action.setBadgeText({ text: `${pct}%` });
-    chrome.action.setBadgeBackgroundColor({ color: PROGRESS_BADGE_COLOR });
-    chrome.action.setBadgeTextColor({ color: '#000000' });
     await setScreenshotState({ active: true, mode: session.mode, tabId: session.tabId, progress: { done, total } });
 }
 
@@ -132,6 +144,7 @@ export function onRegionSelected(tabId: number | undefined, payload: RegionSelec
 }
 
 export function onRegionCancelled(tabId: number | undefined): void {
+    if (session && session.tabId === tabId) session.cancelSource ??= 'page';
     if (pendingRegion && pendingRegion.tabId === tabId) {
         const { resolve } = pendingRegion;
         pendingRegion = null;
@@ -142,7 +155,10 @@ export function onRegionCancelled(tabId: number | undefined): void {
 /** Escape during a full-page capture. */
 export function onContentCancelled(tabId: number | undefined): void {
     const current = session;
-    if (current && current.tabId === tabId) current.cancelled = true;
+    if (current && current.tabId === tabId) {
+        current.cancelled = true;
+        current.cancelSource ??= 'page';
+    }
 }
 
 // ============================================================================
@@ -342,7 +358,7 @@ async function completeRegionCapture(tab: chrome.tabs.Tab, current: ScreenshotSe
     try {
         const selection = await selectionPromise;
         if (!selection || current.cancelled) {
-            await endScreenshotSession();
+            await cancelledScreenshot(current);
             return;
         }
 
@@ -394,8 +410,11 @@ interface CapturedTile {
  * elements at the page bottom. Every strip owns a canvas region that window
  * tiles never paint into, so draw order can't clobber a strip. Targets are
  * planned from where the previous tile actually landed (browser clamping,
- * reflow); the page height is adopted after tiles 1–2 and frozen after that
- * so infinite feeds terminate. Design: plans/full-page-capture-oneshot.md.
+ * reflow). The page height is adopted after tiles 1–2; after that, when a
+ * strip's planned bottom is reached, the page gets one bounded wait for
+ * lazy/infinite content and any growth is adopted — clamped to
+ * MAX_PAGE_HEIGHT_CSS (and MAX_TILES) so infinite feeds still terminate.
+ * Design: plans/full-page-capture-oneshot.md.
  */
 async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSession, contentScriptPath: string): Promise<void> {
     const tabId = tab.id!;
@@ -407,7 +426,7 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
 
         const prep = await sendToTab<FullPagePrepareResult & { error?: string }>(tabId, MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_PREPARE);
         prepared = true;
-        if (prep.error) throw new Error(prep.error);
+        if (prep.error) throw new ContentScriptError(prep.error);
 
         if (prep.pinchZoomed || (!prep.document.scrollable && prep.strips.length === 0)) {
             // Nothing to tile (or tiling math would be wrong) — take the visible area instead.
@@ -422,8 +441,14 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
 
         const vh = prep.viewportHeight;
         const overlap = overlapFor(prep.devicePixelRatio);
-        let docH = prep.document.scrollHeight;
-        const stripHeights = prep.strips.map((st) => st.scrollHeight);
+        const capHeight = (h: number) => {
+            if (h <= MAX_PAGE_HEIGHT_CSS) return h;
+            truncated = true;
+            return MAX_PAGE_HEIGHT_CSS;
+        };
+        let truncated = false;
+        let docH = capHeight(prep.document.scrollHeight);
+        const stripHeights = prep.strips.map((st) => capHeight(st.scrollHeight));
         const windowMaxY = () => (prep.document.scrollable ? Math.max(0, docH - vh) : 0);
         const liveLayout = () => computeCanvasLayout({
             ...prep,
@@ -438,8 +463,9 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
 
         let layout = liveLayout();
         let budget = liveBudget();
-        let truncated = budget.truncated;
-        const total = budget.window + budget.strips.reduce((a, b) => a + b, 0) + (budget.footer ? 1 : 0);
+        truncated = truncated || budget.truncated;
+        const totalOf = (b: typeof budget) => b.window + b.strips.reduce((a, c) => a + c, 0) + (b.footer ? 1 : 0);
+        let total = totalOf(budget);
         let stitcher: FullPageStitcher | null = null;
         let done = 0;
         let replanned = false;
@@ -458,12 +484,39 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
             layout = liveLayout();
             budget = liveBudget();
             truncated = truncated || budget.truncated;
+            total = totalOf(budget);
             replanned = true;
             applyLayout();
         };
+        /**
+         * At a strip's planned bottom: give lazy loaders / infinite feeds a
+         * bounded moment, adopt any growth (capped) and re-plan. Returns true
+         * when there is more to capture.
+         */
+        const grewAtBottom = async (strip: number): Promise<boolean> => {
+            if (current.cancelled) return false;
+            if (strip === -1 && !prep.document.scrollable) return false;
+            const grown = await sendToTab<FullPageWaitForGrowthResult & { error?: string }>(tabId, MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_WAIT_FOR_GROWTH, { strip });
+            if (grown.error) throw new ContentScriptError(grown.error);
+            if (grown.cancelled || current.cancelled) return false;
+            if (strip === -1) {
+                const next = capHeight(grown.documentHeight);
+                if (next <= docH) return false;
+                docH = next;
+            } else {
+                const live = grown.stripScrollHeight;
+                if (live === undefined) return false;
+                const next = capHeight(live);
+                if (next <= stripHeights[strip]) return false;
+                stripHeights[strip] = next;
+            }
+            relayout();
+            return true;
+        };
         const captureTile = async (payload: FullPageScrollToPayload): Promise<CapturedTile | null> => {
             if (current.cancelled) return null;
-            const scrolled = await sendToTab<FullPageScrollToResult>(tabId, MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO, payload);
+            const scrolled = await sendToTab<FullPageScrollToResult & { error?: string }>(tabId, MSG_TYPES.BACKGROUND_CONTENT_FULLPAGE_SCROLL_TO, payload);
+            if (scrolled.error) throw new ContentScriptError(scrolled.error);
             if (scrolled.cancelled || current.cancelled) return null;
             const blob = await throttledCaptureVisibleTab(tab.windowId);
             if (current.cancelled) return null;
@@ -487,14 +540,15 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
                 break;
             }
             const target = i === 0 ? 0 : nextTileY(prevY, vh, prep.headerHeight, overlap, windowMaxY());
-            const tile = await captureTile({ phase: 'tile', strip: -1, windowY: target, tileIndex: done, tileCount: total });
+            if (i > 0 && target <= prevY) break;
+            const tile = await captureTile({ phase: 'tile', strip: -1, windowY: target, tileIndex: i });
             if (!tile) {
                 cancelled = true;
                 break;
             }
             try {
                 if ((i === 1 || i === 2) && tile.scrolled.documentHeight !== docH) {
-                    docH = tile.scrolled.documentHeight;
+                    docH = capHeight(tile.scrolled.documentHeight);
                     relayout();
                 }
                 const c = canvasOf();
@@ -513,7 +567,7 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
             }
             prevY = tile.scrolled.scrollY;
             await finishTile();
-            if (target >= windowMaxY()) break;
+            if (target >= windowMaxY() && !(await grewAtBottom(-1))) break;
         }
 
         // ── Inner strips ─────────────────────────────────────────────────
@@ -527,7 +581,8 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
                     break;
                 }
                 const target = i === 0 ? 0 : nextTileY(prevTop, st.clientHeight, 0, overlap, maxT());
-                const tile = await captureTile({ phase: 'tile', strip: j, windowY: st.windowY, scrollTop: target, tileIndex: done, tileCount: total });
+                if (i > 0 && target <= prevTop) break;
+                const tile = await captureTile({ phase: 'tile', strip: j, windowY: st.windowY, scrollTop: target, tileIndex: i });
                 if (!tile) {
                     cancelled = true;
                     break;
@@ -535,7 +590,7 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
                 try {
                     const live = tile.scrolled.stripScrollHeight;
                     if (i === 1 && live !== undefined && live !== stripHeights[j]) {
-                        stripHeights[j] = live;
+                        stripHeights[j] = capHeight(live);
                         relayout();
                     }
                     const box = tile.scrolled.box;
@@ -562,7 +617,7 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
                 }
                 prevTop = tile.scrolled.scrollTop ?? target;
                 await finishTile();
-                if (target >= maxT()) break;
+                if (target >= maxT() && !(await grewAtBottom(j))) break;
             }
         }
 
@@ -571,7 +626,7 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
             const c = canvasOf();
             c.cropToDrawn();
             if (budget.footer) {
-                const tile = await captureTile({ phase: 'footer', strip: -1, windowY: windowMaxY(), tileIndex: done, tileCount: total });
+                const tile = await captureTile({ phase: 'footer', strip: -1, windowY: windowMaxY(), tileIndex: 0 });
                 if (!tile) {
                     cancelled = true;
                 } else {
@@ -591,7 +646,7 @@ async function runFullPageCapture(tab: chrome.tabs.Tab, current: ScreenshotSessi
         prepared = false;
 
         if (cancelled || current.cancelled || !stitcher || done === 0) {
-            await endScreenshotSession();
+            await cancelledScreenshot(current);
             return;
         }
 
@@ -668,7 +723,8 @@ function friendlyError(err: unknown): string {
  * Starts a capture on the active tab. `visible` runs to completion before
  * resolving (the popup shows "Capturing…" on the row and closes when the
  * import tab takes focus). `region` / `fullPage` resolve as soon as the
- * page-side flow has started so the popup can close (Steps 4–5).
+ * page-side flow has started — region so the popup can close, full page so
+ * it can flip to the progress view and stay open (Steps 4–5).
  */
 export async function startScreenshot(
     mode: ScreenshotMode,
@@ -679,10 +735,12 @@ export async function startScreenshot(
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id || tab.windowId === undefined || !isCapturableUrl(tab.url)) {
+        trackScreenshotError({ mode, error: 'uncapturable_url' });
         return { success: false, error: 'Cannot capture this page.' };
     }
 
     session = { mode, tabId: tab.id, windowId: tab.windowId, startedAt: Date.now(), cancelled: false };
+    trackScreenshotStarted({ mode });
 
     if (mode === 'visible') {
         try {
@@ -712,14 +770,16 @@ export async function startScreenshot(
             const selectionPromise = new Promise<RegionSelectedPayload | null>((resolve) => {
                 pendingRegion = { tabId: tab.id!, resolve };
             });
-            await sendToTab(tab.id, MSG_TYPES.BACKGROUND_CONTENT_START_REGION_SELECT);
+            const started = await sendToTab<{ ok?: boolean; error?: string }>(tab.id, MSG_TYPES.BACKGROUND_CONTENT_START_REGION_SELECT);
+            if (started?.error) throw new ContentScriptError(started.error);
             await setScreenshotState({ active: true, mode, tabId: tab.id, progress: null });
             void completeRegionCapture(tab, current, selectionPromise);
             return { success: true };
         } catch (err) {
             pendingRegion = null;
             session = null;
-            captureException(err instanceof Error ? err : new Error(String(err)));
+            if (!(err instanceof ContentScriptError)) captureException(err instanceof Error ? err : new Error(String(err)));
+            trackScreenshotError({ mode, error: err instanceof Error ? err.message : String(err) });
             return { success: false, error: friendlyError(err) };
         }
     }
@@ -729,10 +789,11 @@ export async function startScreenshot(
     return { success: true };
 }
 
-/** Popup cancel: flag the session (loops check it after every await) and dismiss the region overlay. */
-export async function cancelScreenshot(): Promise<boolean> {
+/** Popup cancel (or tab gone): flag the session (loops check it after every await) and dismiss the region overlay. */
+export async function cancelScreenshot(source: ScreenshotCancelSource = 'popup'): Promise<boolean> {
     if (!session) return false;
     session.cancelled = true;
+    session.cancelSource ??= source;
     if (session.mode === 'region') {
         await sendToTab(session.tabId, MSG_TYPES.BACKGROUND_CONTENT_CANCEL_REGION_SELECT).catch(() => undefined);
         onRegionCancelled(session.tabId);
@@ -742,7 +803,17 @@ export async function cancelScreenshot(): Promise<boolean> {
 
 /** Tab closed or navigated away mid-capture. */
 export async function cancelScreenshotForTab(tabId: number): Promise<void> {
-    if (session?.tabId === tabId) await cancelScreenshot();
+    if (session?.tabId === tabId) await cancelScreenshot('tab_closed');
+}
+
+/** Records the cancel, then ends the session. `source` defaults to `page` (overlay/Escape without an explicit cancel message). */
+async function cancelledScreenshot(current: ScreenshotSession): Promise<void> {
+    trackScreenshotCanceled({
+        mode: current.mode,
+        elapsed_ms: Date.now() - current.startedAt,
+        source: current.cancelSource ?? 'page',
+    });
+    await endScreenshotSession();
 }
 
 /** Ends the session (success or failure) and clears the mirrored state/badge. */
@@ -757,7 +828,7 @@ export async function endScreenshotSession(): Promise<void> {
  * recording-failure UX — badge `!`, stored message, try to open the popup.
  */
 export async function failScreenshot(mode: ScreenshotMode, err: unknown): Promise<void> {
-    captureException(err instanceof Error ? err : new Error(String(err)));
+    if (!(err instanceof ContentScriptError)) captureException(err instanceof Error ? err : new Error(String(err)));
     trackScreenshotError({ mode, error: err instanceof Error ? err.message : String(err) });
     await endScreenshotSession();
     chrome.action.setBadgeText({ text: '!' });

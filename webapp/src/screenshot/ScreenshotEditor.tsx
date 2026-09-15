@@ -28,6 +28,7 @@ import { ScreenshotInspector } from './components/ScreenshotInspector';
 import { ScreenshotConflictModal } from './components/ScreenshotConflictModal';
 import { ScreenshotExportActions } from './components/ScreenshotExportActions';
 import { ScreenshotShareButton } from './components/ScreenshotShareButton';
+import { ScreenshotZoomControls } from './components/ScreenshotZoomControls';
 import { publishRenderIfNeeded } from './publish';
 
 /** Decodes an object URL into a drawable image. */
@@ -48,6 +49,7 @@ export function ScreenshotEditor() {
     const isAuthenticated = useUserStore(s => s.isAuthenticated);
     const lastSyncedAt = useSyncStatusStore(s => s.lastSyncedAt);
     const imageRef = useRef<HTMLImageElement | null>(null);
+    const scrollRef = useRef<HTMLElement | null>(null);
 
     useScreenshotShortcuts();
 
@@ -159,15 +161,18 @@ export function ScreenshotEditor() {
             <div className="flex-1 flex min-h-0">
                 <ScreenshotToolbar />
 
-                <main className="flex-1 min-w-0 overflow-auto scrollbar-thin bg-state-inactive p-6">
-                    {loadingStatus && (
-                        <p role="status" className="text-sm text-text-muted text-center">{loadingStatus}</p>
-                    )}
-                    {loadError && (
-                        <p role="alert" className="text-sm text-destructive text-center">{loadError}</p>
-                    )}
-                    {image && <ScreenshotCanvas image={image} />}
-                </main>
+                <div className="flex-1 min-w-0 relative flex">
+                    <main ref={scrollRef} className="flex-1 min-w-0 overflow-auto scrollbar-thin bg-state-inactive p-6">
+                        {loadingStatus && (
+                            <p role="status" className="text-sm text-text-muted text-center">{loadingStatus}</p>
+                        )}
+                        {loadError && (
+                            <p role="alert" className="text-sm text-destructive text-center">{loadError}</p>
+                        )}
+                        {image && <ScreenshotCanvas image={image} scrollContainerRef={scrollRef} />}
+                    </main>
+                    {image && <ScreenshotZoomControls />}
+                </div>
 
                 <ScreenshotInspector />
             </div>

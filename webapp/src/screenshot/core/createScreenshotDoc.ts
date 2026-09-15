@@ -13,7 +13,7 @@ export const MAX_SOURCE_SIDE_PX = 16384;
 
 export const DEFAULT_ANNOTATION_DEFAULTS: AnnotationDefaults = {
     blurDefaults: { blurRadiusPx: 20 },
-    textDefaults: { color: '#454545', backgroundColor: '#ffdb57', fontSizePx: 0 },
+    textDefaults: { color: '#454545', backgroundColor: '#ffdb5700', fontSizePx: 0 },
     arrowDefaults: { color: '#7B61FF', strokeWidthPx: 4 },
     borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
 };

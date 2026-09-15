@@ -220,14 +220,14 @@ export const useProjectStore = create<ProjectState>()(
                             enabled: true,
                             defaultDurationMs: 3000,
                             blurDefaults: { blurRadiusPx: 20 },
-                            textDefaults: { color: '#454545', backgroundColor: '#ffdb57', fontSizePx: 0 },
+                            textDefaults: { color: '#454545', backgroundColor: '#ffdb5700', fontSizePx: 0 },
                             arrowDefaults: { color: '#7B61FF', strokeWidthPx: 4 },
                             borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
                         };
                     } else if (projectWithoutEvents.settings.overlay.textDefaults?.color === '#ffffff') {
                         // Migrate old default white to new default colors
                         projectWithoutEvents.settings.overlay.textDefaults.color = '#454545';
-                        projectWithoutEvents.settings.overlay.textDefaults.backgroundColor = '#ffdb57';
+                        projectWithoutEvents.settings.overlay.textDefaults.backgroundColor = '#ffdb5700';
                     }
 
                     // First open: generate auto zoom/spotlight segments and focus areas

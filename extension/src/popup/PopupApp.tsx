@@ -86,7 +86,7 @@ export function PopupApp() {
         })();
     }, []);
 
-    // Keep RecordingView / CapturingView in sync with state changes from background
+    // Keep RecordingView / CapturingView / the error card in sync with state changes from background
     useEffect(() => {
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
             if (area !== 'session') return;
@@ -97,6 +97,14 @@ export function PopupApp() {
             if (changes[STORAGE_KEYS.SCREENSHOT_STATE]) {
                 const newState = changes[STORAGE_KEYS.SCREENSHOT_STATE].newValue as ScreenshotState | undefined;
                 setScreenshotState(newState?.active ? newState : null);
+            }
+            // The popup stays open during a full-page capture, so a failure can
+            // land while it is showing — same handling as the mount-time read.
+            const shotError = changes[STORAGE_KEYS.SCREENSHOT_ERROR]?.newValue as { message: string } | undefined;
+            if (shotError?.message) {
+                setStoredError({ title: 'Screenshot failed', message: shotError.message });
+                chrome.storage.session.remove(STORAGE_KEYS.SCREENSHOT_ERROR);
+                chrome.action.setBadgeText({ text: '' });
             }
         };
         chrome.storage.onChanged.addListener(listener);
