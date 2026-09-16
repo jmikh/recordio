@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LuClockAlert, LuEllipsis, LuPencil, LuRotateCcw, LuShare2, LuTrash2 } from 'react-icons/lu';
+import { LuClockAlert, LuEllipsis, LuGlobe, LuLock, LuPencil, LuRotateCcw, LuShare2, LuTrash2, LuUsers } from 'react-icons/lu';
 import { CardCheckbox } from './CardCheckbox';
-import { CopyLinkButton } from '@shared/components';
+import { CopyLinkButton, Tooltip } from '@shared/components';
 import { timeAgo } from './timeAgo';
 import { videoUrl } from '../../lib/videoUrls';
+import { useToast } from '../../components/Toast';
+import { copiedLinkToast } from '../../share/copyLinkToast';
 import type { SharePolicy } from '@shared/api';
 
 /** Minimal project info needed for the card — works with both Project and ProjectListItem */
@@ -17,7 +19,7 @@ export interface ProjectCardData {
     durationMs?: number | null;
     /** Permanent share slug (share-access model: every project has one) */
     shareSlug?: string | null;
-    /** Visibility — the copy-link button only shows for workspace/public */
+    /** Visibility — drives the lock/members/globe glyph; copy-link only for workspace/public */
     sharePolicy?: SharePolicy | null;
     /** Granted to the viewer individually (not via workspace) — shows a tag */
     sharedWithMe?: boolean;
@@ -60,6 +62,13 @@ function formatDuration(ms: number): string {
     return parts.join(' ');
 }
 
+/** Visibility read-out on the card — same glyphs as the share dialog's policy list */
+const VISIBILITY: Record<SharePolicy, { Icon: typeof LuLock; label: string }> = {
+    private: { Icon: LuLock, label: 'Private' },
+    workspace: { Icon: LuUsers, label: 'Workspace members can view' },
+    public: { Icon: LuGlobe, label: 'Public — anyone with the link can view' },
+};
+
 function daysUntil(dateStr: string): number {
     const now = Date.now();
     const target = new Date(dateStr).getTime();
@@ -93,6 +102,10 @@ export const ProjectCard = ({
     const shareUrl = isSharedOut
         ? (shareUrlOverride ?? (project.shareSlug ? videoUrl(project.shareSlug) : null))
         : null;
+
+    const visibility = !isTrashed && project.sharePolicy ? VISIBILITY[project.sharePolicy] : null;
+
+    const { addToast } = useToast();
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -218,21 +231,20 @@ export const ProjectCard = ({
                     </button>
                 )}
 
-                {/* Duration Badge (or the host's replacement) */}
-                {badge !== undefined ? (
-                    <div className="absolute bottom-2 right-2 bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded flex items-center">
-                        {badge}
-                    </div>
-                ) : showDuration && (
-                    <div className="absolute bottom-2 right-2 bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-0.5 rounded">
-                        {formatDuration(project.durationMs ?? 0)}
+                {/* Duration Badge (or the host's replacement) — one container so
+                    text and icon badges sit identically */}
+                {(badge !== undefined || showDuration) && (
+                    <div className="absolute bottom-2 right-2 flex items-center bg-surface-raised/90 backdrop-blur-sm text-text-highlighted text-badge px-1.5 py-1 rounded">
+                        {badge !== undefined ? badge : formatDuration(project.durationMs ?? 0)}
                     </div>
                 )}
             </div>
 
             {/* Info */}
             <div className={`w-full min-w-0 shrink-0 ${isGrid ? 'p-3' : ''}`}>
-                <div className="flex items-center justify-between">
+                {/* Title row — min-h-9 so cards line up whether or not the
+                    copy-link button (h-9) is there */}
+                <div className="flex items-center justify-between gap-2 min-h-9">
                     {isRenaming ? (
                         <input
                             ref={renameInputRef}
@@ -247,27 +259,34 @@ export const ProjectCard = ({
                             onClick={e => e.stopPropagation()}
                             aria-label="Project name"
                             placeholder="Enter a title"
-                            className="text-text-highlighted text-sm min-w-0 mr-2 w-full bg-transparent border-none p-0 outline-none placeholder:text-text-muted"
+                            className="text-text-highlighted text-sm min-w-0 w-full bg-transparent border-none p-0 outline-none placeholder:text-text-muted"
                         />
                     ) : (
-                        <h3 className="truncate text-text-highlighted text-sm min-w-0 mr-2">
+                        <h3 className="truncate text-text-highlighted text-sm min-w-0">
                             {project.name}
                         </h3>
                     )}
+                    {/* Copy link lives here, away from the visibility glyph below:
+                        one is an action, the other is status */}
                     <div className="flex items-center gap-1 shrink-0">
-                        {!isTrashed && (
-                            <>
-                                {shareUrl ? (
-                                    <CopyLinkButton url={shareUrl} title="Copy published link" />
-                                ) : (
-                                    <span className="text-2xs text-text-muted">Private</span>
-                                )}
-                                {isActive && <span className="chosen-dot"></span>}
-                            </>
+                        {!isTrashed && shareUrl && (
+                            <CopyLinkButton
+                                url={shareUrl}
+                                title="Copy share link"
+                                onCopied={() => addToast(copiedLinkToast(project.sharePolicy))}
+                            />
                         )}
+                        {!isTrashed && isActive && <span className="chosen-dot"></span>}
                     </div>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2">
+                    {visibility && (
+                        <Tooltip text={visibility.label} className="flex items-center">
+                            <span role="img" aria-label={visibility.label} className="flex text-text-muted">
+                                <visibility.Icon className="icon-sm" />
+                            </span>
+                        </Tooltip>
+                    )}
                     <span className="text-label">
                         {showUpdatedAt && project.updatedAt
                             ? `Updated ${timeAgo(project.updatedAt)}`

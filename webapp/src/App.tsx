@@ -12,7 +12,7 @@ import { AdminPage } from './pages/admin/AdminPage';
 import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
-import { AuthModal } from './auth/AuthModal';
+import { AuthPage } from './auth/AuthPage';
 import { AuthUnreachableModal } from './auth/AuthUnreachableModal';
 import { useUserStore } from './auth/useUserStore';
 import { useAuthStatusStore } from './auth/useAuthStatusStore';
@@ -28,9 +28,9 @@ AuthManager.init();
 const VIDEO_EDIT_PATH = /^\/video\/[^/]+\/edit\/?$/;
 
 /**
- * Routes App gates itself: signed out they render nothing but the page
- * background with the sign-in modal on top — the dashboard never mounts
- * and never fetches. Everything else is either public (/video/{slug},
+ * Routes App gates itself: signed out they render the full sign-in page
+ * instead — the dashboard never mounts and never fetches. Everything else
+ * is either public (/video/{slug},
  * /uninstall, /accept-invite) or prompts for auth on its own at the right
  * moment: the editor blocks on its own sign-in screen once the project
  * load needs a session, and /import has to keep running while signed out
@@ -147,16 +147,15 @@ export function App() {
         );
     }
 
-    // Signed out on a gated route: bare background + a sign-in modal with no
-    // way out. The modal waits for authReady so a returning session doesn't
-    // flash it; the blank page doesn't, so the dashboard never shows through.
+    // Signed out on a gated route: the full sign-in page, no way out. It waits
+    // for authReady so a returning session doesn't flash it; until then the
+    // bare background holds, so the dashboard never shows through.
     const blocked = !isAuthenticated && isGated;
 
     if (blocked) {
         return (
             <ToastProvider>
-                <div className="w-full h-screen bg-surface-body" />
-                <AuthModal isOpen={authReady} onClose={() => {}} />
+                {authReady ? <AuthPage /> : <div className="w-full h-screen bg-surface-body" />}
             </ToastProvider>
         );
     }

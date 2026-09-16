@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { AuthManager } from '../auth/AuthManager';
-import { AuthModal } from '../auth/AuthModal';
+import { AuthPage } from '../auth/AuthPage';
 import { useUserStore } from '../auth/useUserStore';
 import { useWorkspaceStore } from '../workspace/useWorkspaceStore';
 import { useSyncStatusStore } from '../storage/syncStatusStore';
@@ -144,11 +144,7 @@ export function ScreenshotEditor() {
     }, [lastSyncedAt]);
 
     if (needsAuth) {
-        return (
-            <div className="w-full h-screen bg-surface-body">
-                <AuthModal isOpen onClose={() => {}} />
-            </div>
-        );
+        return <AuthPage />;
     }
 
     return (

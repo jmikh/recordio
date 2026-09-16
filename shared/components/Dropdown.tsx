@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuChevronDown } from 'react-icons/lu';
 
@@ -39,6 +39,20 @@ interface DropdownProps<T> {
     matchTriggerWidth?: boolean;
 }
 
+/**
+ * What the menu looks like before it has been measured. Fixed + hidden, never
+ * `{}`: a statically positioned menu joins the flow at the end of <body>, which
+ * on a full-height page (the dashboard) adds a scrollbar for one frame and
+ * shunts every fixed element — the modal it opened from included — sideways.
+ */
+const UNMEASURED_MENU_STYLE: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    visibility: 'hidden',
+    zIndex: 9999,
+};
+
 export function Dropdown<T>({
     options,
     value,
@@ -55,12 +69,14 @@ export function Dropdown<T>({
     matchTriggerWidth = false,
 }: DropdownProps<T>) {
     const [isOpen, setIsOpen] = useState(false);
-    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>(UNMEASURED_MENU_STYLE);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Calculate menu position when opening — flip upward if not enough space below
-    useEffect(() => {
+    // Calculate menu position when opening — flip upward if not enough space
+    // below. Must be a layout effect: a passive effect lands after the browser
+    // has painted, so the menu shows up unpositioned for a frame first.
+    useLayoutEffect(() => {
         if (!isOpen || !dropdownRef.current) return;
 
         const rect = dropdownRef.current.getBoundingClientRect();

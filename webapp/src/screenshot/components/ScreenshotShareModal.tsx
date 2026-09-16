@@ -11,6 +11,7 @@ import { Button, Modal } from '@shared/components';
 import type { AccessRole, SharePolicy } from '@shared/api';
 import { useUserStore } from '../../auth/useUserStore';
 import { useToast } from '../../components/Toast';
+import { copiedLinkToast } from '../../share/copyLinkToast';
 import { captureError } from '../../lib/sentry';
 import { screenshotUrl } from '../../lib/screenshotUrls';
 import { trackScreenshotShared } from '../../analytics';
@@ -65,7 +66,7 @@ export function ScreenshotShareModal({ isOpen, onClose, image }: ScreenshotShare
     const handleCopyLink = async () => {
         try {
             await navigator.clipboard.writeText(screenshotUrl(meta.slug));
-            addToast({ type: 'success', title: 'Link copied to clipboard' });
+            addToast(copiedLinkToast(meta.sharePolicy));
         } catch {
             addToast({ type: 'error', title: 'Failed to copy link' });
             return;

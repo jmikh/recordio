@@ -46,11 +46,11 @@ test('auth server unreachable — explains itself instead of hanging blank', asy
     // Fast — not after the ~50s of refresh retries
     await expect(page.getByText("Can't reach Recordio")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
-    // Not the sign-in modal: signing in wouldn't fix an unreachable server
-    await expect(page.getByRole('dialog', { name: 'Sign in' })).toBeHidden();
+    // Not the sign-in page: signing in wouldn't fix an unreachable server
+    await expect(page.getByRole('main', { name: 'Sign in' })).toBeHidden();
 });
 
-test('refresh token rejected — sign-in modal, not the connection screen', async ({ page }) => {
+test('refresh token rejected — sign-in page, not the connection screen', async ({ page }) => {
     await seedExpiredSession(page);
     // The server answered and said no: auth-js drops the session + emits SIGNED_OUT
     await page.route('**/auth/v1/token**', route => route.fulfill({
@@ -62,7 +62,7 @@ test('refresh token rejected — sign-in modal, not the connection screen', asyn
 
     await page.goto('/');
 
-    await expect(page.getByRole('dialog', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Can't reach Recordio")).toBeHidden();
 });
 
@@ -100,5 +100,5 @@ test('401 while the logout call fails — still ends up signed out', async ({ pa
 
     await page.goto('/');
 
-    await expect(page.getByRole('dialog', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 });
 });

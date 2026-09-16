@@ -369,7 +369,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
 
     const closeShareModal = () => {
         setShareTarget(null);
-        // Reflect any policy/access change on the card (copy-link vs Private)
+        // Reflect any policy/access change on the card (visibility glyph + copy-link)
         const m = useProjectMetaStore.getState().meta;
         if (m) {
             setAllProjects(prev => prev.map(p => p.id === m.id

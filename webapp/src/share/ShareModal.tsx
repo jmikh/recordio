@@ -10,6 +10,7 @@ import { CloudProjectService } from '../storage/cloudProjectService';
 import { useToast } from '../components/Toast';
 import { captureError } from '../lib/sentry';
 import { videoUrl } from '../lib/videoUrls';
+import { copiedLinkToast } from './copyLinkToast';
 import { trackPublishClicked, trackPublishFailed } from '../analytics';
 import { Avatar, OwnerOnlyNote, ShareCreatorRow, SharePolicyControls } from './SharePolicyControls';
 
@@ -125,7 +126,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
     const handleCopyLink = async () => {
         try {
             await navigator.clipboard.writeText(videoUrl(meta.slug));
-            addToast({ type: 'success', title: 'Link copied to clipboard' });
+            addToast(copiedLinkToast(meta.sharePolicy));
         } catch {
             addToast({ type: 'error', title: 'Failed to copy link' });
             return;

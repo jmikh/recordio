@@ -1,0 +1,47 @@
+/* AuthPage marketing panel — gradient, dot grid and product-shot glow.
+   Lives in CSS (not Tailwind classes) because these are layered background
+   images; every colour is derived from the theme's primary hue so a hue
+   change carries through. The panel is the same purple in both themes. */
+
+.auth-panel {
+    background-color: oklch(0.44 0.19 var(--hue-primary));
+    background-image:
+        radial-gradient(90% 70% at 15% 0%, oklch(0.54 0.21 var(--hue-primary)), transparent 70%),
+        linear-gradient(150deg, oklch(0.48 0.21 var(--hue-primary)) 0%, oklch(0.34 0.14 var(--hue-primary)) 100%);
+}
+
+/* Dot grid, fading out toward the bottom of the panel */
+.auth-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(oklch(1 0 0 / 22%) 1px, transparent 1.5px);
+    background-size: 26px 26px;
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 70%);
+    mask-image: linear-gradient(to bottom, black 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.auth-panel-glow {
+    background-color: oklch(0.75 0.16 var(--hue-primary) / 45%);
+    filter: blur(60px);
+}
+
+.auth-panel-shot {
+    box-shadow: 0 30px 70px -20px oklch(0.20 0.08 var(--hue-primary) / 70%);
+}
+
+/* Marketing headline — deliberately outside the app type scale, which tops
+   out at heading-1 (24px). Matches the landing hero's weight and tracking. */
+.auth-panel-headline {
+    font-size: 2.75rem;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+}
+
+/* The shot dissolves into the panel at its bottom edge rather than ending on
+   a hard line — the mask takes the border and shadow with it. */
+.auth-panel-shot {
+    -webkit-mask-image: linear-gradient(to bottom, black 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 62%, transparent 100%);
+}
