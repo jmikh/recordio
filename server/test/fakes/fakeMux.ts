@@ -1,10 +1,10 @@
-import type { MuxPort } from '../../src/ports/mux.js';
+import type { MuxAssetMeta, MuxPort } from '../../src/ports/mux.js';
 
 /** The only signature header the fake accepts. */
 export const FAKE_MUX_SIGNATURE = 'fake-valid-mux-signature';
 
 export interface FakeMux extends MuxPort {
-    createdAssets: Array<{ assetId: string; inputUrl: string }>;
+    createdAssets: Array<{ assetId: string; inputUrl: string; meta: MuxAssetMeta }>;
     deletedAssetIds: string[];
 }
 
@@ -13,9 +13,9 @@ export function createFakeMux(): FakeMux {
         createdAssets: [],
         deletedAssetIds: [],
 
-        async createAsset(inputUrl) {
+        async createAsset(inputUrl, meta) {
             const assetId = `fake-mux-asset-${fake.createdAssets.length + 1}`;
-            fake.createdAssets.push({ assetId, inputUrl });
+            fake.createdAssets.push({ assetId, inputUrl, meta });
             return { assetId };
         },
         async deleteAsset(assetId) {

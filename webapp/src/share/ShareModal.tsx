@@ -5,7 +5,7 @@ import type { AccessRole, SharePolicy, WorkspaceMemberRow } from '@shared/api';
 import { invokeFunction } from '../api/client';
 import { useProjectMetaStore } from './useProjectMetaStore';
 import { useUserStore } from '../auth/useUserStore';
-import { useSyncStatusStore } from '../storage/syncStatusStore';
+import { useActivityStore, selectUploadTask } from '../activity/useActivityStore';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { useToast } from '../components/Toast';
 import { captureError } from '../lib/sentry';
@@ -34,7 +34,7 @@ export function ShareModal({ isOpen, onClose, projectName }: ShareModalProps) {
     const setEditors = useProjectMetaStore(s => s.setEditors);
     const userId = useUserStore(s => s.userId);
     const { addToast } = useToast();
-    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
+    const isSyncingMedia = useActivityStore(s => (meta ? selectUploadTask(meta.id)(s)?.status === 'active' : false));
 
     const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
 

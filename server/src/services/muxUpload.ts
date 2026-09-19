@@ -58,10 +58,32 @@ export async function uploadToMux(
         return { success: false, error: 'Failed to generate signed URL' };
     }
 
-    // 2. Create the Mux asset
+    // 2. Ownership metadata for the asset (project / workspace / owner) —
+    // mux_videos.user_id is the project OWNER (see sharedVideoPublish).
+    const { rows } = await deps.db.query(
+        `SELECT mv.project_id, mv.user_id, mv.cloud_version, p.workspace_id, p.name
+         FROM mux_videos mv
+         JOIN projects p ON p.id = mv.project_id
+         WHERE mv.id = $1`,
+        [muxVideoId],
+    );
+    const row = rows[0] as
+        | { project_id: string; user_id: string; cloud_version: number; workspace_id: string; name: string }
+        | undefined;
+    if (!row) {
+        throw new Error(`uploadToMux: mux_video ${muxVideoId} not found`);
+    }
+
+    // 3. Create the Mux asset
     let muxAssetId: string;
     try {
-        ({ assetId: muxAssetId } = await deps.mux.createAsset(downloadUrl));
+        ({ assetId: muxAssetId } = await deps.mux.createAsset(downloadUrl, {
+            projectId: row.project_id,
+            workspaceId: row.workspace_id,
+            creatorId: row.user_id,
+            cloudVersion: row.cloud_version,
+            title: row.name,
+        }));
     } catch (err) {
         const error =
             err instanceof MuxApiError
@@ -71,7 +93,7 @@ export async function uploadToMux(
         return { success: false, error };
     }
 
-    // 3. Store mux_asset_id + render_storage_path (status stays 'pending' — webhook completes)
+    // 4. Store mux_asset_id + render_storage_path (status stays 'pending' — webhook completes)
     await deps.db.query(
         `UPDATE mux_videos
          SET mux_asset_id = $2, render_storage_path = $3, updated_at = $4

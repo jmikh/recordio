@@ -4,12 +4,12 @@ import { useExtensionBridge } from './useExtensionBridge';
 import { CloudProjectService } from '../../storage/cloudProjectService';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
 import { captureImportError } from '../../lib/sentry';
-import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed, trackScreenshotCreated } from '../../analytics';
+import { trackProjectCreated, trackImportPageLoaded, trackImportFailed, trackProjectCreationFailed, trackScreenshotCreated, rememberExtensionDistinctId, linkExtensionIdentity } from '../../analytics';
 import { ScreenshotService, readScreenshotCapError } from '../../screenshot/screenshotService';
 import { screenshotEditPath } from '../../lib/screenshotUrls';
 import { useUserStore } from '../../auth/useUserStore';
 import { useWorkspaceStore } from '../../workspace/useWorkspaceStore';
-import { LogoLink, Button } from '@shared/components';
+import { LogoLink, Button, Modal } from '@shared/components';
 import { AuthModal } from '../../auth/AuthModal';
 import { navigate } from '../../lib/navigate';
 import { editorPath } from '../../lib/videoUrls';
@@ -63,7 +63,11 @@ async function readProjectCapError(error: unknown): Promise<{ cap: number | null
 export function ImportPage() {
     const [status, setStatus] = useState<ImportStatus>('init');
     const [errorDetails, setErrorDetails] = useState<string | null>(null);
-    const [hasStarted, setHasStarted] = useState(false);
+    // Must be a ref, not state: React state updates are not synchronous, so under
+    // StrictMode's double-invoked mount effect both runs would read `false` and
+    // start a second concurrent handoff — two ports streaming the same recording,
+    // doubling the service worker's memory and encode work.
+    const hasStartedRef = useRef(false);
     const [uploadPhase, setUploadPhase] = useState<string | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [capInfo, setCapInfo] = useState<{ cap: number | null; kind: 'project' | 'screenshot' } | null>(null);
@@ -73,7 +77,7 @@ export function ImportPage() {
     // Auth modal state
     const [showAuthModal, setShowAuthModal] = useState(false);
 
-    const { state, requestHandoff, confirmHandoff, sendIdentify } = useExtensionBridge();
+    const { state, requestHandoff, confirmHandoff } = useExtensionBridge();
 
     // Get recording ID from URL, stripping any legacy "proj-" prefix
     const params = new URLSearchParams(window.location.search);
@@ -91,6 +95,16 @@ export function ImportPage() {
         trackImportPageLoaded({ recording_id: recordingId });
     }, []);
 
+    // The handoff carries the extension's anonymous Mixpanel ID. Stash it, then link
+    // it immediately if we already know who the user is — otherwise setUser() picks it
+    // up when they sign in. Whichever happens last does the work.
+    useEffect(() => {
+        if (!state.extensionDistinctId) return;
+        rememberExtensionDistinctId(state.extensionDistinctId);
+        const { email } = useUserStore.getState();
+        if (email) linkExtensionIdentity(email);
+    }, [state.extensionDistinctId]);
+
     // Start handoff when page loads
     useEffect(() => {
         if (!recordingId) {
@@ -104,12 +118,12 @@ export function ImportPage() {
             return;
         }
 
-        if (hasStarted) return;
-        setHasStarted(true);
+        if (hasStartedRef.current) return;
+        hasStartedRef.current = true;
 
         requestHandoff(recordingId);
         setStatus('receiving');
-    }, [recordingId, hasStarted, requestHandoff]);
+    }, [recordingId, requestHandoff]);
 
     // Handle handoff state changes
     useEffect(() => {
@@ -131,30 +145,49 @@ export function ImportPage() {
         }
 
         if (state.status === 'error') {
-            captureImportError(
-                new Error(state.error || 'Extension bridge error'),
-                {
-                    recordingId,
-                    phase: 'receiving',
-                    bridgeStatus: state.status,
-                    progress: state.progress ? {
-                        bytesReceived: state.progress.bytesReceived,
-                        totalBytes: state.progress.totalBytes,
-                        chunksReceived: state.progress.chunksReceived,
-                        totalChunks: state.progress.totalChunks,
-                        source: state.progress.source,
-                    } : null,
-                }
-            );
+            // `failureKind` distinguishes the failure modes that all used to look
+            // identical (or, for stalls, produced no report at all): 'stall',
+            // 'port-disconnected', 'stream-error', 'metadata'.
+            const failureKind = state.failureKind ?? 'unknown';
+
+            // Streaming failures self-report to Sentry from the bridge with timing
+            // context; only the ones that didn't need capturing here.
+            if (!state.failureKind) {
+                captureImportError(
+                    new Error(state.error || 'Extension bridge error'),
+                    {
+                        recordingId,
+                        phase: 'receiving',
+                        bridgeStatus: failureKind,
+                        progress: state.progress ? {
+                            bytesReceived: state.progress.bytesReceived,
+                            totalBytes: state.progress.totalBytes,
+                            chunksReceived: state.progress.chunksReceived,
+                            totalChunks: state.progress.totalChunks,
+                            source: state.progress.source,
+                        } : null,
+                    }
+                );
+            }
+
             setStatus('error-extension');
             setErrorDetails(state.error);
 
+            const progress = state.progress;
             trackImportFailed({
                 recording_id: recordingId,
                 phase: 'extension',
-                bridge_status: state.status,
+                bridge_status: failureKind,
                 error: state.error || 'Extension bridge error',
                 is_offline: !navigator.onLine,
+                bytes_received: progress?.bytesReceived ?? 0,
+                total_bytes: progress?.totalBytes ?? 0,
+                percent_complete: progress && progress.totalBytes > 0
+                    ? Math.round((progress.bytesReceived / progress.totalBytes) * 100)
+                    : 0,
+                chunks_received: progress?.chunksReceived ?? 0,
+                total_chunks: progress?.totalChunks ?? 0,
+                stalled_source: progress?.source ?? null,
             });
             trackProjectCreatedFailure('extension');
         }
@@ -198,13 +231,6 @@ export function ImportPage() {
         setStatus('uploading');
         setUploadPhase(phase);
         setUploadProgress(0);
-
-        // Tell extension which user this is so its events share the same Mixpanel distinct_id.
-        // The extension aliases its anonymous UUID to the email and switches going forward.
-        const { email } = useUserStore.getState();
-        if (email) {
-            sendIdentify(email);
-        }
 
         let { workspaceId } = useWorkspaceStore.getState();
         if (!workspaceId) {
@@ -250,16 +276,17 @@ export function ImportPage() {
                 { defaultSettings: defaults.settings },
             );
 
-            // 2. Kick off the cloud upload as fire-and-forget. The editor will
-            //    show progress via the UploadProgressToast (reads syncStatusStore),
-            //    and project_confirm_upload flips upload_status to 'ready' when done.
+            // 2. Kick off the cloud upload as fire-and-forget. Progress shows
+            //    as an upload task: the editor header's badge and, back on
+            //    the dashboard, the project card's; project-confirm-upload
+            //    flips upload_status to 'ready' when done.
             const blobs: { fileType: string; blob: Blob }[] = [
                 { fileType: 'screen', blob: state.screenVideo },
             ];
             if (state.cameraVideo) blobs.push({ fileType: 'camera', blob: state.cameraVideo });
             if (state.micAudio) blobs.push({ fileType: 'mic', blob: state.micAudio });
 
-            CloudProjectService.startMediaUpload(project.id, name, bucket, uploads, blobs);
+            CloudProjectService.startMediaUpload(project.id, name, bucket, uploads, blobs, slug);
 
             // 3. Navigate immediately — editor allows pending projects whose upload
             //    is active in this tab.
@@ -467,7 +494,9 @@ export function ImportPage() {
             case 'init':
             case 'receiving':
             case 'streaming':
-                return isScreenshot ? 'Receiving screenshot' : 'Receiving Recording';
+                // Deliberately not "receiving"/"streaming": the transfer mechanics
+                // are ours, not the user's — to them this is the app starting up.
+                return 'Initializing';
             case 'uploading':
                 return uploadPhase || 'Uploading...';
             case 'success':
@@ -497,75 +526,73 @@ export function ImportPage() {
 
     return (
         <div className="min-h-screen bg-surface-body text-text-main">
-            {/* state-inactive wash tints the page in both themes so the card reads as a card
-                (light-theme surface tokens are all ~white — a bare card would blend in) */}
-            <div className="min-h-screen bg-state-inactive flex flex-col items-center justify-center px-4 py-10">
-                <div className="w-full max-w-md bg-surface-raised border border-border rounded-[var(--radius-lg)] shadow-float px-6 py-8 flex flex-col items-center">
-                    <LogoLink imgClassName="h-8" />
+            {/* Stands down while the auth modal is up so the two backdrops don't stack */}
+            <Modal
+                isOpen={!showAuthModal}
+                maxWidth="max-w-[460px]"
+                ariaLabel={isScreenshot ? 'Importing screenshot' : 'Importing recording'}
+            >
+                <div className="flex flex-col items-center text-center py-6 px-4">
+                    <LogoLink imgClassName="h-8" className="mb-10" />
 
-                    <div className="mt-8 text-center w-full">
-                <div className={`text-lg ${isError ? 'text-destructive' : 'text-text-main'}`}>
-                    {getStatusMessage()}
-                </div>
-
-                {errorDetails && (
-                    <div className="mt-2 text-sm text-text-muted">
-                        {errorDetails}
+                    <div
+                        role={isError ? 'alert' : 'status'}
+                        className={`heading-2 ${isError ? 'text-destructive' : ''}`}
+                    >
+                        {getStatusMessage()}
                     </div>
-                )}
 
-                {/* Progress bar */}
-                {!isError && status !== 'success' && (
-                    <div className="mt-6 w-full">
-                        <div className="w-full h-2 bg-state-inactive rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-primary transition-all duration-300 ease-out"
-                                style={{ width: `${progressPercent}%` }}
-                            />
+                    {errorDetails && (
+                        <div className="mt-2 text-xs text-text-muted">
+                            {errorDetails}
                         </div>
+                    )}
 
-                        <div className="mt-2 text-sm text-text-muted text-center">
-                            {progressPercent}%
-                        </div>
-
-                        {status === 'uploading' && uploadPhase && (
-                            <div className="mt-3 text-xs text-text-muted">
-                                {uploadPhase}
+                    {/* Progress bar */}
+                    {!isError && status !== 'success' && (
+                        <div className="mt-8 w-full">
+                            <div className="w-full h-2 bg-state-inactive rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-primary transition-all duration-300 ease-out"
+                                    style={{ width: `${progressPercent}%` }}
+                                />
                             </div>
-                        )}
-                    </div>
-                )}
 
-                {status === 'error-cap' && capInfo && storeWorkspaceId && (
-                    <CapRecoveryPanel
-                        kind={capInfo.kind}
-                        cap={capInfo.cap}
-                        workspaceId={storeWorkspaceId}
-                        onRetry={() => performUpload()}
-                    />
-                )}
+                            <div className="mt-2 text-label">
+                                {progressPercent}%
+                            </div>
+                        </div>
+                    )}
 
-                {isError && status !== 'error-cap' && (
-                    <div className="mt-4 flex flex-col items-center gap-2">
-                        {status === 'error-upload' && hasPayload && (
+                    {status === 'error-cap' && capInfo && storeWorkspaceId && (
+                        <CapRecoveryPanel
+                            kind={capInfo.kind}
+                            cap={capInfo.cap}
+                            workspaceId={storeWorkspaceId}
+                            onRetry={() => performUpload()}
+                        />
+                    )}
+
+                    {isError && status !== 'error-cap' && (
+                        <div className="mt-6 flex flex-col items-center gap-2">
+                            {status === 'error-upload' && hasPayload && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => performUpload()}
+                                >
+                                    Retry upload
+                                </Button>
+                            )}
                             <Button
-                                variant="primary"
-                                onClick={() => performUpload()}
+                                variant="ghost"
+                                onClick={() => navigate('/')}
                             >
-                                Retry upload
+                                Go to Dashboard
                             </Button>
-                        )}
-                        <Button
-                            variant="ghost"
-                            onClick={() => navigate('/')}
-                        >
-                            Go to Dashboard
-                        </Button>
-                    </div>
-                )}
-                    </div>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </Modal>
 
             {/* Auth modal — shown when blobs are received but user is not logged in */}
             <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />

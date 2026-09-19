@@ -8,7 +8,11 @@
 import { EDITOR_ORIGIN_PROD } from '@shared/urls';
 
 const MIXPANEL_TOKEN = '773bc18d036f7f77ec70ec94e7eec508';
-const MIXPANEL_API_URL = `${EDITOR_ORIGIN_PROD}/mp/track`;
+// `/mp/track` is on ad-blocker filter lists. Service-worker requests are not
+// subject to page-level blocking, so this path still works here — but it is kept
+// aligned with the webapp so there is a single proxy to maintain.
+// `e` is the neutral alias for Mixpanel's `track` endpoint; see functions/api/v2/m.
+const MIXPANEL_API_URL = `${EDITOR_ORIGIN_PROD}/api/v2/m/e`;
 const DISTINCT_ID_KEY = 'mixpanel_distinct_id';
 
 const IS_PRODUCTION = import.meta.env.MODE === 'production';
@@ -82,45 +86,12 @@ async function track(eventName: string, properties: Record<string, any> = {}) {
 // Public API
 // ============================================================================
 
-/**
- * Alias the anonymous UUID to the user's email, then switch to email as distinct_id.
- * The alias merges past anonymous events into the identified user profile in Mixpanel.
- * Profile setup is the web app's responsibility.
- */
-export async function identifyUser(email: string): Promise<void> {
-    if (!IS_PRODUCTION) {
-        console.log('[Mixpanel] $create_alias', { distinct_id: cachedDistinctId, alias: email });
-        return;
-    }
-
-    try {
-        const anonymousId = await getDistinctId();
-
-        // Only alias if we're still on the anonymous UUID (don't re-alias if already identified)
-        if (anonymousId === email) return;
-
-        const payload = [{
-            event: '$create_alias',
-            properties: {
-                token: MIXPANEL_TOKEN,
-                distinct_id: anonymousId,
-                alias: email,
-            },
-        }];
-
-        fetch(MIXPANEL_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
-            body: JSON.stringify(payload),
-        }).catch(e => console.error('[Mixpanel] alias fetch failed:', e));
-
-        // Switch to email for all future events
-        cachedDistinctId = email;
-        await chrome.storage.local.set({ [DISTINCT_ID_KEY]: email });
-    } catch (e) {
-        console.error('[Mixpanel] identifyUser error:', e);
-    }
-}
+// The distinct_id stays the anonymous UUID for the life of the install. Linking it
+// to a signed-in user is the webapp's job: the import handoff hands it our
+// distinct_id (see extensionDistinctId in shared/types/bridge.ts) and the webapp
+// emits the Simplified-ID-Merge $identify once it knows the email. The extension
+// has no reliable moment to do that itself, and the $create_alias it used to send
+// is not part of the Simplified ID Merge API at all.
 
 export type CaptureType = 'tab' | 'current_window' | 'another_window' | 'desktop';
 

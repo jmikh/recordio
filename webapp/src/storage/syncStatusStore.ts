@@ -7,11 +7,6 @@ export interface SyncState {
     currentUpload: { projectId: string; projectName?: string; type: string; progress: number } | null;
     currentDownload: { projectId: string; type: string; progress: number } | null;
     error: string | null;
-    /**
-     * Set when a media upload fails terminally. The toast surfaces this with a
-     * retry button; calling onRetry() should re-kick the upload.
-     */
-    mediaUploadError: { projectId: string; projectName?: string; message: string; onRetry: () => void } | null;
     /** Set when another device wrote a newer version */
     conflict: { projectId: string } | null;
     /** Screenshot counterpart of `conflict` (plans/screenshots) — read by the screenshot editor's modal */
@@ -29,7 +24,6 @@ interface SyncStatusStore extends SyncState {
     setPendingMediaUploads: (count: number) => void;
     setCurrentUpload: (upload: SyncState['currentUpload']) => void;
     setCurrentDownload: (download: SyncState['currentDownload']) => void;
-    setMediaUploadError: (err: SyncState['mediaUploadError']) => void;
     setConflict: (conflict: SyncState['conflict']) => void;
     clearConflict: () => void;
     setScreenshotConflict: (conflict: SyncState['screenshotConflict']) => void;
@@ -44,7 +38,6 @@ export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
     currentUpload: null,
     currentDownload: null,
     error: null,
-    mediaUploadError: null,
     conflict: null,
     screenshotConflict: null,
     pendingNavigation: null,
@@ -57,7 +50,6 @@ export const useSyncStatusStore = create<SyncStatusStore>()((set) => ({
     setPendingMediaUploads: (count) => set({ pendingMediaUploads: count }),
     setCurrentUpload: (upload) => set({ currentUpload: upload }),
     setCurrentDownload: (download) => set({ currentDownload: download }),
-    setMediaUploadError: (err) => set({ mediaUploadError: err }),
     setConflict: (conflict) => set({ conflict }),
     clearConflict: () => set({ conflict: null, pendingNavigation: null }),
     setScreenshotConflict: (screenshotConflict) => set({ screenshotConflict }),

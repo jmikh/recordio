@@ -327,8 +327,19 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
         expect(deps.s3.presignedDownloads).toEqual([
             { key: renderPath, expiresInSeconds: 3600 },
         ]);
+        // Ownership metadata rides along so the asset traces back to us
         expect(deps.mux.createdAssets).toEqual([
-            { assetId: 'fake-mux-asset-1', inputUrl: `https://fake-s3/get/${renderPath}` },
+            {
+                assetId: 'fake-mux-asset-1',
+                inputUrl: `https://fake-s3/get/${renderPath}`,
+                meta: {
+                    projectId: project.id,
+                    workspaceId: subscribedWs,
+                    creatorId: project.ownerId,
+                    cloudVersion: 1,
+                    title: 'Publish me',
+                },
+            },
         ]);
         // Status STAYS pending — the Mux webhook (Wave D) completes it
         expect(rows[0]).toMatchObject({
@@ -363,10 +374,32 @@ describe.runIf(hasTestDb())('POST /mux-video-create (e2e, real Postgres)', () =>
             mux_asset_id: null,
             mux_playback_id: null,
             render_storage_path: null,
+            // The reset spends one publish attempt — the budget
+            // shared-video-get's self-heal reads (sharedVideoPublish.ts)
+            attempt: 2,
         });
         // Fresh render pipeline kicked off
         expect(await jobRows(project.id)).toHaveLength(1);
         expect(deps.renderWorker.submissions).toHaveLength(1);
+    });
+
+    it('a first publish starts the attempt budget at 1', async () => {
+        const { app } = testApp();
+        const project = await seed();
+
+        await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
+
+        expect((await muxRows(project.id))[0]).toMatchObject({ status: 'pending', attempt: 1 });
+    });
+
+    it('a repeat publish of a PENDING row does not spend an attempt', async () => {
+        const { app } = testApp();
+        const project = await seed();
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+
+        await post(app, { projectId: project.id, cloudVersion: 1 }, await ownerToken());
+
+        expect((await muxRows(project.id))[0]).toMatchObject({ attempt: 1 });
     });
 
     it('render failure marks the mux_video failed with `Render dispatch failed` and 500s (pin: no eternal pending)', async () => {

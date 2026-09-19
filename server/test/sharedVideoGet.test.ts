@@ -22,12 +22,16 @@ import {
     hasTestDb,
     seedMuxVideo,
     seedProject,
+    seedRenderJob,
     seedProjectEditor,
     seedWorkspace,
     seedWorkspaceMember,
     SEEDED_USER_2_ID,
     SEEDED_USER_ID,
 } from './helpers/db.js';
+
+/** Whatever the worker is told to call back on; only its presence matters here. */
+const TEST_PUBLIC_URL = 'http://127.0.0.1:8090';
 
 async function post(app: App, body: unknown, token?: string) {
     return app.inject({
@@ -86,11 +90,44 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         await pool.end();
     });
 
-    /** Fresh app per test — the per-route rate limiter's counter is per instance. */
+    /**
+     * Fresh app per test — the per-route rate limiter's counter is per
+     * instance. publicUrl is required because the route now dispatches
+     * renders itself (the worker needs a callback URL).
+     */
     function testApp(): { app: App; deps: FakeDeps } {
         const deps = createFakeDeps({ db: pool });
-        const app = buildApp(deps, { supabaseJwtSecret: TEST_JWT_SECRET, logLevel: 'silent' });
+        const app = buildApp(deps, {
+            supabaseJwtSecret: TEST_JWT_SECRET,
+            publicUrl: TEST_PUBLIC_URL,
+            logLevel: 'silent',
+        });
         return { app, deps: deps as FakeDeps };
+    }
+
+    /** A project whose media is uploaded — the precondition for self-heal. */
+    async function seedReady(opts: Parameters<typeof seedProject>[1] = {}) {
+        return seed({ ...opts, uploadStatus: 'ready' });
+    }
+
+    function hoursAgo(n: number): string {
+        return new Date(Date.now() - n * 60 * 60 * 1000).toISOString();
+    }
+
+    async function muxRow(projectId: string) {
+        const { rows } = await pool.query(
+            'SELECT status, attempt, cloud_version FROM mux_videos WHERE project_id = $1',
+            [projectId],
+        );
+        return rows as { status: string; attempt: number; cloud_version: number }[];
+    }
+
+    async function renderRow(projectId: string) {
+        const { rows } = await pool.query(
+            'SELECT status, attempt_count, quality FROM render_jobs WHERE project_id = $1',
+            [projectId],
+        );
+        return rows as { status: string; attempt_count: number; quality: string }[];
     }
 
     async function seed(opts: Parameters<typeof seedProject>[1] = {}) {
@@ -368,6 +405,59 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         expect(res.json()).toMatchObject({ status: 'pending' });
     });
 
+    // ── render progress on a pending video ────────────────────────
+
+    it('pending: carries the 2K render job progress', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K', progress: 0.42,
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending', progress: 0.42 });
+    });
+
+    it('pending: no progress key while the job is queued (progress NULL)', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+        await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1, quality: '2K' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).not.toHaveProperty('progress');
+    });
+
+    it('pending: progress 1 = rendered, waiting on the Mux webhook', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'completed', progress: 1,
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending', progress: 1 });
+    });
+
+    it('pending: a 1080p download render is NOT the source of progress', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '1080p', progress: 0.9,
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).not.toHaveProperty('progress');
+    });
+
     it('pending wins over failed', async () => {
         const { app, deps } = testApp();
         const project = await seed();
@@ -379,14 +469,17 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         expect(res.json()).toMatchObject({ status: 'pending' });
     });
 
-    it('failed only', async () => {
+    it('failed only, media not uploaded: no status and no dispatch', async () => {
         const { app, deps } = testApp();
+        // seedProject defaults upload_status 'pending' — a render would
+        // only fail, so the route leaves it alone
         const project = await seed();
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed' });
 
         const res = await post(app, { slug: project.slug });
-        expect(res.json()).toMatchObject({ status: 'failed' });
+        expect(res.json()).toEqual({ name: 'Test project', userName: 'Jane' });
+        expect(deps.renderWorker.submissions).toHaveLength(0);
     });
 
     it('canceled rows are ignored (edge-function parity)', async () => {
@@ -493,5 +586,268 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
     it('seeded user id sanity: FK target exists', async () => {
         const { rows } = await pool.query('SELECT id FROM auth.users WHERE id = $1', [SEEDED_USER_ID]);
         expect(rows).toHaveLength(1);
+    });
+
+    // ── self-heal: the page starts its own render ─────────────────
+
+    it('no mux video: dispatches a 2K render at the project current version', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ name: 'My demo', cloudVersion: 3 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane Doe' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ name: 'My demo', userName: 'Jane Doe', status: 'pending' });
+
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+        expect(await muxRow(project.id)).toEqual([
+            { status: 'pending', attempt: 1, cloud_version: 3 },
+        ]);
+        expect(await renderRow(project.id)).toEqual([
+            { status: 'pending', attempt_count: 1, quality: '2K' },
+        ]);
+    });
+
+    it('an ANONYMOUS viewer of a public link triggers the render', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ sharePolicy: 'public' });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+
+        // No authorization header at all
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending' });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+    });
+
+    it('the dispatch is attributed to the project OWNER, not the viewer', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ ownerId: SEEDED_USER_ID });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+
+        // A different signed-in viewer with view access via the public policy
+        await post(app, { slug: project.slug }, await userToken({ sub: SEEDED_USER_2_ID }));
+
+        const { rows } = await pool.query(
+            'SELECT user_id, render_storage_path FROM render_jobs WHERE project_id = $1',
+            [project.id],
+        );
+        expect(rows[0]).toMatchObject({ user_id: SEEDED_USER_ID });
+        expect((rows[0] as { render_storage_path: string }).render_storage_path)
+            .toBe(`${SEEDED_USER_ID}/${project.id}/renders/v1_2K.mp4`);
+    });
+
+    it('a second poll does not dispatch again — the pending row latches it', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+
+        await post(app, { slug: project.slug });
+        await post(app, { slug: project.slug });
+        await post(app, { slug: project.slug });
+
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+    });
+
+    it('an older completed video still plays and does NOT render the newer version', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ cloudVersion: 2 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'completed', muxPlaybackId: 'pb-old' });
+        expect(deps.renderWorker.submissions).toHaveLength(0);
+    });
+
+    it('a completed row without a playback id reads as pending, not a re-render', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: null });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending' });
+        expect(deps.renderWorker.submissions).toHaveLength(0);
+    });
+
+    // ── the attempt budget ────────────────────────────────────────
+
+    it('failed, render attempts left: re-dispatches and spends one of each', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 3 });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'failed', attemptCount: 3,
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending' });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+        expect(await muxRow(project.id)).toEqual([
+            { status: 'pending', attempt: 4, cloud_version: 1 },
+        ]);
+        expect(await renderRow(project.id)).toEqual([
+            { status: 'pending', attempt_count: 4, quality: '2K' },
+        ]);
+    });
+
+    it('render budget spent inside the cooldown: failed, no dispatch, row untouched', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 5 });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'failed', attemptCount: 5,
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'failed' });
+        expect(deps.renderWorker.submissions).toHaveLength(0);
+        // Critically: NOT flipped back to pending, which would strand the
+        // page on "Preparing video..." forever
+        expect(await muxRow(project.id)).toEqual([
+            { status: 'failed', attempt: 5, cloud_version: 1 },
+        ]);
+    });
+
+    it('budget spent: sends the render error as failureReason outside production', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, {
+            projectId: project.id, cloudVersion: 1, status: 'failed',
+            attempt: 5, error: 'Render failed',
+        });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'failed', attemptCount: 5, error: 'Worker unresponsive',
+        });
+
+        const res = await post(app, { slug: project.slug });
+        // The render's own error, not the mux row's cascade of it
+        expect(res.json().failureReason).toContain('Worker unresponsive');
+    });
+
+    it('production withholds failureReason entirely', async () => {
+        const deps = createFakeDeps({ db: pool });
+        const app = buildApp(deps, {
+            supabaseJwtSecret: TEST_JWT_SECRET,
+            publicUrl: TEST_PUBLIC_URL,
+            env: 'production',
+            logLevel: 'silent',
+        });
+        const project = await seedReady();
+        await seedMuxVideo(pool, {
+            projectId: project.id, cloudVersion: 1, status: 'failed',
+            attempt: 5, error: 'Mux API error: 401',
+        });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'failed', attemptCount: 5, error: 'Worker unresponsive',
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'failed' });
+        expect(res.json()).not.toHaveProperty('failureReason');
+    });
+
+    it('a dispatch failure reports the thrown message as failureReason', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        deps.s3.presignUpload = async () => { throw new Error('s3 down'); };
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json().failureReason).toContain('s3 down');
+    });
+
+    it('render budget spent but the cooldown has passed: one more dispatch', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, {
+            projectId: project.id, cloudVersion: 1, status: 'failed',
+            attempt: 5, updatedAt: hoursAgo(2),
+        });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'failed', attemptCount: 5, updatedAt: hoursAgo(2),
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending' });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+    });
+
+    it('Mux-errored path: the mux counter blocks even with the render cached', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        // asset.errored failed the mux row while the render stayed
+        // completed — attempt_count is frozen at 1, so only mux.attempt
+        // can stop the re-upload loop
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 5 });
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 1, quality: '2K',
+            status: 'completed', attemptCount: 1, progress: 1,
+        });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'failed' });
+        expect(deps.mux.createdAssets).toHaveLength(0);
+    });
+
+    it('a failed publish at an OLDER version does not spend the new version budget', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ cloudVersion: 2 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 5 });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ status: 'pending' });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+    });
+
+    it('a dispatch failure answers 200 failed, not 500', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady();
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        deps.s3.presignUpload = async () => { throw new Error('s3 down'); };
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ status: 'failed' });
+        // The publish service marked the row before rethrowing
+        expect(await muxRow(project.id)).toEqual([
+            { status: 'failed', attempt: 1, cloud_version: 1 },
+        ]);
+    });
+
+    it('tags the canonical event when it self-heals', async () => {
+        const lines: Record<string, unknown>[] = [];
+        const deps = createFakeDeps({ db: pool });
+        const app = buildApp(deps, {
+            supabaseJwtSecret: TEST_JWT_SECRET,
+            publicUrl: TEST_PUBLIC_URL,
+            logStream: {
+                write(chunk: string) {
+                    for (const line of chunk.split('\n')) {
+                        if (line.trim()) lines.push(JSON.parse(line));
+                    }
+                },
+            },
+        });
+        const project = await seedReady();
+
+        await post(app, { slug: project.slug });
+        expect(lines.find((l) => l.msg === 'request')).toMatchObject({
+            'mux.video_status': 'pending',
+            'mux.auto_started': true,
+            'mux.attempt': 1,
+            'render.attempt_count': 1,
+        });
     });
 });

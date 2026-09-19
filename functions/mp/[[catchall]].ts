@@ -1,8 +1,16 @@
 /**
- * Cloudflare Pages Function — Mixpanel Reverse Proxy
+ * Cloudflare Pages Function — Mixpanel Reverse Proxy (LEGACY PATH)
  *
  * Routes /mp/* → https://api.mixpanel.com/*
- * Bypasses ad blockers by keeping analytics calls same-origin.
+ *
+ * DEPRECATED for page traffic — `/mp/track/` is on ad-blocker filter lists and
+ * is blocked outright under Brave Shields "Aggressive". Current clients use
+ * functions/api/v2/m instead; see that file for the full explanation.
+ *
+ * Kept alive only for extension versions already in the wild that still post to
+ * /mp/track. Those are sent from the extension service worker, which page-level
+ * blocking cannot touch, so they still arrive. Remove once the extension
+ * version floor has moved past 1.0.20.
  *
  * Geolocation: Forwards the real client IP via X-Real-IP and X-Forwarded-For
  * headers so Mixpanel geolocates correctly (not the CF edge IP).

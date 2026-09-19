@@ -15,6 +15,8 @@ import {
     BRIDGE_MSG,
     PORT_MSG,
     HANDOFF_PORT_NAME,
+    HANDOFF_TIMEOUT_MS,
+    KEEPALIVE_INTERVAL_MS,
     type HandoffRequestResponse,
     type HandoffMetadataResponse,
     type HandoffKind,
@@ -40,6 +42,28 @@ export interface HandoffProgress {
     totalBytes: number;
 }
 
+/**
+ * Why a handoff failed. Reported to both Sentry (tag) and Mixpanel (property) so
+ * the silent-stall class of failure is distinguishable in the funnel.
+ *
+ * - `metadata`        — extension never answered HANDOFF_REQUEST
+ * - `stall`           — connected, but no chunk arrived for HANDOFF_TIMEOUT_MS.
+ *                       Usually the MV3 service worker was terminated mid-stream.
+ * - `port-disconnected` — port closed before STREAM_COMPLETE
+ * - `stream-error`    — extension explicitly reported STREAM_ERROR
+ */
+export type HandoffFailureKind = 'metadata' | 'stall' | 'port-disconnected' | 'stream-error';
+
+/** Error carrying the failure kind out of the streaming promise. */
+class HandoffError extends Error {
+    readonly kind: HandoffFailureKind;
+    constructor(message: string, kind: HandoffFailureKind) {
+        super(message);
+        this.name = 'HandoffError';
+        this.kind = kind;
+    }
+}
+
 export interface HandoffState {
     status: 'idle' | 'requesting' | 'streaming' | 'success' | 'error';
     /** The capture id (recording or screenshot) being handed off */
@@ -47,6 +71,8 @@ export interface HandoffState {
     /** Known once metadata arrives */
     kind: HandoffKind | null;
     error: string | null;
+    /** Set alongside `status: 'error'` — what kind of failure this was */
+    failureKind: HandoffFailureKind | null;
     progress: HandoffProgress | null;
     // Result data (available when status === 'success')
     recording: RawRecording | null;
@@ -148,6 +174,7 @@ export function useExtensionBridge() {
         status: 'idle',
         recordingId: null,
         kind: null,
+        failureKind: null,
         error: null,
         progress: null,
         recording: null,
@@ -170,6 +197,13 @@ export function useExtensionBridge() {
     const imageTotalRef = useRef<number>(0);
     const metadataRef = useRef<HandoffMetadataResponse | null>(null);
 
+    /** Re-entrancy guard. Two concurrent handoffs for the same capture open two
+     *  ports, make the extension encode and send everything twice, and write into
+     *  the same chunk Maps — which `requestHandoff` resets on entry, so the first
+     *  stream can reassemble a half-cleared Map. Doubling the service worker's
+     *  memory is also a good way to get it killed mid-transfer. */
+    const inFlightRef = useRef(false);
+
     const chunksReceived = () =>
         screenChunksRef.current.size + cameraChunksRef.current.size + micChunksRef.current.size + imageChunksRef.current.size;
     const chunksExpected = () =>
@@ -180,7 +214,11 @@ export function useExtensionBridge() {
      * Returns once all data is received and blobs are reconstructed.
      */
     const requestHandoff = useCallback(async (recordingId: string) => {
-
+        if (inFlightRef.current) {
+            console.warn(`[handoff] ignoring duplicate requestHandoff for ${recordingId} — one is already in flight`);
+            return;
+        }
+        inFlightRef.current = true;
 
         // Reset state
         screenChunksRef.current = new Map();
@@ -197,6 +235,7 @@ export function useExtensionBridge() {
             status: 'requesting',
             recordingId,
             kind: null,
+            failureKind: null,
             error: null,
             progress: { phase: 'metadata', source: null, chunksReceived: 0, totalChunks: 0, bytesReceived: 0, totalBytes: 0 },
             recording: null,
@@ -330,27 +369,36 @@ export function useExtensionBridge() {
             const meta = metadataRef.current;
             const recordingMeta = meta && meta.kind !== 'screenshot' ? meta : null;
             const primaryChunks = meta?.kind === 'screenshot' ? imageChunksRef.current : screenChunksRef.current;
-            captureImportError(error, {
-                recordingId,
-                phase: meta ? 'streaming' : 'receiving',
-                bridgeStatus: meta ? 'post-metadata' : 'pre-metadata',
-                screenVideoSize: recordingMeta?.screenVideoSize,
-                cameraVideoSize: recordingMeta?.cameraVideoSize,
-                micAudioSize: recordingMeta?.micAudioSize,
-                extra: meta?.kind === 'screenshot' ? { kind: 'screenshot', imageSize: meta.imageSize } : undefined,
-                progress: {
-                    bytesReceived: [...primaryChunks.values()].reduce((s, c) => s + c.byteLength, 0),
-                    totalBytes: meta ? totalBytesOf(meta) : 0,
-                    chunksReceived: chunksReceived(),
-                    totalChunks: chunksExpected(),
-                    source: null,
-                },
-            });
+
+            // Streaming failures are already reported to Sentry by `fail()`, with
+            // richer timing context — don't double-report them here.
+            if (!(error instanceof HandoffError)) {
+                captureImportError(error, {
+                    recordingId,
+                    phase: meta ? 'streaming' : 'receiving',
+                    bridgeStatus: meta ? 'post-metadata' : 'pre-metadata',
+                    screenVideoSize: recordingMeta?.screenVideoSize,
+                    cameraVideoSize: recordingMeta?.cameraVideoSize,
+                    micAudioSize: recordingMeta?.micAudioSize,
+                    extra: meta?.kind === 'screenshot' ? { kind: 'screenshot', imageSize: meta.imageSize } : undefined,
+                    progress: {
+                        bytesReceived: [...primaryChunks.values()].reduce((s, c) => s + c.byteLength, 0),
+                        totalBytes: meta ? totalBytesOf(meta) : 0,
+                        chunksReceived: chunksReceived(),
+                        totalChunks: chunksExpected(),
+                        source: null,
+                    },
+                });
+            }
+
             setState(prev => ({
                 ...prev,
                 status: 'error',
+                failureKind: error instanceof HandoffError ? error.kind : 'metadata',
                 error: error instanceof Error ? error.message : 'Failed to communicate with extension',
             }));
+        } finally {
+            inFlightRef.current = false;
         }
     }, []);
 
@@ -365,14 +413,115 @@ export function useExtensionBridge() {
         return new Promise((resolve, reject) => {
             let bytesReceived = 0;
 
+            /** Guards against double-settling: onDisconnect always fires after
+             *  STREAM_COMPLETE/STREAM_ERROR, and the stall timer can race both. */
+            let settled = false;
+            let stallTimer: ReturnType<typeof setTimeout> | null = null;
+            let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+
+            const startedAt = performance.now();
+            let lastChunkAt = startedAt;
+            /** Per-source timing, logged on completion so we can see where time goes. */
+            const sourceTiming = new Map<string, { chunks: number; bytes: number; decodeMs: number }>();
+
+            // Declared outside the try so the catch below can always clear them.
+            const clearStall = () => {
+                if (stallTimer !== null) {
+                    clearTimeout(stallTimer);
+                    stallTimer = null;
+                }
+                if (keepAliveTimer !== null) {
+                    clearInterval(keepAliveTimer);
+                    keepAliveTimer = null;
+                }
+            };
+
             try {
                 const port = connectToExtension(EXTENSION_ID, HANDOFF_PORT_NAME);
+
+                const progressSnapshot = () => ({
+                    bytesReceived,
+                    totalBytes,
+                    chunksReceived: chunksReceived(),
+                    totalChunks: chunksExpected(),
+                    source: null,
+                });
+
+                const succeed = () => {
+                    if (settled) return;
+                    settled = true;
+                    clearStall();
+                    const elapsedMs = performance.now() - startedAt;
+                    console.log(
+                        `[handoff] complete: ${(bytesReceived / 1e6).toFixed(1)}MB in ${(elapsedMs / 1000).toFixed(2)}s ` +
+                        `(${(bytesReceived / 1e6 / (elapsedMs / 1000)).toFixed(1)} MB/s)`,
+                        Object.fromEntries(sourceTiming),
+                    );
+                    port.disconnect();
+                    resolve();
+                };
+
+                /** Single exit for every failure: logs, reports to Sentry, rejects
+                 *  with the kind so ImportPage can report it to Mixpanel too. */
+                const fail = (message: string, kind: HandoffFailureKind) => {
+                    if (settled) return;
+                    settled = true;
+                    clearStall();
+                    const err = new HandoffError(message, kind);
+                    console.error(`[handoff] failed (${kind}):`, message, progressSnapshot());
+                    captureImportError(err, {
+                        recordingId,
+                        phase: 'streaming',
+                        bridgeStatus: kind,
+                        progress: progressSnapshot(),
+                        extra: {
+                            elapsedMs: Math.round(performance.now() - startedAt),
+                            msSinceLastChunk: Math.round(performance.now() - lastChunkAt),
+                            sourceTiming: Object.fromEntries(sourceTiming),
+                        },
+                    });
+                    try { port.disconnect(); } catch { /* already gone */ }
+                    reject(err);
+                };
+
+                /** (Re)arm the stall watchdog. The MV3 service worker can be
+                 *  terminated mid-stream, which closes the port with no
+                 *  `lastError` — without this the promise would never settle. */
+                const armStall = () => {
+                    clearStall();
+                    stallTimer = setTimeout(() => {
+                        fail(
+                            `Transfer stalled: no data from the extension for ${Math.round(HANDOFF_TIMEOUT_MS / 1000)}s ` +
+                            `at ${bytesReceived} of ${totalBytes} bytes`,
+                            'stall',
+                        );
+                    }, HANDOFF_TIMEOUT_MS);
+                };
 
                 port.onMessage.addListener((message) => {
                     switch (message.type) {
                         case PORT_MSG.CHUNK: {
                             const chunk = message.payload as ChunkPayload;
+                            const decodeStart = performance.now();
                             const data = new Uint8Array(chunk.data);
+                            const decodeMs = performance.now() - decodeStart;
+
+                            lastChunkAt = performance.now();
+                            armStall();
+
+                            const timing = sourceTiming.get(chunk.source)
+                                ?? { chunks: 0, bytes: 0, decodeMs: 0 };
+                            timing.chunks += 1;
+                            timing.bytes += data.byteLength;
+                            timing.decodeMs += decodeMs;
+                            sourceTiming.set(chunk.source, timing);
+
+                            if (import.meta.env.DEV) {
+                                console.log(
+                                    `[handoff] chunk ${chunk.index + 1}/${chunk.total} (${chunk.source}) ` +
+                                    `${(data.byteLength / 1e6).toFixed(1)}MB decoded in ${decodeMs.toFixed(0)}ms`,
+                                );
+                            }
 
                             // Store chunk by index (handles out-of-order arrival)
                             if (chunk.source === 'screen') {
@@ -408,60 +557,58 @@ export function useExtensionBridge() {
                         }
 
                         case PORT_MSG.STREAM_COMPLETE:
-                            port.disconnect();
-                            resolve();
+                            succeed();
                             break;
 
                         case PORT_MSG.STREAM_ERROR:
-                            console.error('[useExtensionBridge] Stream error:', message.payload);
-                            captureImportError(
-                                new Error(message.payload.error || 'Stream error from extension'),
-                                {
-                                    recordingId,
-                                    phase: 'streaming',
-                                    progress: {
-                                        bytesReceived,
-                                        totalBytes,
-                                        chunksReceived: chunksReceived(),
-                                        totalChunks: chunksExpected(),
-                                        source: null,
-                                    },
-                                }
-                            );
-                            port.disconnect();
-                            reject(new Error(message.payload.error));
+                            fail(message.payload?.error || 'Stream error from extension', 'stream-error');
                             break;
                     }
                 });
 
+                // A disconnect before STREAM_COMPLETE is always a failure. When the
+                // MV3 service worker is terminated the port closes *cleanly* — no
+                // `lastError` — so this must not be gated on it, or the handoff
+                // hangs silently at whatever percentage it reached.
                 port.onDisconnect.addListener(() => {
                     const chrome = (window as unknown as { chrome?: typeof globalThis.chrome }).chrome;
-                    if (chrome?.runtime?.lastError) {
-                        const err = new Error(chrome.runtime.lastError.message || 'Port disconnected');
-                        captureImportError(err, {
-                            recordingId,
-                            phase: 'streaming',
-                            bridgeStatus: 'port-disconnected',
-                            progress: {
-                                bytesReceived,
-                                totalBytes,
-                                chunksReceived: chunksReceived(),
-                                totalChunks: chunksExpected(),
-                                source: null,
-                            },
-                        });
-                        reject(err);
-                    }
+                    const lastError = chrome?.runtime?.lastError?.message;
+                    fail(
+                        lastError
+                            || 'The extension disconnected before the transfer finished '
+                            + '(its background service worker was most likely terminated).',
+                        'port-disconnected',
+                    );
                 });
 
+                // Keep the extension's MV3 service worker from being terminated
+                // mid-transfer. It only posts chunks outward while streaming, which
+                // does not count as activity, so a transfer longer than the ~30s
+                // idle timeout gets the worker killed. An inbound port message
+                // resets that timer — including on extensions old enough not to
+                // know this message type, since the reset happens on delivery.
+                keepAliveTimer = setInterval(() => {
+                    if (settled) return;
+                    try {
+                        port.postMessage({ type: PORT_MSG.KEEPALIVE });
+                    } catch {
+                        // Port already torn down; onDisconnect handles the failure.
+                    }
+                }, KEEPALIVE_INTERVAL_MS);
+
                 // Start streaming
+                armStall();
                 port.postMessage({
                     type: PORT_MSG.START_STREAM,
                     payload: { recordingId },
                 });
 
             } catch (error) {
-                reject(error);
+                clearStall();
+                if (!settled) {
+                    settled = true;
+                    reject(error);
+                }
             }
         });
     }, []);
@@ -488,16 +635,5 @@ export function useExtensionBridge() {
         }
     }, [state.recordingId]);
 
-    /**
-     * Send the logged-in user's email to the extension for Mixpanel identity.
-     * Fire-and-forget — analytics should never block the import flow.
-     */
-    const sendIdentify = useCallback((email: string) => {
-        sendToExtension(EXTENSION_ID, {
-            type: BRIDGE_MSG.IDENTIFY_USER,
-            payload: { email },
-        }).catch(e => console.error('[useExtensionBridge] Error sending identify:', e));
-    }, []);
-
-    return { state, requestHandoff, confirmHandoff, sendIdentify };
+    return { state, requestHandoff, confirmHandoff };
 }

@@ -1,18 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { LuImage, LuTrash2 } from 'react-icons/lu';
+import { useShallow } from 'zustand/react/shallow';
+import { LuTrash2 } from 'react-icons/lu';
 import { CloudProjectService, toShareMeta, type ProjectListItem } from '../../storage/cloudProjectService';
 import { ShareModal } from '../../share/ShareModal';
 import { useProjectMetaStore } from '../../share/useProjectMetaStore';
 import { ProjectCard } from './ProjectCard';
+import { CardActivityBadge } from './CardActivityBadge';
+import { useActivityStore, uploadTaskId, renderTaskId } from '../../activity/useActivityStore';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
 import { deriveLibraryCounts } from './libraryCounts';
-import { ScreenshotsView } from './ScreenshotsView';
+import { ScreenshotsView, ScreenshotCard, TrashScreenshotCard } from './ScreenshotsView';
 import { ScreenshotService, toScreenshotMeta, type ScreenshotListItem } from '../../screenshot/screenshotService';
 import { ScreenshotStorage } from '../../screenshot/api/screenshotStorage';
 import { useScreenshotMetaStore } from '../../screenshot/store/useScreenshotMetaStore';
 import { ScreenshotShareModal } from '../../screenshot/components/ScreenshotShareModal';
-import { screenshotEditPath, screenshotUrl, screenshotViewPath } from '../../lib/screenshotUrls';
+import { screenshotEditPath, screenshotViewPath } from '../../lib/screenshotUrls';
 import { DashboardHeader, type ContentKind, type SortOrder } from './DashboardHeader';
 import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
 import { PersonalSettingsPage } from '../settings/personal/PersonalSettingsPage';
@@ -36,6 +39,11 @@ import { captureError } from '../../lib/sentry';
 
 import { navigate } from '../../lib/navigate';
 import { editorPath, viewPath } from '../../lib/videoUrls';
+
+/** One entry of the mixed "All" grid — a video or a screenshot with the date it sorts by */
+type MediaItem =
+    | { kind: 'video'; item: ProjectListItem; sortAt: string }
+    | { kind: 'screenshot'; item: ScreenshotListItem; sortAt: string };
 
 /**
  * `settingsPage` renders a settings page in the content area (same sidebar):
@@ -104,9 +112,19 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         () => projects.filter(p => p.sharePolicy === 'workspace' || p.sharePolicy === 'public'),
         [projects],
     );
-    // Trash only shows the caller's own trashed videos
+    // Projects with a cloud export running — a render started in the editor
+    // keeps going once the user comes back here. Shallow-compared and ids
+    // only, so progress ticks re-render the card's badge, not the dashboard.
+    const exportingIds = useActivityStore(useShallow(s =>
+        Object.values(s.tasks)
+            .filter(t => t.kind === 'render' && t.status === 'active')
+            .map(t => t.projectId),
+    ));
+
+    // Trash only shows the caller's own trashed videos — never a pending one
+    // (the server already excludes trashed pending rows; belt and braces)
     const trashProjects = useMemo(
-        () => allProjects.filter(p => !!p.deletedAt && p.ownerId === userId),
+        () => allProjects.filter(p => !!p.deletedAt && p.ownerId === userId && p.uploadStatus === 'ready'),
         [allProjects, userId],
     );
 
@@ -148,8 +166,8 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         return 'last_created';
     });
     const [searchQuery, setSearchQuery] = useState('');
-    // Videos / Screenshots selector — shared by Yours, Workspace and Trash
-    const [activeKind, setActiveKind] = useState<ContentKind>('videos');
+    // All / Videos / Screenshots selector — shared by Yours, Workspace and Trash
+    const [activeKind, setActiveKind] = useState<ContentKind>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const selectMode = selectedIds.size > 0;
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -201,6 +219,9 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 const loaded = await CloudProjectService.listProjects(workspaceId);
                 if (!ctrl.cancelled) {
                     setAllProjects(loaded);
+                    // Pending projects the list kept are resumable from this
+                    // browser's cache — pick their uploads back up now
+                    CloudProjectService.resumePendingUploads(loaded);
                     // Load thumbnails AFTER setting state so callbacks patch the correct array
                     CloudProjectService.loadThumbnails(loaded, (projectId, thumbnailUrl) => {
                         if (!ctrl.cancelled) {
@@ -219,6 +240,22 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
 
         return () => { ctrl.cancelled = true; };
     }, [isAuthenticated, workspaceId]);
+
+    // A listed pending project flips to ready the moment its upload
+    // completes, so the card drops its "Uploading" badge without a reload
+    // (duration_ms arrives with the next list load)
+    useEffect(() => {
+        return useActivityStore.subscribe((state, prev) => {
+            if (state.tasks === prev.tasks) return;
+            const finished = Object.values(state.tasks)
+                .filter(t => t.kind === 'upload' && t.status === 'completed' && prev.tasks[t.id]?.status !== 'completed')
+                .map(t => t.projectId);
+            if (finished.length === 0) return;
+            setAllProjects(list => list.map(p =>
+                finished.includes(p.id) && p.uploadStatus === 'pending' ? { ...p, uploadStatus: 'ready', mediaPaths: null } : p,
+            ));
+        });
+    }, []);
 
     // Screenshots load alongside projects (plans/screenshots Step 11)
     useEffect(() => {
@@ -308,6 +345,23 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         }
         return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [searchedScreenshots, sortOrder, isTrash]);
+
+    /**
+     * The mixed "All" grid: videos and screenshots interleaved by one shared
+     * date. Duration sorts have no screenshot equivalent, so the header offers
+     * only the date sorts here (same fallback the screenshot grid uses).
+     */
+    const sortedMedia = useMemo<MediaItem[]>(() => {
+        const sortAt = (x: { createdAt: string; updatedAt: string; deletedAt: string | null }) => {
+            if (isTrash) return x.deletedAt ?? x.createdAt;
+            return sortOrder === 'last_updated' ? x.updatedAt : x.createdAt;
+        };
+        const merged: MediaItem[] = [
+            ...searchedProjects.map(item => ({ kind: 'video' as const, item, sortAt: sortAt(item) })),
+            ...searchedScreenshots.map(item => ({ kind: 'screenshot' as const, item, sortAt: sortAt(item) })),
+        ];
+        return merged.sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime());
+    }, [searchedProjects, searchedScreenshots, sortOrder, isTrash]);
 
     // Sidebar numbers — same derivation the pulled-out nav uses, so the two
     // can't disagree about what Yours/Workspace/Trash mean
@@ -488,6 +542,16 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         }
     };
 
+    // A trashed project's finished activity rows are noise; in-flight ones
+    // keep going (the upload confirms into the trashed row, a render still
+    // downloads)
+    const dropFinishedTasks = (projectId: string) => {
+        const { tasks, removeTask } = useActivityStore.getState();
+        for (const id of [uploadTaskId(projectId), renderTaskId(projectId)]) {
+            if (tasks[id] && tasks[id].status !== 'active') removeTask(id);
+        }
+    };
+
     // Delete single project (move to trash)
     const handleDelete = async (projectId: string) => {
         try {
@@ -496,6 +560,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
             setAllProjects(prev => prev.map(p =>
                 p.id === projectId ? { ...p, deletedAt: now } : p
             ));
+            dropFinishedTasks(projectId);
             addToast({ type: 'success', title: 'Moved to Trash' });
         } catch (err: any) {
             captureError(err, { flow: 'project', phase: 'delete', projectId });
@@ -522,6 +587,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
             setAllProjects(prev => prev.map(p =>
                 selectedIds.has(p.id) ? { ...p, deletedAt: now } : p
             ));
+            for (const id of selectedIds) dropFinishedTasks(id);
             setSelectedIds(new Set());
             setShowBulkDeleteModal(false);
             addToast({ type: 'success', title: 'Moved to Trash', message: `${count} project${count !== 1 ? 's' : ''} moved to trash` });
@@ -550,6 +616,68 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
     const exitSelectMode = () => {
         setSelectedIds(new Set());
     };
+
+    // Card renderers — shared by the single-kind grids and the mixed All grid
+    const videoCard = (item: ProjectListItem) => (
+        <ProjectCard
+            key={item.id}
+            variant="grid"
+            project={{
+                id: item.id,
+                name: item.name,
+                thumbnail: item.thumbnail,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                durationMs: item.durationMs,
+                shareSlug: item.shareSlug,
+                sharePolicy: item.sharePolicy,
+                sharedWithMe: !!item.editorRole && item.ownerId !== userId,
+            }}
+            onOpen={() => handleOpen(item)}
+            selectMode={selectMode}
+            selected={selectedIds.has(item.id)}
+            onSelect={() => toggleSelect(item.id)}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onShare={item.ownerId === userId && item.uploadStatus === 'ready'
+                ? () => void handleShareSettings(item)
+                : undefined}
+            showUpdatedAt={sortOrder === 'last_updated'}
+            badge={item.uploadStatus === 'pending' || exportingIds.includes(item.id)
+                ? <CardActivityBadge projectId={item.id} pending={item.uploadStatus === 'pending'} />
+                : undefined}
+        />
+    );
+
+    const trashVideoCard = (item: ProjectListItem) => (
+        <ProjectCard
+            key={item.id}
+            variant="grid"
+            project={{
+                id: item.id,
+                name: item.name,
+                thumbnail: item.thumbnail,
+                createdAt: item.createdAt,
+                durationMs: item.durationMs,
+                deletedAt: item.deletedAt,
+            }}
+            onOpen={() => {}}
+            onRestore={() => handleRestore(item.id)}
+        />
+    );
+
+    const screenshotCard = (item: ScreenshotListItem) => (
+        <ScreenshotCard
+            key={item.id}
+            item={item}
+            userId={userId}
+            showUpdatedAt={sortOrder === 'last_updated'}
+            onOpen={handleOpenScreenshot}
+            onRename={handleRenameScreenshot}
+            onDelete={handleDeleteScreenshot}
+            onShare={item => void handleScreenshotShareSettings(item)}
+        />
+    );
 
     if (isAuthenticated && !workspaceReady) return null;
 
@@ -629,7 +757,36 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                         Videos and screenshots in trash are permanently deleted after 30 days.
                                     </p>
                                 )}
-                                {activeKind === 'screenshots' && !isTrash ? (
+                                {activeKind === 'all' ? (
+                                    /* Mixed grid — videos and screenshots interleaved by date */
+                                    loading || screenshotsLoading ? (
+                                        <div className="flex items-center justify-center h-64">
+                                            <div className="text-text-muted">Loading library...</div>
+                                        </div>
+                                    ) : sortedMedia.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                            {isTrash && <LuTrash2 size={40} className="text-text-muted/50" />}
+                                            <p className="text-sm text-text-muted text-center">
+                                                {hasSearch
+                                                    ? 'Nothing matches your search.'
+                                                    : isTrash
+                                                        ? 'Trash is empty'
+                                                        : <>Use the <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary-highlighted underline">Recordio extension</a> to record a video or capture a screenshot.</>
+                                                }
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+                                            {sortedMedia.map(entry => (
+                                                entry.kind === 'video'
+                                                    ? (isTrash ? trashVideoCard(entry.item) : videoCard(entry.item))
+                                                    : (isTrash
+                                                        ? <TrashScreenshotCard key={entry.item.id} item={entry.item} onRestore={handleRestoreScreenshot} />
+                                                        : screenshotCard(entry.item))
+                                            ))}
+                                        </div>
+                                    )
+                                ) : activeKind === 'screenshots' && !isTrash ? (
                                     <ScreenshotsView
                                         items={sortedScreenshots}
                                         loading={screenshotsLoading}
@@ -657,21 +814,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                                             {sortedScreenshots.map(item => (
-                                                <ProjectCard
-                                                    key={item.id}
-                                                    variant="grid"
-                                                    project={{
-                                                        id: item.id,
-                                                        name: item.name,
-                                                        thumbnail: item.thumbnail,
-                                                        createdAt: item.createdAt,
-                                                        deletedAt: item.deletedAt,
-                                                    }}
-                                                    shareUrl={screenshotUrl(item.slug)}
-                                                    badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
-                                                    onOpen={() => {}}
-                                                    onRestore={() => handleRestoreScreenshot(item.id)}
-                                                />
+                                                <TrashScreenshotCard key={item.id} item={item} onRestore={handleRestoreScreenshot} />
                                             ))}
                                         </div>
                                     )
@@ -694,52 +837,11 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                 ) : isTrash ? (
                                     /* Trash — videos */
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-                                        {sortedProjects.map(item => (
-                                            <ProjectCard
-                                                key={item.id}
-                                                variant="grid"
-                                                project={{
-                                                    id: item.id,
-                                                    name: item.name,
-                                                    thumbnail: item.thumbnail,
-                                                    createdAt: item.createdAt,
-                                                    durationMs: item.durationMs,
-                                                    deletedAt: item.deletedAt,
-                                                }}
-                                                onOpen={() => {}}
-                                                onRestore={() => handleRestore(item.id)}
-                                            />
-                                        ))}
+                                        {sortedProjects.map(trashVideoCard)}
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-                                        {sortedProjects.map((item: ProjectListItem) => (
-                                            <ProjectCard
-                                                key={item.id}
-                                                variant="grid"
-                                                project={{
-                                                    id: item.id,
-                                                    name: item.name,
-                                                    thumbnail: item.thumbnail,
-                                                    createdAt: item.createdAt,
-                                                    updatedAt: item.updatedAt,
-                                                    durationMs: item.durationMs,
-                                                    shareSlug: item.shareSlug,
-                                                    sharePolicy: item.sharePolicy,
-                                                    sharedWithMe: !!item.editorRole && item.ownerId !== userId,
-                                                }}
-                                                onOpen={() => handleOpen(item)}
-                                                selectMode={selectMode}
-                                                selected={selectedIds.has(item.id)}
-                                                onSelect={() => toggleSelect(item.id)}
-                                                onRename={handleRename}
-                                                onDelete={handleDelete}
-                                                onShare={item.ownerId === userId
-                                                    ? () => void handleShareSettings(item)
-                                                    : undefined}
-                                                showUpdatedAt={sortOrder === 'last_updated'}
-                                            />
-                                        ))}
+                                        {sortedProjects.map(videoCard)}
                                     </div>
                                 )}
                             </main>

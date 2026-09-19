@@ -16,9 +16,8 @@ import { AuthPage } from './auth/AuthPage';
 import { AuthUnreachableModal } from './auth/AuthUnreachableModal';
 import { useUserStore } from './auth/useUserStore';
 import { useAuthStatusStore } from './auth/useAuthStatusStore';
-import { UploadProgressToast } from './storage/UploadProgressToast';
-import { useUploadBeforeUnloadWarning } from './storage/useUploadBeforeUnloadWarning';
 import { LeaveReviewModal } from './components/LeaveReviewModal';
+import { ActivityToasts } from './activity/ActivityToasts';
 
 // Initialize auth before React renders — ensures onAuthStateChange fires
 // before any component tries to make Supabase queries.
@@ -51,8 +50,6 @@ export function App() {
     const [authReady, setAuthReady] = useState(false);
     const isAuthenticated = useUserStore(s => s.isAuthenticated);
     const authServerUnreachable = useAuthStatusStore(s => s.authServerUnreachable);
-
-    useUploadBeforeUnloadWarning();
 
     useEffect(() => {
         AuthManager.ready.then(() => setAuthReady(true));
@@ -163,7 +160,9 @@ export function App() {
     return (
         <ToastProvider>
             {getPage()}
-            <UploadProgressToast />
+            {/* Toasts for background render/upload transitions — progress
+                itself shows on the editor header and the dashboard cards */}
+            <ActivityToasts />
             {/* Loud on every page while impersonating (admin feature) */}
             <ImpersonationBanner />
             {/* Global host — its triggers live on transient surfaces */}

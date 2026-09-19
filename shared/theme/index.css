@@ -24,6 +24,9 @@
    --color-surface-body: var(--surface-body);
    --color-surface: var(--surface-default);
    --color-surface-raised: var(--surface-raised);
+   /* Stand-in for video/media — identical in both themes, see below */
+   --color-surface-media: var(--surface-media);
+   --color-text-on-media: var(--text-on-media);
 
    /* ─────────────────────────────────────────────────────────
      Interactive State Overlays
@@ -159,6 +162,12 @@
    --surface-body: oklch(96.5% 0.012 var(--hue-primary));
    --surface-default: oklch(99% 0.003 var(--hue-primary));
    --surface-raised: oklch(100% 0 0);
+
+   /* Media surface — where a video sits or will sit. Deliberately NOT
+      theme-flipped: a player slot reads as black in light mode too, so
+      there is no .dark override for these two. */
+   --surface-media: oklch(0.14 0.02 var(--hue-primary));
+   --text-on-media: oklch(0.98 0 0);
 
    /* Interactive State Overlays - Black transparency */
    --state-inactive: oklch(0 0 0 / 3%);

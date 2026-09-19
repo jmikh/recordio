@@ -20,7 +20,7 @@
  */
 
 import { initSentry, captureException } from '../utils/sentry';
-import { trackRecordingStarted, trackRecordingPaused, trackRecordingResumed, trackRecordingFinished, trackRecordingCanceled, trackRecordingError, getDistinctId, identifyUser } from '../utils/mixpanel';
+import { trackRecordingStarted, trackRecordingPaused, trackRecordingResumed, trackRecordingFinished, trackRecordingCanceled, trackRecordingError, getDistinctId } from '../utils/mixpanel';
 
 import { BADGE_RECORDING_COLOR_HEX, BADGE_PAUSED_COLOR_HEX, BADGE_TEXT_COLOR_HEX } from '../utils/colors';
 import { MSG_TYPES, type BaseMessage, type RecordingState, STORAGE_KEYS } from '../shared/messageTypes';
@@ -28,6 +28,7 @@ import {
     BRIDGE_MSG,
     buildImportUrl,
     getEditorOrigin,
+    KEEPALIVE_INTERVAL_MS,
     type HandoffCompletePayload,
 } from '@shared/types/bridge';
 import type { RawRecording, RawScreenshot } from '@shared/types';
@@ -47,6 +48,12 @@ initSentry('background');
 
 // A restarted service worker has no capture session — clear any stale mirror
 resetScreenshotStateOnStartup();
+
+/** When this service worker instance booted. A handoff that logs a small
+ *  "worker alive" value has been restarted mid-transfer — the signature of the
+ *  MV3 worker being terminated (idle eviction or OOM) during streaming. */
+const WORKER_STARTED_AT = Date.now();
+console.log('[handoff] service worker started');
 
 // --- State Management ---
 
@@ -923,7 +930,6 @@ import {
     type HandoffErrorResponse,
     type StartStreamPayload,
     type ChunkPayload,
-    type IdentifyUserPayload,
 } from '@shared/types/bridge';
 
 // Cache for pending handoff data (between metadata request and stream)
@@ -956,13 +962,6 @@ chrome.runtime.onMessageExternal.addListener((message, _sender, sendResponse) =>
                 }
                 sendResponse({ success: true });
                 break;
-
-            case BRIDGE_MSG.IDENTIFY_USER: {
-                const { email } = message.payload as IdentifyUserPayload;
-                await identifyUser(email);
-                sendResponse({ success: true });
-                break;
-            }
 
             default:
                 sendResponse({ success: false, error: 'Unknown message type', code: 'UNKNOWN' });
@@ -1063,14 +1062,46 @@ chrome.runtime.onConnectExternal.addListener((port) => {
         return;
     }
 
+    let streaming = false;
+
     port.onMessage.addListener(async (message) => {
         if (message.type === PORT_MSG.START_STREAM) {
-            await handleStartStream(port, message.payload as StartStreamPayload);
+            streaming = true;
+            try {
+                await handleStartStream(port, message.payload as StartStreamPayload);
+            } finally {
+                streaming = false;
+            }
         }
     });
 
-    port.onDisconnect.addListener(() => { });
+    port.onDisconnect.addListener(() => {
+        // The page hung up (tab closed/navigated) while we were still sending.
+        // Worth knowing: it means the bytes streamed so far were thrown away.
+        if (streaming) {
+            console.warn('[handoff] port disconnected mid-stream — the import page went away');
+        }
+    });
 });
+
+/**
+ * Keep this service worker from being terminated mid-transfer.
+ *
+ * MV3 kills an idle worker after ~30s, and "idle" means no incoming event and no
+ * extension API call — posting chunks *outward* does not count. A large recording
+ * takes longer than that to stream, so without this the worker dies partway
+ * through and the import page sees the port close.
+ *
+ * Calling any extension API resets the timer; `getPlatformInfo` is the cheapest.
+ * Returns a stop function.
+ */
+function keepWorkerAlive(): () => void {
+    const interval = setInterval(() => {
+        chrome.runtime.getPlatformInfo().catch(() => { /* worker is going away anyway */ });
+    }, KEEPALIVE_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+}
 
 async function handleStartStream(port: chrome.runtime.Port, payload: StartStreamPayload) {
     const { recordingId } = payload;
@@ -1083,6 +1114,8 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
         });
         return;
     }
+
+    const stopKeepAlive = keepWorkerAlive();
 
     try {
         if (cached.kind === 'screenshot') {
@@ -1112,6 +1145,8 @@ async function handleStartStream(port: chrome.runtime.Port, payload: StartStream
             type: PORT_MSG.STREAM_ERROR,
             payload: { error: error instanceof Error ? error.message : 'Unknown error' },
         });
+    } finally {
+        stopKeepAlive();
     }
 }
 
@@ -1121,14 +1156,29 @@ async function streamBlobChunks(
     source: ChunkPayload['source']
 ) {
     const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
+    const sourceStart = Date.now();
+
+    console.log(
+        `[handoff] streaming ${source}: ${(blob.size / 1e6).toFixed(1)}MB in ${totalChunks} chunks ` +
+        `(worker alive ${((Date.now() - WORKER_STARTED_AT) / 1000).toFixed(0)}s)`,
+    );
 
     for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, blob.size);
         const chunk = blob.slice(start, end);
 
+        const readStart = Date.now();
         const buffer = await chunk.arrayBuffer();
+        const readMs = Date.now() - readStart;
+
+        // NOTE: this expands each 10MB chunk into a ~10M-element JS array before
+        // Chrome JSON-serializes it across the port. It is the dominant cost of
+        // the handoff and the most likely reason the worker gets OOM-killed
+        // mid-stream. The timings below are here to confirm that.
+        const encodeStart = Date.now();
         const data = Array.from(new Uint8Array(buffer));
+        const encodeMs = Date.now() - encodeStart;
 
         const chunkPayload: ChunkPayload = {
             source,
@@ -1137,11 +1187,27 @@ async function streamBlobChunks(
             data,
         };
 
+        const postStart = Date.now();
         port.postMessage({
             type: PORT_MSG.CHUNK,
             payload: chunkPayload,
         });
+        const postMs = Date.now() - postStart;
+
+        // @ts-expect-error __DEV_MODE__ is defined by Vite at build time
+        if (__DEV_MODE__) {
+            console.log(
+                `[handoff] ${source} chunk ${i + 1}/${totalChunks}: ` +
+                `read ${readMs}ms, encode ${encodeMs}ms, post ${postMs}ms`,
+            );
+        }
     }
+
+    const elapsedMs = Date.now() - sourceStart;
+    console.log(
+        `[handoff] ${source} done: ${(blob.size / 1e6).toFixed(1)}MB in ${(elapsedMs / 1000).toFixed(2)}s ` +
+        `(${(blob.size / 1e6 / (elapsedMs / 1000)).toFixed(1)} MB/s)`,
+    );
 }
 
 async function handleHandoffComplete(payload: HandoffCompletePayload) {

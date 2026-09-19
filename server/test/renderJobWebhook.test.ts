@@ -250,8 +250,22 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         expect(deps.s3.presignedDownloads).toEqual([
             { key: renderPath, expiresInSeconds: 3600 },
         ]);
+        const { rows: projectRows } = await pool.query(
+            'SELECT workspace_id FROM projects WHERE id = $1',
+            [project.id],
+        );
         expect(deps.mux.createdAssets).toEqual([
-            { assetId: 'fake-mux-asset-1', inputUrl: `https://fake-s3/get/${renderPath}` },
+            {
+                assetId: 'fake-mux-asset-1',
+                inputUrl: `https://fake-s3/get/${renderPath}`,
+                meta: {
+                    projectId: project.id,
+                    workspaceId: projectRows[0].workspace_id,
+                    creatorId: project.ownerId,
+                    cloudVersion: 2,
+                    title: project.name,
+                },
+            },
         ]);
         const { rows } = await pool.query('SELECT * FROM mux_videos WHERE id = $1', [muxVideoId]);
         expect(rows[0]).toMatchObject({

@@ -18,7 +18,7 @@ import { trackGenerateCaptions, trackGenerateCaptionsClicked, trackGenerateCapti
 import { captureError } from '../../../lib/sentry';
 import { useToast } from '../../../components/Toast';
 import { ColorButton } from './ColorButton';
-import { useSyncStatusStore } from '../../../storage/syncStatusStore';
+import { useActivityStore, selectUploadTask } from '../../../activity/useActivityStore';
 
 type TranscriptionEngine = 'local' | 'openai';
 
@@ -53,7 +53,7 @@ export function CaptionsSettings() {
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
     const { addToast } = useToast();
-    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
+    const isSyncingMedia = useActivityStore(s => selectUploadTask(project.id)(s)?.status === 'active');
     const hideCloudTranscription = false; // TODO: remove after per-user limits are live
     const [engine, setEngine] = useState<TranscriptionEngine>('openai');
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);

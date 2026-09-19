@@ -10,6 +10,64 @@ import { ProjectCard } from './ProjectCard';
 import { screenshotUrl } from '../../lib/screenshotUrls';
 import type { ScreenshotListItem } from '../../screenshot/screenshotService';
 
+interface ScreenshotCardProps {
+    item: ScreenshotListItem;
+    userId: string | null;
+    showUpdatedAt: boolean;
+    onOpen: (item: ScreenshotListItem) => void;
+    onRename: (id: string, name: string) => void;
+    onDelete: (id: string) => void;
+    onShare: (item: ScreenshotListItem) => void;
+}
+
+/**
+ * One live screenshot card. Exported so the mixed "All" grid on the dashboard
+ * can interleave these with video cards without duplicating the card wiring.
+ */
+export function ScreenshotCard({ item, userId, showUpdatedAt, onOpen, onRename, onDelete, onShare }: ScreenshotCardProps) {
+    return (
+        <ProjectCard
+            variant="grid"
+            project={{
+                id: item.id,
+                name: item.name,
+                thumbnail: item.thumbnail,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                shareSlug: item.slug,
+                sharePolicy: item.sharePolicy,
+            }}
+            shareUrl={screenshotUrl(item.slug)}
+            badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
+            onOpen={() => onOpen(item)}
+            onRename={item.ownerId === userId ? onRename : undefined}
+            onDelete={item.ownerId === userId ? onDelete : undefined}
+            onShare={item.ownerId === userId ? () => onShare(item) : undefined}
+            showUpdatedAt={showUpdatedAt}
+        />
+    );
+}
+
+/** One trashed screenshot card — restore only, no menu actions */
+export function TrashScreenshotCard({ item, onRestore }: { item: ScreenshotListItem; onRestore: (id: string) => void }) {
+    return (
+        <ProjectCard
+            variant="grid"
+            project={{
+                id: item.id,
+                name: item.name,
+                thumbnail: item.thumbnail,
+                createdAt: item.createdAt,
+                deletedAt: item.deletedAt,
+            }}
+            shareUrl={screenshotUrl(item.slug)}
+            badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
+            onOpen={() => {}}
+            onRestore={() => onRestore(item.id)}
+        />
+    );
+}
+
 interface ScreenshotsViewProps {
     items: ScreenshotListItem[];
     loading: boolean;
@@ -52,25 +110,15 @@ export function ScreenshotsView({ items, loading, filtered, userId, showUpdatedA
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
             {items.map(item => (
-                <ProjectCard
+                <ScreenshotCard
                     key={item.id}
-                    variant="grid"
-                    project={{
-                        id: item.id,
-                        name: item.name,
-                        thumbnail: item.thumbnail,
-                        createdAt: item.createdAt,
-                        updatedAt: item.updatedAt,
-                        shareSlug: item.slug,
-                        sharePolicy: item.sharePolicy,
-                    }}
-                    shareUrl={screenshotUrl(item.slug)}
-                    badge={<LuImage className="icon-sm" aria-label="Screenshot" />}
-                    onOpen={() => onOpen(item)}
-                    onRename={item.ownerId === userId ? onRename : undefined}
-                    onDelete={item.ownerId === userId ? onDelete : undefined}
-                    onShare={item.ownerId === userId ? () => onShare(item) : undefined}
+                    item={item}
+                    userId={userId}
                     showUpdatedAt={showUpdatedAt}
+                    onOpen={onOpen}
+                    onRename={onRename}
+                    onDelete={onDelete}
+                    onShare={onShare}
                 />
             ))}
         </div>

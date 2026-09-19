@@ -24,8 +24,6 @@ export const BRIDGE_MSG = {
     HANDOFF_COMPLETE: 'HANDOFF_COMPLETE',
     /** Website → Extension: Open the controller tab for a new recording */
     OPEN_CONTROLLER: 'OPEN_CONTROLLER',
-    /** Website → Extension: Identify the logged-in user for Mixpanel */
-    IDENTIFY_USER: 'IDENTIFY_USER',
 } as const;
 
 export type BridgeMessageType = typeof BRIDGE_MSG[keyof typeof BRIDGE_MSG];
@@ -43,6 +41,19 @@ export const PORT_MSG = {
     STREAM_COMPLETE: 'STREAM_COMPLETE',
     /** Extension → Website: Streaming error */
     STREAM_ERROR: 'STREAM_ERROR',
+    /**
+     * Website → Extension: no-op ping sent while a transfer is in flight.
+     *
+     * MV3 terminates a service worker after ~30s without an incoming event or an
+     * extension API call. During `streamBlobChunks` the worker only posts messages
+     * *outward*, so a transfer longer than the idle timeout gets the worker killed
+     * mid-stream. An inbound port message resets that timer.
+     *
+     * Extensions that predate this simply ignore the unknown type — and still get
+     * their idle timer reset, because the reset happens on message *delivery*, not
+     * in the handler. So this helps already-installed extensions too.
+     */
+    KEEPALIVE: 'KEEPALIVE',
 } as const;
 
 export type PortMessageType = typeof PORT_MSG[keyof typeof PORT_MSG];
@@ -52,6 +63,10 @@ export const HANDOFF_PORT_NAME = 'recordio-handoff';
 
 /** Chunk size for streaming (10MB - safe under 64MB limit) */
 export const CHUNK_SIZE = 10 * 1024 * 1024;
+
+/** How often the website pings the port during a transfer. Comfortably under
+ *  the ~30s MV3 idle timeout. */
+export const KEEPALIVE_INTERVAL_MS = 10_000;
 
 // ============================================
 // Payloads for sendMessage
@@ -77,7 +92,7 @@ export interface HandoffRecordingMetadataResponse {
     cameraVideoType?: string;     // MIME type (optional)
     micAudioSize?: number;        // bytes (optional)
     micAudioType?: string;        // MIME type (optional)
-    extensionDistinctId?: string; // Mixpanel anonymous ID for identity linking
+    extensionDistinctId?: string; // Extension's anonymous Mixpanel ID; the webapp links it to the signed-in user
 }
 
 /** Extension → Website: Direct response to HANDOFF_REQUEST for a screenshot (streamed as one 'image' source). */
@@ -87,7 +102,7 @@ export interface HandoffScreenshotMetadataResponse {
     screenshot: RawScreenshot;
     imageSize: number;            // bytes
     imageType: string;            // MIME type
-    extensionDistinctId?: string; // Mixpanel anonymous ID for identity linking
+    extensionDistinctId?: string; // Extension's anonymous Mixpanel ID; the webapp links it to the signed-in user
 }
 
 export type HandoffMetadataResponse = HandoffRecordingMetadataResponse | HandoffScreenshotMetadataResponse;
@@ -107,11 +122,6 @@ export type HandoffRequestResponse = HandoffMetadataResponse | HandoffErrorRespo
 export interface HandoffCompletePayload {
     recordingId: string;
     projectId: string;
-}
-
-/** Website → Extension: Identify the logged-in user */
-export interface IdentifyUserPayload {
-    email: string;
 }
 
 // ============================================

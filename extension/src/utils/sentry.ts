@@ -41,7 +41,7 @@ export function initSentry(context: "editor" | "background" | "content" | "contr
 
     const client = new BrowserClient({
         dsn: SENTRY_DSN,
-        tunnel: "https://app.recordio.io/sentry",
+        tunnel: "https://app.recordio.io/api/v2/l",
         transport: makeFetchTransport,
         stackParser: defaultStackParser,
         integrations: integrations,

@@ -232,11 +232,14 @@ function Editor() {
     const hasActiveProject = !!project.screenSource?.storagePath;
     const projectOutputSize = project.settings.outputSize;
 
-    // Calculate Rendered Rect (for overlay positioning)
+    // Calculate Rendered Rect (for overlay positioning, and for the loading
+    // placeholder — which falls back to 16:9 until the project's size is known)
+    const videoAspect = projectOutputSize && projectOutputSize.width > 0
+        ? projectOutputSize.width / projectOutputSize.height
+        : 16 / 9;
     let renderedStyle = { width: '100%', height: '100%' };
-    if (projectOutputSize && projectOutputSize.width > 0 && containerSize.width > 0 && containerSize.height > 0) {
+    if (containerSize.width > 0 && containerSize.height > 0) {
         const containerAspect = containerSize.width / containerSize.height;
-        const videoAspect = projectOutputSize.width / projectOutputSize.height;
 
         let rw, rh;
         if (containerAspect > videoAspect) {
@@ -326,7 +329,15 @@ function Editor() {
                         >
 
                             {isLoading ? (
-                                <LoadingLogo text={loadingStatus} />
+                                /* Stand-in for the canvas: the same letterboxed rect it will
+                                   occupy, on the media surface, with the mark on top. */
+                                <div
+                                    id="canvas-loading-placeholder"
+                                    className="relative bg-surface-media"
+                                    style={renderedStyle}
+                                >
+                                    <LoadingLogo text={loadingStatus} />
+                                </div>
                             ) : hasActiveProject ? (
                                 <div
                                     id="canvas-rendered-wrapper"

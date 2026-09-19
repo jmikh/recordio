@@ -60,6 +60,8 @@ export interface SeedProjectOptions {
     permanentlyDeleted?: boolean;
     cloudVersion?: number;
     updatedAt?: string;
+    /** Defaults to now() — the stale-pending job cuts on this */
+    createdAt?: string;
 }
 
 export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promise<SeededProject> {
@@ -80,9 +82,9 @@ export async function seedProject(db: Db, opts: SeedProjectOptions = {}): Promis
 
     await db.query(
         `INSERT INTO projects
-            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, workspace_access, deleted_at, expires_at, upload_status, permanently_deleted, cloud_version, updated_at)
-         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, COALESCE($11, 'pending'), $12, $13, COALESCE($14::timestamptz, now()))`,
-        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy ?? 'public', opts.workspaceAccess ?? 'view', opts.deletedAt ?? null, opts.expiresAt ?? null, opts.uploadStatus ?? null, opts.permanentlyDeleted ?? false, opts.cloudVersion ?? 1, opts.updatedAt ?? null],
+            (id, created_by, owner_id, workspace_id, name, project_data, slug, share_policy, workspace_access, deleted_at, expires_at, upload_status, permanently_deleted, cloud_version, updated_at, created_at)
+         VALUES ($1, $2, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, COALESCE($11, 'pending'), $12, $13, COALESCE($14::timestamptz, now()), COALESCE($15::timestamptz, now()))`,
+        [id, ownerId, workspaceId, name, JSON.stringify(opts.projectData ?? {}), slug, opts.sharePolicy ?? 'public', opts.workspaceAccess ?? 'view', opts.deletedAt ?? null, opts.expiresAt ?? null, opts.uploadStatus ?? null, opts.permanentlyDeleted ?? false, opts.cloudVersion ?? 1, opts.updatedAt ?? null, opts.createdAt ?? null],
     );
     return { id, slug, name, ownerId };
 }
@@ -197,14 +199,18 @@ export interface SeedMuxVideoOptions {
     muxAssetId?: string | null;
     renderStoragePath?: string | null;
     error?: string | null;
+    /** Publish-attempt budget (sharedVideoPublish.ts); table default 1 */
+    attempt?: number;
+    /** The cooldown clock for the budget; defaults to now() */
+    updatedAt?: string;
 }
 
 export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<string> {
     const id = randomUUID();
     await db.query(
         `INSERT INTO mux_videos
-            (id, project_id, user_id, cloud_version, status, mux_playback_id, mux_asset_id, render_storage_path, error)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            (id, project_id, user_id, cloud_version, status, mux_playback_id, mux_asset_id, render_storage_path, error, attempt, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, 1), COALESCE($11::timestamptz, now()))`,
         [
             id,
             opts.projectId,
@@ -215,6 +221,8 @@ export async function seedMuxVideo(db: Db, opts: SeedMuxVideoOptions): Promise<s
             opts.muxAssetId ?? null,
             opts.renderStoragePath ?? null,
             opts.error ?? null,
+            opts.attempt ?? null,
+            opts.updatedAt ?? null,
         ],
     );
     return id;
@@ -491,14 +499,22 @@ export interface SeedRenderJobOptions {
     userId?: string;
     renderStoragePath?: string | null;
     quality?: string;
+    /** 0–1 worker heartbeat; NULL (the default) means queued, not started */
+    progress?: number | null;
+    /** Failure reason, e.g. 'Worker unresponsive' from the stale-job cron */
+    error?: string | null;
+    /** Render-dispatch budget (sharedVideoPublish.ts); table default 1 */
+    attemptCount?: number;
+    /** The cooldown clock for the budget; defaults to now() */
+    updatedAt?: string;
 }
 
 /** render_jobs rows cascade with their project (deleteProjects covers them). */
 export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise<string> {
     const id = randomUUID();
     await db.query(
-        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path, quality)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path, quality, progress, attempt_count, updated_at, error)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 1), COALESCE($10::timestamptz, now()), $11)`,
         [
             id,
             opts.projectId,
@@ -509,6 +525,10 @@ export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise
                 ? `${opts.userId ?? SEEDED_USER_ID}/${opts.projectId}/renders/v${opts.cloudVersion}.mp4`
                 : opts.renderStoragePath,
             opts.quality ?? '1080p',
+            opts.progress ?? null,
+            opts.attemptCount ?? null,
+            opts.updatedAt ?? null,
+            opts.error ?? null,
         ],
     );
     return id;

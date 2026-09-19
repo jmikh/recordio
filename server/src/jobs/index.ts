@@ -10,11 +10,13 @@
  * mux_videos.purge-superseded ← mux-video-purge;
  * render_jobs.purge-superseded ← (new; replaces the broken
  * cron_render_purge); user_profiles.send-welcome ← (new; replaces the
- * caller-less POST /send-welcome-email route).
+ * caller-less POST /send-welcome-email route);
+ * projects.expire-stale-pending ← (new, 2026-09-19; abandoned uploads).
  */
 import type { Deps } from '../deps.js';
 import type { JobLogger, JobRunResult } from './types.js';
 import { projectsPurgeDeleted, PROJECTS_PURGE_BATCH_LIMIT } from './projectsPurgeDeleted.js';
+import { projectsExpireStalePending, PROJECTS_EXPIRE_STALE_PENDING_BATCH_LIMIT } from './projectsExpireStalePending.js';
 import { muxVideosPurgeSuperseded, MUX_PURGE_BATCH_LIMIT } from './muxVideosPurgeSuperseded.js';
 import { renderJobsPurgeSuperseded, RENDER_PURGE_BATCH_LIMIT } from './renderJobsPurgeSuperseded.js';
 import { userProfilesSendWelcome, WELCOME_SEND_BATCH_LIMIT } from './userProfilesSendWelcome.js';
@@ -44,6 +46,18 @@ export const jobs: JobDefinition[] = [
                 itemsProcessed: r.processed,
                 itemsFailed: r.failed,
                 batchFull: r.processed >= PROJECTS_PURGE_BATCH_LIMIT,
+            };
+        },
+    },
+    {
+        name: 'projects.expire-stale-pending',
+        period: 'daily',
+        async run(deps) {
+            const r = await projectsExpireStalePending(deps);
+            return {
+                itemsProcessed: r.processed,
+                itemsFailed: 0,
+                batchFull: r.processed >= PROJECTS_EXPIRE_STALE_PENDING_BATCH_LIMIT,
             };
         },
     },

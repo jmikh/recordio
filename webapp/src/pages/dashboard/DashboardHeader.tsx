@@ -2,8 +2,8 @@ import { LuSearch } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
 
-/** Which kind of item the current library view lists */
-export type ContentKind = 'videos' | 'screenshots';
+/** Which kind of item the current library view lists ('all' interleaves both) */
+export type ContentKind = 'all' | 'videos' | 'screenshots';
 export type SortOrder = 'last_created' | 'last_updated' | 'longest' | 'shortest';
 
 const SORT_OPTIONS = [
@@ -13,8 +13,8 @@ const SORT_OPTIONS = [
     { value: 'shortest' as SortOrder, label: 'Shortest' },
 ];
 
-/** Screenshots have no duration, so only the date sorts apply */
-const SCREENSHOT_SORT_OPTIONS = SORT_OPTIONS.filter(o => o.value === 'last_created' || o.value === 'last_updated');
+/** Screenshots have no duration, so only the date sorts apply — same for the mixed All tab */
+const DATE_SORT_OPTIONS = SORT_OPTIONS.filter(o => o.value === 'last_created' || o.value === 'last_updated');
 
 interface KindTab {
     value: ContentKind;
@@ -47,10 +47,11 @@ export function DashboardHeader({
     showSort = true,
 }: DashboardHeaderProps) {
     const tabs: KindTab[] = [
+        { value: 'all', label: 'All', count: videoCount + screenshotCount },
         { value: 'videos', label: 'Videos', count: videoCount },
         { value: 'screenshots', label: 'Screenshots', count: screenshotCount },
     ];
-    const sortOptions = activeKind === 'screenshots' ? SCREENSHOT_SORT_OPTIONS : SORT_OPTIONS;
+    const sortOptions = activeKind === 'videos' ? SORT_OPTIONS : DATE_SORT_OPTIONS;
     // A remembered duration sort has no screenshot equivalent — show the same fallback the grid sorts by
     const sortValue = sortOptions.some(o => o.value === sortOrder) ? sortOrder : 'last_created';
 
@@ -65,7 +66,7 @@ export function DashboardHeader({
                         value={searchQuery}
                         onChange={e => onSearchChange(e.target.value)}
                         aria-label="Search library"
-                        placeholder={activeKind === 'videos' ? 'Search recordings, transcripts...' : 'Search screenshots...'}
+                        placeholder={activeKind === 'screenshots' ? 'Search screenshots...' : 'Search recordings, transcripts...'}
                         className="w-full h-9 pl-9 pr-3 text-sm bg-surface border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
                     />
                 </div>

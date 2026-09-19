@@ -12,7 +12,7 @@ export interface LibraryCounts {
     workspaceCount: number;
     /** The caller's own trashed videos + screenshots */
     trashCount: number;
-    /** The caller's own live videos — what the free project cap counts */
+    /** The caller's own live, fully uploaded videos — what the free project cap counts (pending rows don't, server-side either) */
     ownedProjectCount: number;
     /** The caller's own live screenshots — the separate free screenshot cap */
     ownedScreenshotCount: number;
@@ -38,7 +38,7 @@ export function deriveLibraryCounts(
         trashCount:
             allProjects.filter(p => !!p.deletedAt && p.ownerId === userId).length
             + allScreenshots.filter(s => !!s.deletedAt && s.ownerId === userId).length,
-        ownedProjectCount: projects.filter(p => p.ownerId === userId).length,
+        ownedProjectCount: projects.filter(p => p.ownerId === userId && p.uploadStatus === 'ready').length,
         ownedScreenshotCount: yourScreenshots.length,
     };
 }

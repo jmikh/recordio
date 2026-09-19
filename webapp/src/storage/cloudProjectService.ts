@@ -6,6 +6,7 @@ import { CloudStorage, CloudVersionConflictError } from './cloudStorage';
 import type { AccessRole, CloudProject, CloudProjectSummary, ProjectEditor, SharePolicy } from '@shared/api';
 import { BlobCache } from './blobCache';
 import { useSyncStatusStore } from './syncStatusStore';
+import { useActivityStore, uploadTaskId } from '../activity/useActivityStore';
 import { useMediaUrlStore } from './useMediaUrlStore';
 import { migrateProject } from '../core/migrateProject';
 import { ProjectImpl } from '../core/Project';
@@ -45,6 +46,14 @@ export interface ProjectListItem {
     isEditor: boolean;
     /** The caller's individual grant role (null = none) */
     editorRole: AccessRole | null;
+    /**
+     * 'pending' = the recording never finished uploading. Only the owner's
+     * own pending projects are listed, and only when every media file is
+     * still in this browser's BlobCache (see listProjects).
+     */
+    uploadStatus: 'pending' | 'ready';
+    /** Pending rows only: the media the upload has to resume with */
+    mediaPaths: { storagePath: string; type: 'screen' | 'camera' | 'mic' }[] | null;
 }
 
 /** Share-relevant metadata returned alongside a loaded project. */
@@ -189,12 +198,13 @@ export class CloudProjectService {
 
     /**
      * Kick off a media upload for a project and register it in `activeUploads`
-     * so other parts of the app (loadProject, the progress toast) can see it's
-     * in flight. Dedupes: if an upload for this projectId is already running,
+     * so other parts of the app (loadProject, saveProject) can see it's in
+     * flight. Dedupes: if an upload for this projectId is already running,
      * returns the existing promise.
      *
-     * On terminal failure, sets `mediaUploadError` in syncStatusStore with a
-     * retry handler so the UI can offer to restart.
+     * Progress and the terminal outcome are reported as an upload task in
+     * useActivityStore (the editor header's badge, the dashboard card's
+     * badge, the toasts); a failed task carries the retry handler.
      */
     static startMediaUpload(
         projectId: string,
@@ -202,12 +212,24 @@ export class CloudProjectService {
         bucket: string,
         uploads: { fileType: string; storagePath: string }[],
         blobs: { fileType: string; blob: Blob }[],
+        slug: string | null = null,
     ): Promise<void> {
         const existing = this.activeUploads.get(projectId);
         if (existing) return existing;
 
-        const store = useSyncStatusStore.getState();
-        store.setMediaUploadError(null);
+        useActivityStore.getState().upsertTask({
+            id: uploadTaskId(projectId),
+            kind: 'upload',
+            projectId,
+            projectName,
+            projectSlug: slug,
+            status: 'active',
+            progress: null,
+            error: null,
+            createdAt: Date.now(),
+            completedAt: null,
+            retry: null,
+        });
 
         Sentry.addBreadcrumb({
             category: 'upload',
@@ -229,6 +251,9 @@ export class CloudProjectService {
                     level: 'info',
                     data: { projectId },
                 });
+                useActivityStore.getState().patchTask(uploadTaskId(projectId), {
+                    status: 'completed', progress: 1, completedAt: Date.now(),
+                });
             })
             .catch((e) => {
                 // uploadMediaV2 already Sentry-captures the underlying error.
@@ -236,11 +261,10 @@ export class CloudProjectService {
                 // promise is fire-and-forget, rethrowing would produce an
                 // unhandled rejection.
                 const message = e instanceof Error ? e.message : String(e);
-                useSyncStatusStore.getState().setMediaUploadError({
-                    projectId,
-                    projectName,
-                    message,
-                    onRetry: () => {
+                useActivityStore.getState().patchTask(uploadTaskId(projectId), {
+                    status: 'failed',
+                    error: message,
+                    retry: () => {
                         Sentry.addBreadcrumb({
                             category: 'upload',
                             message: 'user clicked retry',
@@ -248,7 +272,7 @@ export class CloudProjectService {
                             data: { projectId },
                         });
                         this.activeUploads.delete(projectId);
-                        this.startMediaUpload(projectId, projectName, bucket, uploads, blobs);
+                        this.startMediaUpload(projectId, projectName, bucket, uploads, blobs, slug);
                     },
                 });
             })
@@ -292,21 +316,42 @@ export class CloudProjectService {
             return false;
         }
 
-        // Every source must have a storagePath AND a blob in BlobCache for resume to be possible.
-        const blobs: { fileType: string; blob: Blob }[] = [];
-        const uploads: { fileType: string; storagePath: string }[] = [];
         for (const s of sources) {
             if (!s.storagePath) {
                 Sentry.addBreadcrumb({ category: 'upload', message: 'resume aborted: missing storagePath', level: 'warning', data: { projectId, fileType: s.fileType } });
                 return false;
             }
-            const blob = await BlobCache.getBlobIfCached(s.storagePath);
+        }
+
+        return this.resumeUploadFromPaths(
+            projectId, projectName, cloud.slug,
+            sources.map(s => ({ fileType: s.fileType, storagePath: s.storagePath! })),
+        );
+    }
+
+    /**
+     * Restart an upload from BlobCache given the media paths (from the
+     * project list or project_data). Every path must be cached — a partial
+     * set can't complete the project. Returns false (with a breadcrumb)
+     * when it can't; true once the upload is running.
+     */
+    static async resumeUploadFromPaths(
+        projectId: string,
+        projectName: string,
+        slug: string | null,
+        paths: { fileType: string; storagePath: string }[],
+    ): Promise<boolean> {
+        if (this.activeUploads.has(projectId)) return true;
+        if (paths.length === 0) return false;
+
+        const blobs: { fileType: string; blob: Blob }[] = [];
+        for (const p of paths) {
+            const blob = await BlobCache.getBlobIfCached(p.storagePath);
             if (!blob) {
-                Sentry.addBreadcrumb({ category: 'upload', message: 'resume aborted: blob not in cache', level: 'warning', data: { projectId, fileType: s.fileType, storagePath: s.storagePath } });
+                Sentry.addBreadcrumb({ category: 'upload', message: 'resume aborted: blob not in cache', level: 'warning', data: { projectId, fileType: p.fileType, storagePath: p.storagePath } });
                 return false;
             }
-            blobs.push({ fileType: s.fileType, blob });
-            uploads.push({ fileType: s.fileType, storagePath: s.storagePath });
+            blobs.push({ fileType: p.fileType, blob });
         }
 
         Sentry.addBreadcrumb({
@@ -316,8 +361,24 @@ export class CloudProjectService {
             data: { projectId, fileCount: blobs.length, totalBytes: blobs.reduce((s, b) => s + b.blob.size, 0) },
         });
 
-        this.startMediaUpload(projectId, projectName, 'project-media', uploads, blobs);
+        this.startMediaUpload(projectId, projectName, 'project-media', paths, blobs, slug);
         return true;
+    }
+
+    /**
+     * Dashboard: pick up every listed pending project's upload where it left
+     * off. The list already dropped projects whose media isn't cached here,
+     * so a miss is unexpected (evicted between list and resume) — logged,
+     * not raised. Deduped by `activeUploads`, so calling twice is safe.
+     */
+    static resumePendingUploads(items: ProjectListItem[]): void {
+        for (const item of items) {
+            if (item.uploadStatus !== 'pending' || !item.mediaPaths || this.activeUploads.has(item.id)) continue;
+            this.resumeUploadFromPaths(
+                item.id, item.name, item.shareSlug,
+                item.mediaPaths.map(p => ({ fileType: p.type, storagePath: p.storagePath })),
+            ).catch(e => captureError(e, { flow: 'upload_resume', projectId: item.id }));
+        }
     }
 
     /**
@@ -354,6 +415,7 @@ export class CloudProjectService {
             for (const v of loadedMap.values()) loaded += v;
             const fraction = totalBytes > 0 ? Math.min(1, loaded / totalBytes) : 0;
             store.setCurrentUpload({ projectId, projectName, type: 'media', progress: fraction });
+            useActivityStore.getState().patchTask(uploadTaskId(projectId), { progress: fraction });
         };
 
         const uploadAndCache = async (fileType: string, blob: Blob) => {
@@ -503,10 +565,10 @@ export class CloudProjectService {
     static async saveProject(project: Project, userId: string): Promise<void> {
         const projectId = project.id;
 
-        // Hold saves while media is still uploading — edits buffer locally
-        // and flush when uploadMedia() completes
-        const { pendingMediaUploads } = useSyncStatusStore.getState();
-        if (pendingMediaUploads > 0) return;
+        // Hold saves while THIS project's media is still uploading — edits
+        // buffer locally and flush when the upload completes. Per project:
+        // the dashboard may be resuming other projects' uploads meanwhile.
+        if (this.activeUploads.has(projectId)) return;
 
         // Skip if a save is already in flight
         if (this.saveInFlight.has(projectId)) return;
@@ -551,11 +613,16 @@ export class CloudProjectService {
     /**
      * List projects from cloud. Thumbnails are loaded from cache
      * or downloaded in the background.
+     *
+     * Pending projects (upload never finished) are kept only when every
+     * media file is still in this browser's BlobCache — that's the only
+     * place the upload can resume from. Elsewhere (another device, cleared
+     * site data) they're invisible until the daily job trashes them.
      */
     static async listProjects(workspaceId: string): Promise<ProjectListItem[]> {
         const summaries = await CloudStorage.listProjectsSummary(workspaceId);
 
-        return summaries.map((s: CloudProjectSummary) => ({
+        const items: ProjectListItem[] = summaries.map((s: CloudProjectSummary) => ({
             id: s.id,
             name: s.name,
             thumbnail: null,
@@ -573,7 +640,17 @@ export class CloudProjectService {
             workspaceAccess: s.workspace_access ?? null,
             isEditor: s.is_editor,
             editorRole: s.editor_role ?? null,
+            uploadStatus: s.upload_status === 'pending' ? 'pending' : 'ready',
+            mediaPaths: s.upload_status === 'pending' ? (s.media_paths ?? []) : null,
         }));
+
+        const resumable = await Promise.all(items.map(async item => {
+            if (item.uploadStatus !== 'pending') return true;
+            if (!item.mediaPaths || item.mediaPaths.length === 0) return false;
+            const cached = await Promise.all(item.mediaPaths.map(p => BlobCache.has(p.storagePath)));
+            return cached.every(Boolean);
+        }));
+        return items.filter((_, i) => resumable[i]);
     }
 
     /**

@@ -181,7 +181,6 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
 
     // Migrated edge-function routes (plan Step 4) — one module per function
     app.register(storageDownloadUrlsRoutes);
-    app.register(sharedVideoGetRoutes);
     app.register(stripeCheckoutRoutes, { priceIds: opts.stripePriceIds });
     app.register(stripePortalRoutes);
     app.register(subscriptionChangeRoutes, { priceIds: opts.stripePriceIds });
@@ -198,6 +197,10 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
         : undefined;
     app.register(renderJobCreateRoutes, { statusCallbackUrl });
     app.register(muxVideoCreateRoutes, { statusCallbackUrl });
+    // Needs the callback URL too: it self-heals a shared link whose video
+    // is missing by dispatching the render itself. `env` gates the
+    // dev-only failure reason on its response.
+    app.register(sharedVideoGetRoutes, { statusCallbackUrl, env: opts.env });
     app.register(renderJobWebhookRoutes, { renderSecret: opts.renderSecret });
     app.register(muxVideoWebhookRoutes);
     app.register(stripeWebhooksRoutes);

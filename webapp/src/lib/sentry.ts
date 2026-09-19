@@ -12,7 +12,8 @@ export function initSentry() {
     Sentry.init({
         dsn: SENTRY_DSN,
         enabled: IS_PRODUCTION,
-        tunnel: '/sentry',
+        // Neutral path — `/sentry` is on ad-blocker filter lists (see functions/api/v2/l).
+        tunnel: '/api/v2/l',
         environment: IS_PRODUCTION ? "production" : "development",
         release: `recordio-webapp@${import.meta.env.VITE_APP_VERSION ?? "dev"}`,
         tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,

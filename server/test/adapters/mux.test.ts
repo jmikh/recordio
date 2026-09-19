@@ -8,8 +8,16 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHmac } from 'node:crypto';
-import { createMuxAdapter } from '../../src/adapters/mux.js';
-import { MuxApiError } from '../../src/ports/mux.js';
+import { buildAssetMetaFields, createMuxAdapter } from '../../src/adapters/mux.js';
+import { MuxApiError, type MuxAssetMeta } from '../../src/ports/mux.js';
+
+const META: MuxAssetMeta = {
+    projectId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    workspaceId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    creatorId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    cloudVersion: 3,
+    title: 'My recording',
+};
 
 describe('mux adapter', () => {
     let server: Server;
@@ -53,7 +61,7 @@ describe('mux adapter', () => {
     it('createAsset POSTs the signed URL with basic auth and returns data.id', async () => {
         const mux = await startMux(201, JSON.stringify({ data: { id: 'asset-123' } }));
 
-        const result = await adapter(mux.url).createAsset('https://s3/get/u/p/renders/v1.mp4');
+        const result = await adapter(mux.url).createAsset('https://s3/get/u/p/renders/v1.mp4', META);
 
         expect(result).toEqual({ assetId: 'asset-123' });
         expect(mux.requests).toHaveLength(1);
@@ -66,14 +74,37 @@ describe('mux adapter', () => {
         expect(JSON.parse(mux.requests[0].body)).toEqual({
             input: [{ url: 'https://s3/get/u/p/renders/v1.mp4' }],
             playback_policy: ['public'],
+            meta: {
+                title: 'My recording',
+                creator_id: META.creatorId,
+                external_id: META.projectId,
+            },
+            passthrough: JSON.stringify({
+                projectId: META.projectId,
+                workspaceId: META.workspaceId,
+                creatorId: META.creatorId,
+                cloudVersion: 3,
+            }),
         });
+    });
+
+    it('buildAssetMetaFields caps the title at 512 chars and drops an oversized passthrough', () => {
+        const fields = buildAssetMetaFields({ ...META, title: 'x'.repeat(600) });
+        expect(fields.meta.title).toHaveLength(512);
+        expect(fields.passthrough).toBeDefined();
+        expect(fields.passthrough!.length).toBeLessThanOrEqual(255);
+
+        // Ids that would push passthrough past Mux's limit: meta still goes, passthrough is omitted
+        const huge = buildAssetMetaFields({ ...META, workspaceId: 'w'.repeat(300) });
+        expect(huge.passthrough).toBeUndefined();
+        expect(huge.meta.external_id).toBe(META.projectId);
     });
 
     it('createAsset throws MuxApiError with status + snippet on non-2xx', async () => {
         const mux = await startMux(401, '{"error":"bad credentials"}');
 
         const err = await adapter(mux.url)
-            .createAsset('https://s3/get/x')
+            .createAsset('https://s3/get/x', META)
             .catch((e: unknown) => e);
         expect(err).toBeInstanceOf(MuxApiError);
         expect((err as MuxApiError).status).toBe(401);

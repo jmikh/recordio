@@ -52,8 +52,16 @@ export interface DomainLogFields {
     'share.removed_editors'?: number;
     'workspace.id'?: string;
     'render.job_id'?: string;
+    /** render_jobs.attempt_count for the job shared-video-get was weighing */
+    'render.attempt_count'?: number;
     'mux.asset_id'?: string;
     'mux.video_status'?: string;
+    /** Why a shared video failed — mux_videos.error / render_jobs.error */
+    'mux.error'?: string;
+    /** mux_videos.attempt — the publish-attempt budget (sharedVideoPublish.ts) */
+    'mux.attempt'?: number;
+    /** A shared link self-healed: the watch page dispatched its own render */
+    'mux.auto_started'?: boolean;
     'stripe.event_type'?: string;
     'stripe.plan'?: string;
     'stripe.interval'?: string;

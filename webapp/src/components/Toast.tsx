@@ -16,7 +16,8 @@ export interface Toast {
     progress?: number; // 0-1 for progress type
     duration?: number; // ms, 0 = persistent
     onCancel?: () => void;
-    action?: { label: string; href: string };
+    /** Inline action after the message: a link (`href`) or a callback (`onClick`); either dismisses the toast */
+    action?: { label: string; href?: string; onClick?: () => void };
     onDismiss?: (reason: ToastDismissReason) => void;
 }
 
@@ -144,15 +145,26 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: () => void }> = ({ toast, on
                         {toast.action && (
                             <>
                                 {toast.message && ' '}
-                                <a
-                                    href={toast.action.href}
-                                    target="_blank"
-                                    rel="noopener"
-                                    className="text-primary underline"
-                                    onClick={handleActionClick}
-                                >
-                                    {toast.action.label}
-                                </a>
+                                {toast.action.href ? (
+                                    <a
+                                        href={toast.action.href}
+                                        target="_blank"
+                                        rel="noopener"
+                                        className="text-primary underline"
+                                        onClick={handleActionClick}
+                                    >
+                                        {toast.action.label}
+                                    </a>
+                                ) : (
+                                    // Styled as the same inline link — a Button would break the sentence
+                                    <button
+                                        type="button"
+                                        className="text-primary underline cursor-pointer"
+                                        onClick={() => { toast.action?.onClick?.(); handleActionClick(); }}
+                                    >
+                                        {toast.action.label}
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>

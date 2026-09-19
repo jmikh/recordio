@@ -7,7 +7,6 @@ import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
 import { ProUpgradeModal } from '../../../billing/ProUpgradeModal';
 import { useEntitlements } from '../../../billing/useEntitlements';
-import type { CloudRenderPhase } from './useCloudRender';
 import type { ExportQuality } from '@shared/utils/exportQuality';
 import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed, type UpgradeModalReason } from '../../../analytics';
 import { maybeOpenLeaveReviewModal } from '../../../components/LeaveReviewModal';
@@ -33,26 +32,20 @@ function estimateLocalTime(durationMs: number): string {
     return `~${minutes} min on this device`;
 }
 
-type ModalView = 'choose' | 'local' | 'cloud';
+type ModalView = 'choose' | 'local';
 
 interface DownloadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    cloudPhase: CloudRenderPhase;
-    cloudProgress: number;
     onStartCloudRender: (quality: ExportQuality) => void;
 }
 
 export function DownloadModal({
     isOpen,
     onClose,
-    cloudPhase,
-    cloudProgress,
     onStartCloudRender,
 }: DownloadModalProps) {
-    // If cloud render is already in progress, skip choice screen
-    const cloudActive = cloudPhase !== 'idle' && cloudPhase !== 'completed' && cloudPhase !== 'failed';
-    const [view, setView] = useState<ModalView>(cloudActive ? 'cloud' : 'choose');
+    const [view, setView] = useState<ModalView>('choose');
 
     const project = useProjectStore(s => s.project);
     const entitlements = useEntitlements();
@@ -63,20 +56,17 @@ export function DownloadModal({
     const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>();
     const [upgradeReason, setUpgradeReason] = useState<UpgradeModalReason>('export');
 
-    // Reset view when modal reopens, and clear stale view on close
-    useEffect(() => {
-        if (isOpen) {
-            setView(cloudActive ? 'cloud' : 'choose');
-        } else {
-            setView('choose');
-        }
-    }, [isOpen, cloudActive]);
+    // Closing rewinds to the choice screen, so reopening never lands mid-flow
+    const handleClose = () => {
+        setView('choose');
+        onClose();
+    };
 
-    // Background export finished (fires even with the modal closed — the
-    // component stays mounted) — follow with the review ask
-    useEffect(() => {
-        if (cloudPhase === 'completed') void maybeOpenLeaveReviewModal('export_completed');
-    }, [cloudPhase]);
+    // A cloud export has no view of its own: it starts in the background and
+    // the editor goes back to the project. Progress shows on the Download
+    // button, and ActivityToasts announces the end (and the review ask) even
+    // if the user has left the editor by then. Local renders still need this
+    // tab, so LocalRenderView below keeps its progress modal.
 
     if (!isOpen) return null;
 
@@ -84,21 +74,9 @@ export function DownloadModal({
         return (
             <LocalRenderView
                 isOpen={isOpen}
-                onClose={onClose}
+                onClose={handleClose}
                 onBack={() => setView('choose')}
                 quality={quality}
-            />
-        );
-    }
-
-    if (view === 'cloud') {
-        return (
-            <CloudRenderView
-                isOpen={isOpen}
-                onClose={onClose}
-                phase={cloudPhase}
-                progress={cloudProgress}
-                onStartRender={() => onStartCloudRender(quality)}
             />
         );
     }
@@ -138,7 +116,8 @@ export function DownloadModal({
         }
         if (cloudExport) {
             trackRenderInCloudClicked(project.id);
-            setView('cloud');
+            onStartCloudRender(quality);
+            handleClose();
         } else {
             trackRenderLocallyClicked(project.id);
             setView('local');
@@ -146,7 +125,7 @@ export function DownloadModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-lg">
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-lg">
             <div className="flex flex-col gap-5">
                 <div className="flex items-center justify-between">
                     <div>
@@ -155,7 +134,7 @@ export function DownloadModal({
                             {durationLabel} · {resolutionLabel} · MP4
                         </p>
                     </div>
-                    <XButton onClick={onClose} title="Close" />
+                    <XButton onClick={handleClose} title="Close" />
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -198,110 +177,6 @@ export function DownloadModal({
                 feature={upgradeFeature}
                 reason={upgradeReason}
             />
-        </Modal>
-    );
-}
-
-// ─── Cloud Render View ───────────────────────────────────────
-
-function CloudRenderView({
-    isOpen,
-    onClose,
-    phase,
-    progress,
-    onStartRender,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    phase: CloudRenderPhase;
-    progress: number;
-    onStartRender: () => void;
-}) {
-    const startedRef = useRef(false);
-
-    useEffect(() => {
-        if (isOpen && !startedRef.current && (phase === 'idle' || phase === 'failed')) {
-            startedRef.current = true;
-            onStartRender();
-        }
-        if (!isOpen) {
-            startedRef.current = false;
-        }
-    }, [isOpen, phase, onStartRender]);
-
-    const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
-    const isQueued = phase === 'saving' || phase === 'queued';
-    const isRendering = phase === 'rendering';
-    const isDownloading = phase === 'downloading';
-    const isCompleted = phase === 'completed';
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
-            <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="heading-2">Cloud Rendering</h2>
-                    <XButton onClick={onClose} title="Close" />
-                </div>
-
-                <div className="flex flex-col gap-3">
-                    {isQueued && (
-                        <div className="flex items-center gap-3 py-4">
-                            <div className="h-5 w-5 border-2 border-border-hover border-t-primary rounded-full animate-spin" />
-                            <span className="text-sm text-text-main">Queued — waiting for render worker...</span>
-                        </div>
-                    )}
-
-                    {isRendering && (
-                        <>
-                            <div className="h-2 bg-surface rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-primary transition-all duration-300 ease-out"
-                                    style={{ width: `${pct}%` }}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-text-main">
-                                <span>{pct}%</span>
-                                <span>Rendering...</span>
-                            </div>
-                        </>
-                    )}
-
-                    {isDownloading && (
-                        <div className="flex items-center gap-3 py-4">
-                            <div className="h-5 w-5 border-2 border-border-hover border-t-primary rounded-full animate-spin" />
-                            <span className="text-sm text-text-main">Downloading your video...</span>
-                        </div>
-                    )}
-
-                    {isCompleted && (
-                        <div className="flex items-center gap-3 py-4">
-                            <span className="text-sm text-text-highlighted">Download complete!</span>
-                        </div>
-                    )}
-
-                    {phase === 'failed' && (
-                        <div className="flex items-center gap-3 py-4">
-                            <span className="text-sm text-destructive">Render failed. Please try again.</span>
-                        </div>
-                    )}
-                </div>
-
-                {(isQueued || isRendering) && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-border text-xs text-text-muted">
-                        <LuZap className="icon-lg text-primary shrink-0" />
-                        <span>You can close this dialog. We'll notify you when your file is ready.</span>
-                    </div>
-                )}
-
-                <div className="flex justify-end pt-1">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-surface hover:bg-surface-hover text-text-highlighted text-sm rounded transition-colors border border-border"
-                    >
-                        Close
-                    </button>
-                </div>
-            </div>
         </Modal>
     );
 }

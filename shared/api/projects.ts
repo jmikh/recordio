@@ -113,6 +113,13 @@ export interface CloudProjectSummary {
     is_editor: boolean;
     /** The calling user's project_editors role, null when none */
     editor_role: AccessRole | null;
+    /**
+     * 'pending' rows are the caller's own unfinished uploads (never other
+     * members') — the client keeps them only when the media is cached locally
+     */
+    upload_status: 'pending' | 'ready';
+    /** Pending rows only: the recording's media, for the client to resume the upload */
+    media_paths?: { storagePath: string; type: 'screen' | 'camera' | 'mic' }[];
 }
 
 export interface ProjectListResponse {
@@ -242,6 +249,19 @@ export const SharedVideoGetResponseSchema = Type.Object({
         ]),
     ),
     muxPlaybackId: Type.Optional(Type.String()),
+    /**
+     * Render progress 0–1 for a pending video, straight from
+     * render_jobs.progress (the worker's ~5s heartbeat). Absent = queued
+     * and not yet reporting; 1 = rendered, waiting on the Mux webhook.
+     */
+    progress: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+    /**
+     * Why a failed video failed (render_jobs.error / mux_videos.error).
+     * NEVER sent in production — why a render died is internal detail, and
+     * a public viewer gets the generic message. Present outside production
+     * so local debugging isn't blind; the watch page console.errors it.
+     */
+    failureReason: Type.Optional(Type.String()),
     /** Only present for a completed video whose timeline has captions */
     captions: Type.Optional(Type.Array(SharedVideoCaptionSchema)),
     /**

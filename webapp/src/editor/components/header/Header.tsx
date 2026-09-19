@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { LuCloudUpload, LuDownload, LuRedo2, LuShare2, LuUndo2 } from 'react-icons/lu';
+import { LuDownload, LuRedo2, LuShare2, LuUndo2 } from 'react-icons/lu';
 
 import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
@@ -11,35 +11,16 @@ import { useUserStore } from '../../../auth/useUserStore';
 
 import { trackDownloadClicked } from '../../../analytics';
 import { useEntitlements } from '../../../billing/useEntitlements';
-import { useSyncStatusStore } from '../../../storage/syncStatusStore';
+import { useActivityStore, selectUploadTask } from '../../../activity/useActivityStore';
 import { useCloudRender } from '../settings/useCloudRender';
 import { DownloadModal } from '../settings/DownloadModal';
 import { SetAsDefaultsButton } from './SetAsDefaultsButton';
 import { ProjectNameField } from './ProjectNameField';
+import { UploadStatusBadge } from './UploadStatusBadge';
 
 import { Button, Tooltip } from '@shared/components';
-import type { ExportQuality } from '@shared/utils/exportQuality';
-import { useToast } from '../../../components/Toast';
 import { ShareModal } from '../../../share/ShareModal';
 import { useProjectMetaStore } from '../../../share/useProjectMetaStore';
-
-function SyncIndicator() {
-    const pendingMediaUploads = useSyncStatusStore(s => s.pendingMediaUploads);
-    const uploadProgress = useSyncStatusStore(s => s.currentUpload?.progress);
-
-    if (pendingMediaUploads <= 0) return null;
-
-    const pct = uploadProgress != null ? `${Math.round(uploadProgress * 100)}%` : '';
-    const tooltipText = pct ? `Syncing to cloud... ${pct}` : 'Syncing to cloud...';
-
-    return (
-        <Tooltip text={tooltipText}>
-            <div className="flex items-center">
-                <LuCloudUpload className="icon-md text-primary animate-pulse" />
-            </div>
-        </Tooltip>
-    );
-}
 
 export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -47,33 +28,24 @@ export const Header = () => {
     const [isProModalOpen, setIsProModalOpen] = useState(false);
     const { isAuthenticated } = useUserStore();
     const entitlements = useEntitlements();
-    const isSyncingMedia = useSyncStatusStore(s => s.pendingMediaUploads) > 0;
-
-    const { addToast } = useToast();
 
     const project = useProjectData();
     const projectName = useProjectName();
+    const isSyncingMedia = useActivityStore(s => selectUploadTask(project.id)(s)?.status === 'active');
 
-    // Cloud render hook
-    const cloudRender = useCloudRender({ onToast: addToast });
+    // Cloud render state lives in CloudRenderService — it keeps going (and
+    // downloads) after the editor unmounts; ActivityToasts reports the end
+    const cloudRender = useCloudRender(project.id, projectName);
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
     const handleDownload = () => {
         trackDownloadClicked(project.id);
-        if (cloudRender.isActive) {
-            setIsDownloadModalOpen(true);
-            return;
-        }
         if (!isAuthenticated) {
             setIsAuthModalOpen(true);
             return;
         }
         setIsDownloadModalOpen(true);
     };
-
-    const handleStartCloudRender = useCallback((quality: ExportQuality) => {
-        cloudRender.startCloudRender(project.id, projectName, quality);
-    }, [cloudRender.startCloudRender, project.id, projectName]);
 
     const downloadBusy = cloudRender.isActive || isSyncingMedia;
     const progressPct = Math.round(cloudRender.progress * 100);
@@ -130,7 +102,7 @@ export const Header = () => {
 
                 {/* Project Name (Centered) */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                    <SyncIndicator />
+                    <UploadStatusBadge projectId={project.id} />
                     <ProjectNameField />
                 </div>
 
@@ -143,22 +115,15 @@ export const Header = () => {
                                 disabled={downloadBusy}
                                 className="text-sm px-3"
                             >
-                                {cloudRender.phase === 'rendering' || cloudRender.phase === 'queued' || cloudRender.phase === 'saving' ? (
-                                    <>
-                                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
-                                        Rendering...
-                                    </>
-                                ) : cloudRender.phase === 'downloading' ? (
-                                    <>
-                                        <div className="h-4 w-4 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
-                                        Downloading...
-                                    </>
+                                {/* Label stays "Download" throughout — only the icon
+                                    becomes a spinner, so the button never resizes.
+                                    Progress is the bar underneath. */}
+                                {cloudRender.isActive ? (
+                                    <div className="h-3.5 w-3.5 border-2 border-border-hover border-t-text-highlighted rounded-full animate-spin" />
                                 ) : (
-                                    <>
-                                        <LuDownload className="icon-sm" />
-                                        Download
-                                    </>
+                                    <LuDownload className="icon-sm" />
                                 )}
+                                Download
                             </Button>
                             {cloudRender.isActive && (
                                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-border-default rounded-b overflow-hidden">
@@ -215,9 +180,7 @@ export const Header = () => {
             <DownloadModal
                 isOpen={isDownloadModalOpen}
                 onClose={() => setIsDownloadModalOpen(false)}
-                cloudPhase={cloudRender.phase}
-                cloudProgress={cloudRender.progress}
-                onStartCloudRender={handleStartCloudRender}
+                onStartCloudRender={cloudRender.startCloudRender}
             />
         </div>
     );

@@ -4,7 +4,37 @@
  * plus webhook signature verification (Wave D #16).
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { MuxApiError, type MuxPort } from '../ports/mux.js';
+import { MuxApiError, type MuxAssetMeta, type MuxPort } from '../ports/mux.js';
+
+/** Mux field limits: meta.title 512, meta.creator_id / external_id 128, passthrough 255 */
+const META_TITLE_MAX = 512;
+const PASSTHROUGH_MAX = 255;
+
+/**
+ * Body fields identifying the asset's owner. `passthrough` is a JSON
+ * string (echoed verbatim on every webhook + in the dashboard); with four
+ * UUIDs it sits well under Mux's 255-char cap, but guard anyway so a
+ * pathological id can never turn into a 422 from Mux.
+ */
+export function buildAssetMetaFields(meta: MuxAssetMeta): {
+    meta: { title: string; creator_id: string; external_id: string };
+    passthrough?: string;
+} {
+    const passthrough = JSON.stringify({
+        projectId: meta.projectId,
+        workspaceId: meta.workspaceId,
+        creatorId: meta.creatorId,
+        cloudVersion: meta.cloudVersion,
+    });
+    return {
+        meta: {
+            title: meta.title.slice(0, META_TITLE_MAX),
+            creator_id: meta.creatorId,
+            external_id: meta.projectId,
+        },
+        ...(passthrough.length <= PASSTHROUGH_MAX && { passthrough }),
+    };
+}
 
 export interface MuxAdapterConfig {
     tokenId: string;
@@ -28,7 +58,7 @@ export function createMuxAdapter(config: MuxAdapterConfig): MuxPort {
     }
 
     return {
-        async createAsset(inputUrl) {
+        async createAsset(inputUrl, meta) {
             const res = await fetch(`${baseUrl}/video/v1/assets`, {
                 method: 'POST',
                 headers: {
@@ -38,6 +68,7 @@ export function createMuxAdapter(config: MuxAdapterConfig): MuxPort {
                 body: JSON.stringify({
                     input: [{ url: inputUrl }],
                     playback_policy: ['public'],
+                    ...buildAssetMetaFields(meta),
                 }),
             });
             if (!res.ok) {

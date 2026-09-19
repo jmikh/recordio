@@ -5,6 +5,14 @@
  * carry a transcript (output-time caption lines) rendered beside the
  * player — clicking a line seeks it.
  *
+ * The player slot is a dark 16:9 box from the first frame: the shell
+ * renders immediately (no full-screen loading overlay) so the layout
+ * never jumps, and every non-playing state — loading, rendering, failed,
+ * missing — fills that same box. A pending video shows the server's
+ * render progress: absent = queued, 0–1 = rendering (percentage), 1 =
+ * rendered and waiting on Mux. A failed one offers support, since the
+ * viewer is usually not the person who can re-share it.
+ *
  * Layout: full-bleed. The header pins navigation to the far left and
  * actions to the far right; the player takes everything left of a
  * flush side panel. The panel is always there — transcript or an empty
@@ -17,11 +25,11 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import MuxPlayer, { type MuxPlayerRefAttributes } from '@mux/mux-player-react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { LuCopy, LuLock, LuPanelRightClose, LuPanelRightOpen, LuPencil } from 'react-icons/lu';
+import { LuCircleAlert, LuCopy, LuLock, LuPanelRightClose, LuPanelRightOpen, LuPencil } from 'react-icons/lu';
 import { LogoLink } from '@shared/components/LogoLink';
-import { Button, LoadingLogo } from '@shared/components';
+import { Button } from '@shared/components';
 import type { SharedVideoGetResponse } from '@shared/api';
-import { CHROME_EXTENSION_URL, MARKETING_ORIGIN } from '@shared/types/bridge';
+import { CHROME_EXTENSION_URL, MARKETING_ORIGIN, SUPPORT_EMAIL } from '@shared/types/bridge';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { invokeFunction } from '../api/client';
 import { AuthModal } from '../auth/AuthModal';
@@ -44,12 +52,44 @@ type PageState =
     | { kind: 'error'; message: string }
     | { kind: 'ready'; data: SharedVideoGetResponse };
 
-/** 16:9 stand-in for the player while there is nothing to play. */
+/**
+ * 16:9 stand-in for the player while there is nothing to play. Dark in
+ * both themes (--surface-media), so the slot reads as a video surface
+ * rather than as page background — hence the text-on-media foreground.
+ */
 function PlayerPlaceholder({ children }: { children: ReactNode }) {
     return (
-        <div className="aspect-video w-full bg-surface-body rounded-xl border border-border flex flex-col items-center justify-center gap-3">
+        <div className="aspect-video w-full bg-surface-media rounded-xl border border-border flex flex-col items-center justify-center gap-3 px-6 text-center">
             {children}
         </div>
+    );
+}
+
+/** The spinner idiom, on the dark ground. */
+function PlaceholderSpinner() {
+    return <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />;
+}
+
+/**
+ * Render progress. `progress` is 0–1 from render_jobs.progress; the
+ * inline width is the sanctioned dynamic-value exception (every other
+ * progress bar in the app does the same).
+ */
+function RenderProgress({ progress }: { progress: number }) {
+    const pct = Math.round(Math.min(1, Math.max(0, progress)) * 100);
+    return (
+        <>
+            <div className="h-1.5 w-48 rounded-full bg-text-on-media/20 overflow-hidden">
+                <div
+                    className="h-full bg-primary transition-[width] duration-300"
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+            <span className="text-sm text-text-on-media" role="status">
+                Rendering video... {pct}%
+            </span>
+            <span className="text-xs text-text-on-media/70">This usually takes a minute.</span>
+        </>
     );
 }
 
@@ -117,6 +157,17 @@ export function VideoPage() {
         };
     }, [slug, isAuthenticated]);
 
+    // The placeholder can only say "something went wrong" — the actual
+    // reason (render_jobs.error / mux_videos.error) is internal detail, so
+    // the server sends it outside production only. Logged once per reason
+    // rather than on every 5s poll.
+    const failureReason = state.kind === 'ready' && state.data.status === 'failed'
+        ? (state.data.failureReason ?? '(no reason sent — production build)')
+        : null;
+    useEffect(() => {
+        if (failureReason) console.error('[VideoPage] video failed:', failureReason);
+    }, [failureReason]);
+
     const copyLink = () => {
         navigator.clipboard.writeText(window.location.href);
         setLinkCopied(true);
@@ -132,14 +183,6 @@ export function VideoPage() {
         // rare rejection (e.g. the source is still attaching)
         Promise.resolve(player.play()).catch(() => {});
     };
-
-    if (state.kind === 'loading') {
-        return (
-            <div className="relative min-h-screen bg-surface">
-                <LoadingLogo text="Loading video..." />
-            </div>
-        );
-    }
 
     if (state.kind === 'auth_required') {
         return (
@@ -178,8 +221,10 @@ export function VideoPage() {
         );
     }
 
-    const { data } = state;
-    const captions = data.status === 'completed' ? data.captions : undefined;
+    // 'loading' renders the same shell with an empty title and a dark
+    // placeholder, so nothing shifts once the answer arrives
+    const data = state.kind === 'ready' ? state.data : undefined;
+    const captions = data?.status === 'completed' ? data.captions : undefined;
     const openExtension = () => { window.open(CHROME_EXTENSION_URL, '_blank'); };
 
     return (
@@ -193,7 +238,7 @@ export function VideoPage() {
                     <Button icon={LuCopy} onClick={copyLink}>
                         {linkCopied ? 'Copied!' : 'Copy link'}
                     </Button>
-                    {data.canEdit && slug && (
+                    {data?.canEdit && slug && (
                         <Button variant="primary" icon={LuPencil} onClick={() => navigate(editorPath(slug))}>
                             Edit
                         </Button>
@@ -212,12 +257,19 @@ export function VideoPage() {
                     below the fold (taller aspect ratios just scroll) */}
                 <main className="flex-1 min-w-0 min-h-0 overflow-y-auto scrollbar-thin">
                     <div className="px-6 pt-5 pb-4">
-                        <h1 className="heading-2 truncate">{data.name}</h1>
-                        <p className="text-label mt-0.5">{data.userName}</p>
+                        {/* Non-breaking spaces hold the two lines' height
+                            while loading, so the player never shifts up */}
+                        <h1 className="heading-2 truncate">{data?.name ?? ' '}</h1>
+                        <p className="text-label mt-0.5">{data?.userName ?? ' '}</p>
                     </div>
                     <div className="px-6 pb-6">
                         <div className="w-full max-w-[calc((100vh-11rem)*16/9)] mx-auto">
-                            {data.status === 'completed' && data.muxPlaybackId ? (
+                            {!data ? (
+                                <PlayerPlaceholder>
+                                    <PlaceholderSpinner />
+                                    <span className="text-sm text-text-on-media" role="status">Loading video...</span>
+                                </PlayerPlaceholder>
+                            ) : data.status === 'completed' && data.muxPlaybackId ? (
                                 <MuxPlayer
                                     ref={playerRef}
                                     playbackId={data.muxPlaybackId}
@@ -228,18 +280,50 @@ export function VideoPage() {
                                 />
                             ) : data.status === 'failed' ? (
                                 <PlayerPlaceholder>
-                                    <span className="text-sm text-destructive" role="alert">Failed to process video</span>
-                                    <span className="text-xs text-text-disabled">Please try sharing again.</span>
+                                    <LuCircleAlert size={32} className="text-destructive" />
+                                    <span className="text-sm text-text-on-media" role="alert">Something went wrong</span>
+                                    <span className="text-xs text-text-on-media/70">
+                                        We couldn&apos;t prepare this video.{' '}
+                                        <a
+                                            href={`mailto:${SUPPORT_EMAIL}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-text-on-media hover:underline"
+                                        >
+                                            Contact support
+                                        </a>
+                                    </span>
+                                    {/* Dev only — the server withholds the
+                                        reason entirely in production */}
+                                    {import.meta.env.MODE !== 'production' && data.failureReason && (
+                                        <code className="text-2xs text-destructive max-w-lg wrap-break-word">
+                                            {data.failureReason}
+                                        </code>
+                                    )}
                                 </PlayerPlaceholder>
                             ) : data.status === 'pending' ? (
                                 <PlayerPlaceholder>
-                                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-sm text-text-muted" role="status">Preparing video...</span>
-                                    <span className="text-xs text-text-disabled">This usually takes a minute.</span>
+                                    {/* No progress yet = queued; 1 = rendered,
+                                        Mux is still ingesting it */}
+                                    {data.progress === undefined ? (
+                                        <>
+                                            <PlaceholderSpinner />
+                                            <span className="text-sm text-text-on-media" role="status">Preparing video...</span>
+                                            <span className="text-xs text-text-on-media/70">Waiting for a render slot.</span>
+                                        </>
+                                    ) : data.progress < 1 ? (
+                                        <RenderProgress progress={data.progress} />
+                                    ) : (
+                                        <>
+                                            <PlaceholderSpinner />
+                                            <span className="text-sm text-text-on-media" role="status">Almost ready...</span>
+                                            <span className="text-xs text-text-on-media/70">Finishing up.</span>
+                                        </>
+                                    )}
                                 </PlayerPlaceholder>
                             ) : (
                                 <PlayerPlaceholder>
-                                    <span className="text-sm text-text-muted">Could not find video</span>
+                                    <span className="text-sm text-text-on-media">Could not find video</span>
                                 </PlayerPlaceholder>
                             )}
                         </div>
@@ -277,7 +361,7 @@ export function VideoPage() {
                         />
                     ) : (
                         <p className="text-label px-5 py-2 flex-1">
-                            {data.status === 'completed'
+                            {data?.status === 'completed'
                                 ? 'This video has no transcript.'
                                 : 'The transcript appears once the video is ready.'}
                         </p>

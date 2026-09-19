@@ -23,7 +23,14 @@ let mixpanelReady = false;
 try {
     mixpanel.init('773bc18d036f7f77ec70ec94e7eec508', {
         opt_out_tracking_by_default: !IS_PRODUCTION,
-        api_host: '/mp',
+        // Same-origin proxy is not enough on its own: `/mp/track/` is the path
+        // Mixpanel's proxy docs recommend, so filter lists match it literally and
+        // Brave Shields "Aggressive" blocks the request with ERR_BLOCKED_BY_CLIENT
+        // before it leaves the page. The host prefix and the endpoint names are
+        // both neutral here; functions/api/v2/m maps them back to Mixpanel's real
+        // endpoints, so these MUST stay in sync with ROUTE_ALIASES there.
+        api_host: '/api/v2/m',
+        api_routes: { track: 'e', engage: 'p', groups: 'g' },
         autocapture: false,
         record_sessions_percent: 0,
         loaded: () => {
@@ -88,17 +95,70 @@ export function resetUser() {
     mixpanel.reset();
 }
 
+// ── Extension identity linking ───────────────────────────────────────────────
+//
+// The extension tracks under its own anonymous UUID and never changes it (it has
+// no reliable moment to). Linking it to the signed-in user is the webapp's job:
+// the import handoff hands us the extension's distinct_id, we hold onto it, and
+// we emit the link once we know who the user is.
+
+const EXTENSION_DISTINCT_ID_KEY = 'recordio-extension-distinct-id';
+
 /**
- * Link the webapp's anonymous Mixpanel profile with the extension's anonymous ID.
- * Called during handoff so extension recording events merge into the same profile.
- * If the user later authenticates, identifyUser() will further merge into the Supabase ID.
+ * Stash the extension's anonymous Mixpanel ID, handed over by the import handoff.
  *
- * Skipped when already authenticated — identifyUser() has already set the distinct_id
- * to the Supabase ID, and calling identify(extId) would overwrite it.
+ * Stored rather than linked on the spot because the user may not be signed in yet
+ * — the import page can send them through a login redirect first. Deliberately NOT
+ * cleared by resetUser(): a transient SIGNED_OUT during startup would otherwise
+ * drop the link before it was ever made. linkExtensionIdentity() clears it.
  */
-export function identifyExtensionUser(extensionDistinctId: string) {
+export function rememberExtensionDistinctId(extensionDistinctId: string) {
+    try {
+        localStorage.setItem(EXTENSION_DISTINCT_ID_KEY, extensionDistinctId);
+    } catch { /* private mode / storage disabled — linking is best-effort */ }
+}
+
+/**
+ * Link a previously stashed extension distinct_id to the signed-in user, so the
+ * extension's recording events and the webapp's events land on one profile.
+ *
+ * Called from useUserStore.setUser (login or session restore) and from the import
+ * page when the handoff arrives while already signed in — whichever happens last
+ * is the one that does the work. Clears the stored ID so the link is emitted once.
+ *
+ * Under Simplified ID Merge an `$identify` event is what links an anonymous ID to
+ * a user ID. We emit that event ourselves rather than calling mixpanel.identify(),
+ * because identify() can only ever use the SDK's *own* previous distinct_id as
+ * $anon_distinct_id — it has no way to link a third ID originating elsewhere.
+ * This is the same event identify() emits internally, and it is an ordinary
+ * track() call: same batcher, same /api/v2/m proxy as every other event.
+ */
+export function linkExtensionIdentity(email: string) {
     if (isImpersonating()) return;
-    mixpanel.identify(extensionDistinctId);
+
+    let extensionDistinctId: string | null = null;
+    try {
+        extensionDistinctId = localStorage.getItem(EXTENSION_DISTINCT_ID_KEY);
+    } catch { return; }
+    if (!extensionDistinctId) return;
+
+    try {
+        localStorage.removeItem(EXTENSION_DISTINCT_ID_KEY);
+    } catch { /* ignore — worst case the link is emitted again, which is idempotent */ }
+
+    // Extensions that went through the old $create_alias flow already store the
+    // email as their distinct_id; there is nothing to link in that case.
+    if (extensionDistinctId === email) return;
+
+    if (!IS_PRODUCTION) {
+        console.log('[Analytics] $identify', { distinct_id: email, $anon_distinct_id: extensionDistinctId });
+        return;
+    }
+    try {
+        mixpanel.track('$identify', { distinct_id: email, $anon_distinct_id: extensionDistinctId });
+    } catch (e) {
+        console.error('[Analytics] Mixpanel $identify failed:', e);
+    }
 }
 
 // ============================================================================
@@ -502,7 +562,18 @@ export function trackImportPageLoaded(params: { recording_id: string | null }) {
 export function trackImportFailed(params: BaseFailureParams & {
     recording_id: string | null;
     phase: 'no_id' | 'extension' | 'no_workspace' | 'cap';
+    /** For `phase: 'extension'`, the HandoffFailureKind — 'stall',
+     *  'port-disconnected', 'stream-error' or 'metadata'. A 'stall' means the
+     *  extension's MV3 service worker was most likely killed mid-transfer. */
     bridge_status?: string;
+    /** How far the extension→webapp transfer got before it failed. */
+    bytes_received?: number;
+    total_bytes?: number;
+    percent_complete?: number;
+    chunks_received?: number;
+    total_chunks?: number;
+    /** Which media source was in flight when it died ('screen' | 'camera' | 'mic' | 'image'). */
+    stalled_source?: string | null;
 }) {
     trackEvent('import_failed', params);
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { identifyUser, setUserProfileOnce, resetUser } from '../analytics';
+import { identifyUser, setUserProfileOnce, resetUser, linkExtensionIdentity } from '../analytics';
 
 export interface UserState {
     // Auth state
@@ -39,6 +39,9 @@ export const useUserStore = create<UserState>()(
                     isAuthenticated: true,
                 });
                 identifyUser(email);
+                // Fold in the extension's anonymous ID if the import handoff stashed one
+                // before the user signed in. No-op when there is nothing stored.
+                linkExtensionIdentity(email);
                 if (!wasAuthenticated) {
                     setUserProfileOnce(email);
                 }

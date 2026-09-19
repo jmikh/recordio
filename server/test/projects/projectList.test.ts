@@ -104,7 +104,6 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
         const softDeleted = await seedProject(pool, {
             workspaceId: ws.id, uploadStatus: 'ready',
             updatedAt: '2026-01-03T10:00:00Z', deletedAt: '2026-01-03T10:00:00Z' });
-        await seedProject(pool, { workspaceId: ws.id, uploadStatus: 'pending' });
         await seedProject(pool, {
             workspaceId: ws.id, uploadStatus: 'ready', permanentlyDeleted: true });
 
@@ -117,6 +116,7 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
         expect(projects.map((p) => p.id)).toEqual([softDeleted.id, newer.id, older.id]);
         // Summary shape: no project_data; deleted_at present for client filtering
         expect(projects[0].project_data).toBeUndefined();
+        expect(projects[0].media_paths).toBeUndefined();
         expect(projects[0].deleted_at).not.toBeNull();
         expect(projects[1]).toMatchObject({
             id: newer.id,
@@ -125,6 +125,7 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
             workspace_id: ws.id,
             cloud_version: 1,
             deleted_at: null,
+            upload_status: 'ready',
             is_shared: true, // seedProject defaults share_policy 'public'
             workspace_access: 'view',
             is_editor: false, // no project_editors row for the caller
@@ -135,6 +136,39 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
             'http.route': '/project-list',
             'workspace.id': ws.id,
         });
+    });
+
+    it('includes the caller\'s own live pending projects with their recording media paths only', async () => {
+        const ws = await seedOwnWorkspace();
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+        const mine = await seedProject(pool, {
+            workspaceId: ws.id, uploadStatus: 'pending',
+            projectData: {
+                screenSource: { storagePath: `${SEEDED_USER_ID}/x/screen.webm` },
+                microphoneSource: { storagePath: `${SEEDED_USER_ID}/x/mic.wav` },
+                settings: { background: { storagePath: `${SEEDED_USER_ID}/assets/bg.png` } },
+            },
+        });
+        await seedProject(pool, {
+            workspaceId: ws.id, uploadStatus: 'pending', ownerId: SEEDED_USER_2_ID });
+        await seedProject(pool, {
+            workspaceId: ws.id, uploadStatus: 'pending', deletedAt: '2026-01-03T10:00:00Z' });
+
+        const { app } = testApp();
+        const res = await post(app, { workspaceId: ws.id },
+            await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+
+        const { projects } = res.json() as { projects: Array<Record<string, unknown>> };
+        expect(projects.map((p) => p.id)).toEqual([mine.id]);
+        expect(projects[0]).toMatchObject({
+            upload_status: 'pending',
+            media_paths: [
+                { storagePath: `${SEEDED_USER_ID}/x/screen.webm`, type: 'screen' },
+                { storagePath: `${SEEDED_USER_ID}/x/mic.wav`, type: 'mic' },
+            ],
+        });
+        expect(projects[0].project_data).toBeUndefined();
     });
 
     it('flags is_editor + editor_role on projects shared with the caller via project_editors', async () => {

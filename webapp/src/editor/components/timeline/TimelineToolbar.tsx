@@ -389,6 +389,7 @@ export const TimelineToolbar: React.FC = () => {
                 <Button
                     variant="ghost"
                     icon={LuMinus}
+                    aria-label="Zoom out timeline"
                     onClick={() => handleScaleChange(Math.max(MIN_PIXELS_PER_SEC, pixelsPerSec - 10))}
                 />
                 <div className="w-24">
@@ -404,6 +405,7 @@ export const TimelineToolbar: React.FC = () => {
                 <Button
                     variant="ghost"
                     icon={LuPlus}
+                    aria-label="Zoom in timeline"
                     onClick={() => handleScaleChange(Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec + 10))}
                 />
             </div>
