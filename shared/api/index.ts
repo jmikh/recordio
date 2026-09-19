@@ -34,6 +34,8 @@ import type {
     ProjectShareResponse,
     ProjectUpdateRequest,
     ProjectUpdateResponse,
+    SharedVideoGetRequest,
+    SharedVideoGetResponse,
 } from './projects';
 import type {
     RenderJobGetStatusRequest,
@@ -120,6 +122,7 @@ export interface ApiRoutes {
     'project-delete': { request: ProjectIdRequest; response: ProjectDeleteResponse };
     'project-restore': { request: ProjectIdRequest; response: ProjectRestoreResponse };
     'project-confirm-upload': { request: ProjectIdRequest; response: ProjectConfirmUploadResponse };
+    'shared-video-get': { request: SharedVideoGetRequest; response: SharedVideoGetResponse };
     'render-job-get-status': { request: RenderJobGetStatusRequest; response: RenderJobGetStatusResponse };
     'screenshot-create': { request: ScreenshotCreateRequest; response: ScreenshotCreateResponse };
     'screenshot-get': { request: ScreenshotGetRequest; response: CloudScreenshot | null };

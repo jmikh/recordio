@@ -211,3 +211,44 @@ export const ProjectConfirmUploadResponseSchema = Type.Object({
     confirmed: Type.Boolean(),
 });
 export type ProjectConfirmUploadResponse = Static<typeof ProjectConfirmUploadResponseSchema>;
+
+// ── POST /shared-video-get (public watch page) ───────────────────
+
+export const SharedVideoGetRequestSchema = Type.Object({
+    slug: Type.String({ minLength: 1 }),
+});
+export type SharedVideoGetRequest = Static<typeof SharedVideoGetRequestSchema>;
+
+/**
+ * One transcript line for the watch page, in OUTPUT time (cuts and
+ * speed already applied by the server) so the page can seek the player
+ * directly. Text is the visible words joined — hidden words are dropped.
+ */
+export const SharedVideoCaptionSchema = Type.Object({
+    text: Type.String(),
+    startMs: Type.Number(),
+    endMs: Type.Number(),
+});
+export type SharedVideoCaption = Static<typeof SharedVideoCaptionSchema>;
+
+export const SharedVideoGetResponseSchema = Type.Object({
+    name: Type.String(),
+    userName: Type.String(),
+    status: Type.Optional(
+        Type.Union([
+            Type.Literal('completed'),
+            Type.Literal('pending'),
+            Type.Literal('failed'),
+        ]),
+    ),
+    muxPlaybackId: Type.Optional(Type.String()),
+    /** Only present for a completed video whose timeline has captions */
+    captions: Type.Optional(Type.Array(SharedVideoCaptionSchema)),
+    /**
+     * Present (true) only when the signed-in viewer has edit access —
+     * the watch page shows its Edit button on this. Never sent to
+     * anonymous viewers; omitted rather than false for view-only ones.
+     */
+    canEdit: Type.Optional(Type.Literal(true)),
+});
+export type SharedVideoGetResponse = Static<typeof SharedVideoGetResponseSchema>;

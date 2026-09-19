@@ -21,7 +21,8 @@ import { SpotlightInspector } from './SpotlightInspector';
 import { ZoomInspector } from './ZoomInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
 import { OverlayInspector } from './OverlayInspector';
-import { LuChevronRight } from 'react-icons/lu';
+import { LuChevronRight, LuPanelLeftOpen } from 'react-icons/lu';
+import { useNavDrawerStore } from '../../../components/useNavDrawerStore';
 import { SETTINGS_NAV_ITEMS } from './settingsNavItems';
 
 
@@ -132,7 +133,7 @@ export const SettingsPanel = () => {
             {/* Logo + navigation — one bordered side panel column */}
             <div className="w-44 flex flex-col bg-surface border-r border-border">
                 {/* Logo — same placement as the dashboard sidebar */}
-                <div className="px-3 pt-3">
+                <div className="px-3 pt-3 flex items-center justify-between gap-2">
                     <Button
                         variant="ghost"
                         onClick={handleGoToDashboard}
@@ -142,6 +143,20 @@ export const SettingsPanel = () => {
                     >
                         <LogoLink imgClassName="h-6" />
                     </Button>
+                    {/* Pulls the main nav out over the editor. Only pause when
+                        actually playing: setIsPlaying also clears the current
+                        selection, a surprise for someone just opening the nav. */}
+                    <Button
+                        variant="ghost"
+                        icon={LuPanelLeftOpen}
+                        onClick={() => {
+                            const { isPlaying, setIsPlaying } = useUIStore.getState();
+                            if (isPlaying) setIsPlaying(false);
+                            useNavDrawerStore.getState().open();
+                        }}
+                        aria-label="Open navigation"
+                        title="Open navigation"
+                    />
                 </div>
                 <SidebarNav id="settings-nav" className="flex-1 min-h-0 py-6">
                     {navItems.map((item) => {

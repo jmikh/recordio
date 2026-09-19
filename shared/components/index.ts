@@ -9,6 +9,7 @@ export { InfoTooltip, type TooltipPlacement } from './InfoTooltip';
 export { Tooltip } from './Tooltip';
 export { Dropdown } from './Dropdown';
 export type { DropdownOption } from './Dropdown';
+export { LoadingLogo } from './LoadingLogo';
 export { LogoLink } from './LogoLink';
 export { Modal } from './Modal';
 export { MultiToggle, type MultiToggleOption } from './MultiToggle';

@@ -175,6 +175,41 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         expect((res.json() as { name: string }).name).toBe('Public one');
     });
 
+    it('canEdit: true for the owner and an edit-role grant; absent for view-only and anonymous viewers', async () => {
+        const ws = await seedWorkspace(pool, { ownerId: SEEDED_USER_ID });
+        createdWorkspaces.push(ws.id);
+        const { app, deps } = testApp();
+        // Public + workspace_access 'view': a plain member can watch but not edit
+        const project = await seed({ workspaceId: ws.id, sharePolicy: 'public', workspaceAccess: 'view' });
+        nameOwner(deps, project.ownerId, { full_name: 'Owner' });
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+
+        const anon = await post(app, { slug: project.slug });
+        expect(anon.statusCode).toBe(200);
+        expect(anon.json()).not.toHaveProperty('canEdit');
+
+        const owner = await post(app, { slug: project.slug }, await userToken({ sub: SEEDED_USER_ID }));
+        expect(owner.json()).toMatchObject({ canEdit: true });
+
+        const member = await post(app, { slug: project.slug }, await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(member.statusCode).toBe(200);
+        expect(member.json()).not.toHaveProperty('canEdit');
+
+        await seedProjectEditor(pool, { projectId: project.id, userId: SEEDED_USER_2_ID, role: 'edit' });
+        const granted = await post(app, { slug: project.slug }, await userToken({ sub: SEEDED_USER_2_ID }));
+        expect(granted.json()).toMatchObject({ canEdit: true });
+    });
+
+    it('canEdit does not depend on the Mux status (a pending publish is still editable)', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        nameOwner(deps, project.ownerId, { full_name: 'Owner' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+
+        const res = await post(app, { slug: project.slug }, await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.json()).toMatchObject({ status: 'pending', canEdit: true });
+    });
+
     it('404 when the project is soft-deleted', async () => {
         const { app } = testApp();
         const project = await seed({ deletedAt: new Date().toISOString() });
@@ -206,6 +241,79 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         const res = await post(app, { slug: project.slug });
         expect(res.statusCode).toBe(200);
         expect(res.json()).toMatchObject({ status: 'completed', muxPlaybackId: 'pb-new' });
+    });
+
+    // ── captions (watch-page transcript) ──────────────────────────
+
+    /** A one-window project with two caption lines, one straddling a cut. */
+    const CAPTIONED_PROJECT = {
+        timeline: {
+            // [0,5000] kept, [5000,8000] cut, [8000,10000] kept at 2x
+            outputWindows: [
+                { id: 'a', startMs: 0, endMs: 5000, speed: 1 },
+                { id: 'b', startMs: 8000, endMs: 10000, speed: 2 },
+            ],
+            captionSegments: [
+                {
+                    id: 's1', sourceStartTimeMs: 1000, sourceEndTimeMs: 2000,
+                    outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true,
+                    words: [
+                        { id: 'w1', word: 'um', hidden: true, sourceStartTimeMs: 1000, sourceEndTimeMs: 1200, outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true },
+                        { id: 'w2', word: 'hello', sourceStartTimeMs: 1200, sourceEndTimeMs: 2000, outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true },
+                    ],
+                },
+                {
+                    id: 's2', sourceStartTimeMs: 6000, sourceEndTimeMs: 7000,
+                    outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true,
+                    words: [{ id: 'w3', word: 'cut', sourceStartTimeMs: 6000, sourceEndTimeMs: 7000, outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true }],
+                },
+                {
+                    id: 's3', sourceStartTimeMs: 8000, sourceEndTimeMs: 9000,
+                    outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true,
+                    words: [{ id: 'w4', word: 'fast', sourceStartTimeMs: 8000, sourceEndTimeMs: 9000, outputStartTimeMs: 0, outputEndTimeMs: 0, visible: true }],
+                },
+            ],
+        },
+    };
+
+    it('completed: returns the timeline captions as output-time transcript lines', async () => {
+        const { app, deps } = testApp();
+        const project = await seed({ projectData: CAPTIONED_PROJECT });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-1' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({
+            name: project.name,
+            userName: 'Jane',
+            status: 'completed',
+            muxPlaybackId: 'pb-1',
+            captions: [
+                { text: 'hello', startMs: 1000, endMs: 2000 },
+                { text: 'fast', startMs: 5000, endMs: 5500 },
+            ],
+        });
+    });
+
+    it('completed without captions in the timeline: no captions key', async () => {
+        const { app, deps } = testApp();
+        const project = await seed({ projectData: { timeline: { outputWindows: [{ id: 'a', startMs: 0, endMs: 1000, speed: 1 }], captionSegments: [] } } });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-1' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toEqual({ name: project.name, userName: 'Jane', status: 'completed', muxPlaybackId: 'pb-1' });
+    });
+
+    it('captions are only sent with a completed video (pending has nothing to seek)', async () => {
+        const { app, deps } = testApp();
+        const project = await seed({ projectData: CAPTIONED_PROJECT });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toEqual({ name: project.name, userName: 'Jane', status: 'pending' });
     });
 
     it('a share link stays live after the workspace trial ends (revamp Step 3: existing links survive; only creating/updating is gated)', async () => {

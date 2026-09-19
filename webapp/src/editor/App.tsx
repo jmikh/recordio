@@ -12,13 +12,15 @@ import { getTimeMapper } from './hooks/useTimeMapper';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { useMediaUrlStore } from '../storage/useMediaUrlStore';
 import { useAssetLibraryStore } from './stores/useAssetLibraryStore';
-import { Modal } from '@shared/components';
+import { LoadingLogo, Modal } from '@shared/components';
 import { SUPPORT_EMAIL } from '@shared/types/bridge';
 import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { ConflictModal } from './components/ConflictModal';
 import { SyncFailedModal } from './components/SyncFailedModal';
 import { AuthModal } from '../auth/AuthModal';
+import { NavDrawer } from '../components/NavDrawer';
+import { useNavDrawerStore } from '../components/useNavDrawerStore';
 
 
 
@@ -168,6 +170,10 @@ function Editor() {
     // Global Key Listener for Undo/Redo & Play/Pause
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // The nav drawer covers the editor — Space there must not start
+            // playback behind the dimmed backdrop
+            if (useNavDrawerStore.getState().isOpen) return;
+
             // Ignore if user is typing in an input
             const activeTag = document.activeElement?.tagName.toLowerCase();
             if (activeTag === 'input' || activeTag === 'textarea' || (document.activeElement as HTMLElement)?.isContentEditable) {
@@ -320,10 +326,7 @@ function Editor() {
                         >
 
                             {isLoading ? (
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="spinner w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                    <div className="text-text-main text-sm">{loadingStatus}</div>
-                                </div>
+                                <LoadingLogo text={loadingStatus} />
                             ) : hasActiveProject ? (
                                 <div
                                     id="canvas-rendered-wrapper"
@@ -344,6 +347,7 @@ function Editor() {
 
             <ConflictModal />
             <SyncFailedModal onRetry={() => { saveProject(); }} />
+            <NavDrawer />
         </div>
     );
 }

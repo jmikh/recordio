@@ -21,13 +21,28 @@
  * 2026-07-22; an older completed row now legally coexists with a newer
  * one until the daily purge, and cloud_version DESC picks the newest.)
  *
+ * Captions: a completed video also carries the project's caption
+ * segments as output-time transcript lines (services/projectCaptions.ts)
+ * so the page can render a clickable transcript. They come from the
+ * LIVE project_data, not a per-render snapshot (none exists) — edits
+ * made after publishing can drift from the rendered video until it is
+ * re-published. Only the two timeline paths are read, never the whole
+ * jsonb (userEvents can be megabytes).
+ *
+ * canEdit: a signed-in viewer with edit access (services/projectAccess
+ * getProjectIfEditor — owner, edit grant, or workspace-edit share) gets
+ * canEdit: true so the page can offer the editor. Independent of the Mux
+ * status: a pending or failed publish is still editable.
+ *
  * Request:  { slug }
- * Response: { name, userName, status?, muxPlaybackId? }
+ * Response: { name, userName, status?, muxPlaybackId?, captions?, canEdit? }
  *           | 403 { error: 'auth_required' } | 404 { error: 'not_found' }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
-import { canViewProject } from '../services/projectAccess.js';
+import { SharedVideoGetRequestSchema, SharedVideoGetResponseSchema } from '@shared/api/projects';
+import { canViewProject, getProjectIfEditor } from '../services/projectAccess.js';
+import { getOutputCaptions, type ProjectTimelineShape } from '../services/projectCaptions.js';
 
 /** VideoPage polls every 5s (12/min); 60/min per IP leaves headroom without inviting scraping. */
 const RATE_LIMIT_PER_MINUTE = 60;
@@ -37,6 +52,7 @@ interface ProjectRow {
     name: string;
     owner_id: string;
     share_policy: string;
+    timeline: ProjectTimelineShape | null;
 }
 
 interface MuxVideoRow {
@@ -53,22 +69,9 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 rateLimit: { max: RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' },
             },
             schema: {
-                body: Type.Object({
-                    slug: Type.String({ minLength: 1 }),
-                }),
+                body: SharedVideoGetRequestSchema,
                 response: {
-                    200: Type.Object({
-                        name: Type.String(),
-                        userName: Type.String(),
-                        status: Type.Optional(
-                            Type.Union([
-                                Type.Literal('completed'),
-                                Type.Literal('pending'),
-                                Type.Literal('failed'),
-                            ]),
-                        ),
-                        muxPlaybackId: Type.Optional(Type.String()),
-                    }),
+                    200: SharedVideoGetResponseSchema,
                     403: Type.Object({ error: Type.String() }),
                     404: Type.Object({ error: Type.String() }),
                 },
@@ -79,7 +82,11 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
             req.logCtx.set({ 'project.slug': slug });
 
             const { rows: projectRows } = await app.deps.db.query(
-                `SELECT id, name, owner_id, share_policy
+                `SELECT id, name, owner_id, share_policy,
+                        jsonb_build_object(
+                            'captionSegments', project_data #> '{timeline,captionSegments}',
+                            'outputWindows', project_data #> '{timeline,outputWindows}'
+                        ) AS timeline
                  FROM projects
                  WHERE slug = $1 AND deleted_at IS NULL
                  LIMIT 1`,
@@ -105,7 +112,7 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
             // Edge-function parity: any owner-lookup failure degrades to
             // 'Unknown' rather than erroring — but surface it in the
             // canonical event so a broken adapter doesn't hide silently.
-            const [owner, { rows: muxRows }] = await Promise.all([
+            const [owner, { rows: muxRows }, editorAccess] = await Promise.all([
                 app.deps.supabaseApi.getUserById(project.owner_id).catch(() => {
                     req.logCtx.set({ error_type: 'SupabaseApiUnavailable' });
                     return null;
@@ -119,11 +126,18 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                      ORDER BY status, cloud_version DESC`,
                     [project.id],
                 ),
+                // Anonymous viewers skip the query entirely
+                req.user ? getProjectIfEditor(app.deps.db, project.id, req.user.id) : null,
             ]);
 
             const meta = owner?.userMetadata ?? {};
             const userName = String(meta.full_name ?? meta.name ?? owner?.email ?? 'Unknown');
-            const base = { name: project.name, userName };
+            const base = {
+                name: project.name,
+                userName,
+                // Key omitted (not false) for viewers without edit access
+                ...(editorAccess && { canEdit: true as const }),
+            };
 
             const byStatus = new Map(
                 (muxRows as MuxVideoRow[]).map((row) => [row.status, row]),
@@ -134,10 +148,13 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
             const completed = byStatus.get('completed');
             if (completed?.mux_playback_id) {
                 req.logCtx.set({ 'mux.video_status': 'completed' });
+                const captions = getOutputCaptions(project.timeline);
                 return {
                     ...base,
                     status: 'completed' as const,
                     muxPlaybackId: completed.mux_playback_id,
+                    // Key omitted (not []) when there is nothing to show
+                    ...(captions.length > 0 && { captions }),
                 };
             }
             if (byStatus.has('pending')) {

@@ -6,6 +6,7 @@ import { ShareModal } from '../../share/ShareModal';
 import { useProjectMetaStore } from '../../share/useProjectMetaStore';
 import { ProjectCard } from './ProjectCard';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
+import { deriveLibraryCounts } from './libraryCounts';
 import { ScreenshotsView } from './ScreenshotsView';
 import { ScreenshotService, toScreenshotMeta, type ScreenshotListItem } from '../../screenshot/screenshotService';
 import { ScreenshotStorage } from '../../screenshot/api/screenshotStorage';
@@ -47,7 +48,12 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
     const [allScreenshots, setAllScreenshots] = useState<ScreenshotListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [screenshotsLoading, setScreenshotsLoading] = useState(true);
-    const [activeView, setActiveView] = useState<DashboardView>('all');
+    // `?view=` deep-links a library view — how the pulled-out nav (NavDrawer)
+    // gets here from the editor or the watch page, which aren't routes.
+    const [activeView, setActiveView] = useState<DashboardView>(() => {
+        const view = new URLSearchParams(window.location.search).get('view');
+        return view === 'workspace' || view === 'trash' ? view : 'all';
+    });
 
     const goToView = (view: DashboardView) => {
         if (view === 'settings') {
@@ -115,8 +121,6 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         () => screenshots.filter(s => s.sharePolicy === 'workspace' || s.sharePolicy === 'public'),
         [screenshots],
     );
-    // The free screenshot cap counts the caller's own live screenshots
-    const ownedScreenshotCount = yourScreenshots.length;
     const trashScreenshots = useMemo(
         () => allScreenshots.filter(s => !!s.deletedAt && s.ownerId === userId),
         [allScreenshots, userId],
@@ -175,10 +179,12 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
             setShowSubscriptionSuccess(true);
         }
 
-        if (error || params.has('subscription-success')) {
+        if (error || params.has('subscription-success') || params.has('view')) {
             const url = new URL(window.location.href);
             url.searchParams.delete('error');
             url.searchParams.delete('subscription-success');
+            // Consumed into activeView above — don't leave it pinned in the URL
+            url.searchParams.delete('view');
             window.history.replaceState({}, '', url.pathname + url.search + url.hash);
         }
     }, []);
@@ -303,10 +309,11 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [searchedScreenshots, sortOrder, isTrash]);
 
-    // The free-plan cap counts the CALLER's projects, not the workspace's
-    const ownedProjectCount = useMemo(
-        () => projects.filter(p => p.ownerId === userId).length,
-        [projects, userId],
+    // Sidebar numbers — same derivation the pulled-out nav uses, so the two
+    // can't disagree about what Yours/Workspace/Trash mean
+    const sidebarCounts = useMemo(
+        () => deriveLibraryCounts(allProjects, allScreenshots, userId),
+        [allProjects, allScreenshots, userId],
     );
 
     // Load the full workspace list once authenticated
@@ -554,13 +561,13 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 <DashboardSidebar
                     activeView={settingsPage === 'personal' ? 'personal' : showSettings ? 'settings' : activeView}
                     onViewChange={handleViewChange}
-                    yoursCount={yourProjects.length + yourScreenshots.length}
-                    workspaceCount={workspaceProjects.length + workspaceScreenshots.length}
-                    ownedProjectCount={ownedProjectCount}
+                    yoursCount={sidebarCounts.yoursCount}
+                    workspaceCount={sidebarCounts.workspaceCount}
+                    ownedProjectCount={sidebarCounts.ownedProjectCount}
                     projectCap={entitlements.projectCap}
-                    ownedScreenshotCount={ownedScreenshotCount}
+                    ownedScreenshotCount={sidebarCounts.ownedScreenshotCount}
                     screenshotCap={entitlements.screenshotCap}
-                    trashCount={trashProjects.length + trashScreenshots.length}
+                    trashCount={sidebarCounts.trashCount}
                     onRecord={handleRecord}
                     isAuthenticated={isAuthenticated}
                     onOpenSupport={() => setIsSupportModalOpen(true)}

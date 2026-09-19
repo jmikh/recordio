@@ -1,4 +1,4 @@
-import { LuBug, LuLayoutGrid, LuPlus, LuSettings, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
+import { LuBug, LuLayoutGrid, LuPanelLeftClose, LuPlus, LuSettings, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
 import { Button, StatusBadge, LogoLink, SidebarNav, SidebarNavItem, type StatusBadgeVariant } from '@shared/components';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { UserMenu } from '../../components/UserMenu';
@@ -17,12 +17,13 @@ const PLAN_BADGE: Record<WorkspaceEntitlementsState, { label: string; variant: S
 export type DashboardView = 'all' | 'workspace' | 'trash' | 'settings' | 'personal';
 
 interface DashboardSidebarProps {
-    activeView: DashboardView;
+    /** null = none highlighted, as when the sidebar is pulled out over the editor */
+    activeView: DashboardView | null;
     onViewChange: (view: DashboardView) => void;
-    /** Videos + screenshots owned by or shared directly with the caller */
-    yoursCount: number;
+    /** Videos + screenshots owned by or shared directly with the caller; undefined hides the number */
+    yoursCount?: number;
     /** Videos + screenshots shared within the workspace or publicly */
-    workspaceCount: number;
+    workspaceCount?: number;
     /** The caller's own live projects — the set the free cap counts (Step 4) */
     ownedProjectCount: number;
     /** Server-sourced cap from entitlements; null = uncapped (trial/pro) */
@@ -30,7 +31,7 @@ interface DashboardSidebarProps {
     /** The caller's own live screenshots — the separate free screenshot cap counts these */
     ownedScreenshotCount: number;
     screenshotCap: number | null;
-    trashCount: number;
+    trashCount?: number;
     onRecord: () => void;
     isAuthenticated: boolean;
     onOpenSupport: () => void;
@@ -45,6 +46,13 @@ interface DashboardSidebarProps {
     memberCount: number | null;
     onInviteTeammates: () => void;
     onOpenBilling: () => void;
+    /**
+     * Rendered inside the pulled-out NavDrawer rather than as the dashboard's
+     * static column: always visible (no `md:` breakpoint), no right border, and
+     * a collapse control beside the logo.
+     */
+    inDrawer?: boolean;
+    onCollapse?: () => void;
 }
 
 interface NavItem {
@@ -109,6 +117,8 @@ export function DashboardSidebar({
     memberCount,
     onInviteTeammates,
     onOpenBilling,
+    inDrawer = false,
+    onCollapse,
 }: DashboardSidebarProps) {
 
     const libraryItems: NavItem[] = [
@@ -118,9 +128,13 @@ export function DashboardSidebar({
     ];
 
     return (
-        <aside className="w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col">
+        <aside
+            className={inDrawer
+                ? 'w-60 shrink-0 h-full bg-surface flex flex-col'
+                : 'w-60 shrink-0 border-r border-border bg-surface hidden md:flex flex-col'}
+        >
             {/* Logo */}
-            <div className="px-3 pt-3">
+            <div className="px-3 pt-3 flex items-center justify-between gap-2">
                 <Button
                     variant="ghost"
                     onClick={() => onViewChange('all')}
@@ -129,6 +143,15 @@ export function DashboardSidebar({
                 >
                     <LogoLink imgClassName="h-6" />
                 </Button>
+                {onCollapse && (
+                    <Button
+                        variant="ghost"
+                        icon={LuPanelLeftClose}
+                        onClick={onCollapse}
+                        aria-label="Close navigation"
+                        title="Close navigation"
+                    />
+                )}
             </div>
 
             {/* Workspace card */}

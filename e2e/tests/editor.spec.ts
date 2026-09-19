@@ -49,3 +49,50 @@ test('dashboard lists the seeded project and opens it', async ({ page }) => {
     await expect(page).toHaveURL(/\/video\/[^/]+\/edit/);
     await expect(page.locator('#project-name-input')).toHaveValue(seeded.name, { timeout: 20_000 });
 });
+
+test('nav drawer pulls the main sidebar out over the editor and pauses playback', async ({ page }) => {
+    await page.goto(`/editor?projectId=${seeded.projectId}`);
+    await expect(page.locator('#project-name-input')).toHaveValue(seeded.name, { timeout: 20_000 });
+    await expect(page.locator('canvas').first()).toBeVisible();
+
+    const elapsed = page.locator('.tabular-nums').first();
+
+    // Start playback, then pull the nav out over it
+    await page.locator('#video-player-container').click();
+    await page.keyboard.press('Space');
+    await expect(elapsed).not.toHaveText('0:00.0');
+
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Main navigation' });
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole('button', { name: 'New Recording' })).toBeVisible();
+
+    // Playback stopped, and Space doesn't restart it behind the backdrop
+    await page.waitForTimeout(300);
+    const stoppedAt = await elapsed.innerText();
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(600);
+    await expect(elapsed).toHaveText(stoppedAt);
+
+    // The editor behind is dimmed — the backdrop takes the clicks
+    expect(await page.evaluate(() => {
+        const el = document.elementFromPoint(window.innerWidth - 100, window.innerHeight / 2);
+        return el?.className?.toString() ?? '';
+    })).toContain('bg-black/60');
+
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden();
+});
+
+test('nav drawer deep-links a dashboard view', async ({ page }) => {
+    await page.goto(`/editor?projectId=${seeded.projectId}`);
+    await expect(page.locator('#project-name-input')).toHaveValue(seeded.name, { timeout: 20_000 });
+
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('dialog', { name: 'Main navigation' })
+        .getByRole('button', { name: /^Trash/ }).click();
+
+    // Lands on the dashboard with Trash selected, and ?view= is cleaned off
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('button', { name: /^Trash/ })).toHaveAttribute('aria-current', 'true');
+});

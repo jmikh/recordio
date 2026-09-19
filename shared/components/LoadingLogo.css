@@ -1,0 +1,71 @@
+/* LoadingLogo: the Recordio mark with a reflection sweeping across it, over a
+   scrim that dims whatever is behind. Sizing/colour stay in the component;
+   only the sweep — which needs a mask and keyframes — lives here. */
+
+.loading-logo-mark {
+   position: relative;
+}
+
+/* The sweep is clipped to the logo silhouette so the highlight rides the mark
+   itself rather than its bounding box. */
+.loading-logo-shine {
+   position: absolute;
+   inset: 0;
+   overflow: hidden;
+   mask-image: url('../assets/logo.svg');
+   mask-size: contain;
+   mask-repeat: no-repeat;
+   mask-position: center;
+   -webkit-mask-image: url('../assets/logo.svg');
+   -webkit-mask-size: contain;
+   -webkit-mask-repeat: no-repeat;
+   -webkit-mask-position: center;
+}
+
+.loading-logo-shine::before {
+   content: '';
+   position: absolute;
+   top: -25%;
+   bottom: -25%;
+   left: 0;
+   width: 40%;
+   background: linear-gradient(90deg,
+         transparent 0%,
+         oklch(100% 0 0 / 75%) 50%,
+         transparent 100%);
+   animation: loadingLogoShine 1.8s ease-in-out infinite;
+}
+
+@keyframes loadingLogoShine {
+   from {
+      transform: translateX(-140%) skewX(-16deg);
+   }
+
+   to {
+      transform: translateX(340%) skewX(-16deg);
+   }
+}
+
+/* No travelling highlight for reduced motion — the mark breathes instead. */
+@media (prefers-reduced-motion: reduce) {
+   .loading-logo-shine::before {
+      animation: none;
+      opacity: 0;
+   }
+
+   .loading-logo-mark {
+      animation: loadingLogoBreathe 2.4s ease-in-out infinite;
+   }
+}
+
+@keyframes loadingLogoBreathe {
+
+   0%,
+   100% {
+      opacity: 1;
+   }
+
+   50% {
+      opacity: 0.55;
+   }
+}
