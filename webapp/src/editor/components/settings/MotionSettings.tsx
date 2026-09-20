@@ -14,11 +14,14 @@ import { EASING_OPTIONS } from './easingOptions';
  *
  * Editor: every change goes through applyZoomSettingsToAll /
  * applySpotlightSettingsToAll, so it updates the project defaults AND every
- * existing segment in one undo step. Regenerate / Delete All live here too.
- * A single segment is edited from its inspector (click it on the timeline).
+ * existing segment in one undo step — there is no per-segment editing.
+ * Clicking a zoom or spotlight on the timeline opens this tab on its card;
+ * the only thing the selection drives is Delete Selected, which is disabled
+ * while nothing is selected. Regenerate / Delete All live here too.
  *
  * Personal Settings (template mode): the same controls edit the defaults,
- * plus the Auto-zoom / Auto-spotlight toggles (first-open generation only —
+ * plus Max zoom / Enlarge (they only take effect when segments are generated)
+ * and the Auto-zoom / Auto-spotlight toggles (first-open generation only —
  * the timeline tracks are never disabled by a default) and Preview buttons.
  */
 export const MotionSettings = () => {
@@ -27,13 +30,17 @@ export const MotionSettings = () => {
     const templateMode = useProjectStore(s => s.templateMode);
     const updateSettings = useProjectStore(s => s.updateSettings);
     const applyZoomSettingsToAll = useProjectStore(s => s.applyZoomSettingsToAll);
+    const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const applySpotlightSettingsToAll = useProjectStore(s => s.applySpotlightSettingsToAll);
+    const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
     const resetZooms = useProjectStore(s => s.resetZooms);
     const clearZoomSegments = useProjectStore(s => s.clearZoomSegments);
     const resetSpotlights = useProjectStore(s => s.resetSpotlights);
     const clearSpotlights = useProjectStore(s => s.clearSpotlights);
-    const zoomCount = useProjectStore(s => s.project.timeline.zoomSegments.length);
-    const spotlightCount = useProjectStore(s => s.project.timeline.spotlightSegments.length);
+    const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
+    const zoomCount = zoomSegments.length;
+    const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
+    const spotlightCount = spotlightSegments.length;
     const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
     const hasHoveredCards = useProjectStore(s => (s.userEvents.hoveredCards || []).length > 0);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
@@ -52,6 +59,30 @@ export const MotionSettings = () => {
     const showCollapsibleSpotlight = useUIStore(s => s.showCollapsibleSpotlight);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
+    /**
+     * The segment picked on the timeline. The look controls ignore it — they
+     * always apply to all — so it only decides whether Delete Selected is live.
+     */
+    const selectedZoomId = useUIStore(s => s.selectedZoomId);
+    const selectZoom = useUIStore(s => s.selectZoom);
+    const selectedZoomExists = !!selectedZoomId && zoomSegments.some(z => z.id === selectedZoomId);
+
+    const handleDeleteSelectedZoom = () => {
+        if (!selectedZoomId) return;
+        deleteZoomSegment(selectedZoomId);
+        selectZoom(null);
+    };
+
+    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    const selectSpotlight = useUIStore(s => s.selectSpotlight);
+    const selectedSpotlightExists = !!selectedSpotlightId && spotlightSegments.some(s => s.id === selectedSpotlightId);
+
+    const handleDeleteSelectedSpotlight = () => {
+        if (!selectedSpotlightId) return;
+        deleteSpotlight(selectedSpotlightId);
+        selectSpotlight(null);
+    };
+
     const autoZoom = zoom.autoGenerate ?? true;
     const autoSpotlight = spotlight.autoGenerate ?? true;
 
@@ -63,7 +94,7 @@ export const MotionSettings = () => {
                 icon={<LuZoomIn className="icon-md" />}
                 previewItems={[
                     ...(templateMode ? [{ type: 'text' as const, content: autoZoom ? 'Auto' : 'Manual' }] : []),
-                    { type: 'text', content: `${zoom.maxZoom.toFixed(1)}×` },
+                    ...(templateMode ? [{ type: 'text' as const, content: `${zoom.maxZoom.toFixed(1)}×` }] : []),
                     { type: 'text', content: `${zoom.transitionDurationMs}ms` },
                 ]}
                 isExpanded={showCollapsibleZoom}
@@ -80,21 +111,22 @@ export const MotionSettings = () => {
                             <PreviewEffectButton kind="zoom" label="Preview auto-zoom" />
                         </Toggle>
                     )}
-                    <Slider
-                        label="Max zoom"
-                        min={1.2}
-                        max={3}
-                        value={zoom.maxZoom}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(maxZoom) => batchAction(() => updateSettings({ zoom: { ...zoom, maxZoom } }))}
-                        showTooltip
-                        units="×"
-                        decimals={1}
-                        labelSuffix={!templateMode && (
-                            <InfoTooltip description="Max zoom applies when zooms are regenerated." />
-                        )}
-                    />
+                    {/* Max zoom only shapes zooms as they are generated, so it
+                        stays on the defaults page and is not offered per zoom. */}
+                    {templateMode && (
+                        <Slider
+                            label="Max zoom"
+                            min={1.2}
+                            max={3}
+                            value={zoom.maxZoom}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(maxZoom) => batchAction(() => updateSettings({ zoom: { ...zoom, maxZoom } }))}
+                            showTooltip
+                            units="×"
+                            decimals={1}
+                        />
+                    )}
                     <Slider
                         label="Transition"
                         min={250}
@@ -122,17 +154,27 @@ export const MotionSettings = () => {
                         <div className="flex flex-col gap-2 pt-1">
                             {hasTrackableContent && (
                                 <Button variant="primary" fullWidth onClick={handleRegenerateZooms}>
-                                    <span>Regenerate Auto Zooms</span>
+                                    <span>Auto Apply</span>
                                 </Button>
                             )}
-                            <Button
-                                fullWidth
-                                onClick={() => clearZoomSegments()}
-                                disabled={zoomCount === 0}
-                                className="text-danger hover:text-danger"
-                            >
-                                <span>Delete All Zooms</span>
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    fullWidth
+                                    onClick={handleDeleteSelectedZoom}
+                                    disabled={!selectedZoomExists}
+                                    className="text-danger hover:text-danger"
+                                >
+                                    <span>Delete Selected</span>
+                                </Button>
+                                <Button
+                                    fullWidth
+                                    onClick={() => clearZoomSegments()}
+                                    disabled={zoomCount === 0}
+                                    className="text-danger hover:text-danger"
+                                >
+                                    <span>Delete All</span>
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -162,18 +204,21 @@ export const MotionSettings = () => {
                             <PreviewEffectButton kind="spotlight" label="Preview spotlight" />
                         </Toggle>
                     )}
-                    <Slider
-                        label="Enlarge"
-                        min={1.1}
-                        max={2}
-                        value={spotlight.enlargeScale}
-                        onPointerDown={startInteraction}
-                        onPointerUp={endInteraction}
-                        onChange={(enlargeScale) => batchAction(() => applySpotlightSettingsToAll({ enlargeScale }))}
-                        showTooltip
-                        units="×"
-                        decimals={2}
-                    />
+                    {/* Enlarge is only offered as a default, like Max zoom. */}
+                    {templateMode && (
+                        <Slider
+                            label="Enlarge"
+                            min={1.1}
+                            max={2}
+                            value={spotlight.enlargeScale}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(enlargeScale) => batchAction(() => applySpotlightSettingsToAll({ enlargeScale }))}
+                            showTooltip
+                            units="×"
+                            decimals={2}
+                        />
+                    )}
                     <Slider
                         label="Dim"
                         min={0.1}
@@ -220,18 +265,28 @@ export const MotionSettings = () => {
                                         onClick={() => resetSpotlights()}
                                         disabled={!hasHoveredCards}
                                     >
-                                        <span>Regenerate Auto Spotlights</span>
+                                        <span>Auto Apply</span>
                                     </Button>
                                 </Tooltip>
                             )}
-                            <Button
-                                fullWidth
-                                onClick={() => clearSpotlights()}
-                                disabled={spotlightCount === 0}
-                                className="text-danger hover:text-danger"
-                            >
-                                <span>Delete All Spotlights</span>
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    fullWidth
+                                    onClick={handleDeleteSelectedSpotlight}
+                                    disabled={!selectedSpotlightExists}
+                                    className="text-danger hover:text-danger"
+                                >
+                                    <span>Delete Selected</span>
+                                </Button>
+                                <Button
+                                    fullWidth
+                                    onClick={() => clearSpotlights()}
+                                    disabled={spotlightCount === 0}
+                                    className="text-danger hover:text-danger"
+                                >
+                                    <span>Delete All</span>
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>

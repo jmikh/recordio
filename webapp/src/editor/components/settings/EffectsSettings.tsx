@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
+import { useProjectStore, useUserEvents } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
@@ -66,6 +66,15 @@ export const EffectsSettings = () => {
     // Personal Settings defaults template: no timeline, so effects get a Preview button
     const templateMode = useProjectStore(s => s.templateMode);
 
+    // Effects that have nothing to draw in this recording are shown off and locked.
+    // The defaults template carries no recorded events, so its controls stay live.
+    const userEvents = useUserEvents();
+    const hasClicks = templateMode || userEvents.mouseClicks.length > 0;
+    const hasHotkeys = templateMode || userEvents.keyboardEvents.length > 0;
+    const soundOn = mouseSettings.soundEnabled && hasClicks;
+    const clickEffectOn = mouseSettings.mouseClickEnabled && hasClicks;
+    const hotkeysOn = (keyboardSettings.showHotkeys ?? true) && hasHotkeys;
+
     // Collapsible visibility state
     const showCollapsibleEffects = useUIStore(s => s.showCollapsibleEffects);
     const showCollapsibleMouse = useUIStore(s => s.showCollapsibleMouse);
@@ -97,16 +106,22 @@ export const EffectsSettings = () => {
                         )
                     },
                     { type: 'text', content: mouseSettings.effectType === 'ring' ? 'Ring' : 'Circle' },
-                    ...(mouseSettings.soundEnabled ? [{ type: 'text' as const, content: 'Sound' }] : []),
+                    ...(soundOn ? [{ type: 'text' as const, content: 'Sound' }] : []),
                 ]}
                 isExpanded={showCollapsibleMouse}
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleMouse', v)}
             >
                 <div className="flex flex-col gap-4">
+                    {/* No clicks recorded — both mouse effects have nothing to draw */}
+                    {!hasClicks && (
+                        <p className="text-label">No clicks detected in this recording</p>
+                    )}
+
                     {/* Sound Toggle + Preview */}
                     <Toggle
                         label="Sound"
-                        value={mouseSettings.soundEnabled}
+                        value={soundOn}
+                        disabled={!hasClicks}
                         onChange={(val) => handleMouseChange({ soundEnabled: val })}
                     >
                         <button
@@ -119,7 +134,7 @@ export const EffectsSettings = () => {
                     </Toggle>
 
                     {/* Volume (visible when sound enabled) */}
-                    {mouseSettings.soundEnabled && (
+                    {soundOn && (
                         <div className="pl-1">
                             <Slider
                                 label="Volume"
@@ -140,16 +155,17 @@ export const EffectsSettings = () => {
                     {/* Click Effect Toggle (+ Preview on the defaults page) */}
                     <Toggle
                         label="Click Effect"
-                        value={mouseSettings.mouseClickEnabled}
+                        value={clickEffectOn}
+                        disabled={!hasClicks}
                         onChange={(val) => handleMouseChange({ mouseClickEnabled: val })}
                     >
                         {templateMode && (
-                            <PreviewEffectButton kind="click" label="Preview click effect" disabled={!mouseSettings.mouseClickEnabled} />
+                            <PreviewEffectButton kind="click" label="Preview click effect" disabled={!clickEffectOn} />
                         )}
                     </Toggle>
 
                     {/* Effect Sub-Settings (visible when the click effect is enabled) */}
-                    {mouseSettings.mouseClickEnabled && (
+                    {clickEffectOn && (
                         <div className="flex flex-col gap-4 pl-1">
                             {/* Effect Type */}
                             <MultiToggle
@@ -192,8 +208,8 @@ export const EffectsSettings = () => {
                 title="Keyboard"
                 icon={<LuCommand className="icon-md" />}
                 previewItems={[
-                    { type: 'text', content: (keyboardSettings.showHotkeys ?? true) ? 'On' : 'Off' },
-                    ...((keyboardSettings.showHotkeys ?? true) ? [
+                    { type: 'text', content: hotkeysOn ? 'On' : 'Off' },
+                    ...(hotkeysOn ? [
                         { type: 'text' as const, content: (keyboardSettings.hotkeysPlacement ?? 'top') === 'top' ? 'Top' : 'Bottom' },
                         { type: 'text' as const, content: `${(keyboardSettings.hotkeysSize ?? 1.0).toFixed(1)}×` },
                     ] : []),
@@ -202,22 +218,29 @@ export const EffectsSettings = () => {
                 onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleEffects', v)}
             >
                 <div className="flex flex-col gap-4">
+                    {/* No keystrokes recorded — the hotkey overlay has nothing to draw */}
+                    {!hasHotkeys && (
+                        <p className="text-label">No hotkeys detected in this recording</p>
+                    )}
+
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                            <label className="text-label">Hotkeys Enabled</label>
+                            <label className="text-label">Display Hotkeys</label>
                             <HotkeyTooltip />
                             {templateMode && (
-                                <PreviewEffectButton kind="keyboard" label="Preview keyboard hotkeys" disabled={!(keyboardSettings.showHotkeys ?? true)} />
+                                <PreviewEffectButton kind="keyboard" label="Preview keyboard hotkeys" disabled={!hotkeysOn} />
                             )}
                         </div>
                         <Toggle
-                            value={keyboardSettings.showHotkeys ?? true}
+                            value={hotkeysOn}
+                            disabled={!hasHotkeys}
                             onChange={(val) => handleKeyboardChange({ showHotkeys: val })}
+                            aria-label="Display Hotkeys"
                         />
                     </div>
 
                     {/* Sub-settings (visible when hotkeys enabled) */}
-                    {(keyboardSettings.showHotkeys ?? true) && (
+                    {hotkeysOn && (
                         <div className="pl-1 flex flex-col gap-4">
                             <MultiToggle
                                 options={PLACEMENT_OPTIONS}

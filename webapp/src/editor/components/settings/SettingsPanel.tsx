@@ -17,8 +17,6 @@ import { useSyncStatusStore } from '../../../storage/syncStatusStore';
 import { navigate } from '../../../lib/navigate';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
-import { SpotlightInspector } from './SpotlightInspector';
-import { ZoomInspector } from './ZoomInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
 import { OverlayInspector } from './OverlayInspector';
 import { LuChevronRight, LuPanelLeftOpen } from 'react-icons/lu';
@@ -92,20 +90,17 @@ export const SettingsPanel = () => {
     }, [hasCameraSource, hasMicrophone]);
 
     // Check if any timeline item is selected
-    const selectedZoomId = useUIStore(s => s.selectedZoomId);
-    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
     const selectedOverlaySegmentId = useUIStore(s => s.selectedOverlaySegmentId);
-    const hasSelection = !!(selectedZoomId || selectedSpotlightId || selectedWindowId || selectedCameraMoveId || selectedOverlaySegmentId);
+    // A selected zoom or spotlight is edited inside the Motion tab (its card,
+    // badged "1 selected") rather than in an inspector that replaces the panel,
+    // so neither counts as a panel-replacing selection here.
+    const hasSelection = !!(selectedWindowId || selectedCameraMoveId || selectedOverlaySegmentId);
 
-    const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
-    const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
     const cameraMoveSegments = useProjectStore(s => s.project.timeline.cameraMoveSegments);
 
-    const selectedZoom = selectedZoomId ? zoomSegments.find(z => z.id === selectedZoomId) : null;
-    const selectedSpotlight = selectedSpotlightId ? spotlightSegments.find(s => s.id === selectedSpotlightId) : null;
     const selectedWindow = selectedWindowId ? outputWindows.find(w => w.id === selectedWindowId) : null;
     const selectedCameraMove = selectedCameraMoveId ? (cameraMoveSegments || []).find(s => s.id === selectedCameraMoveId) : null;
 
@@ -196,8 +191,6 @@ export const SettingsPanel = () => {
                 >
                     {hasSelection ? (
                         <>
-                            {selectedZoom && <ZoomInspector segment={selectedZoom} />}
-                            {selectedSpotlight && <SpotlightInspector segment={selectedSpotlight} />}
                             {selectedWindow && <ClipInspector window={selectedWindow} />}
                             {selectedCameraMove && <CameraMoveInspector segment={selectedCameraMove} />}
                             {selectedOverlaySegment && <OverlayInspector block={selectedOverlaySegment} />}

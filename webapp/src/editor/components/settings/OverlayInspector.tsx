@@ -84,6 +84,14 @@ export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block })
                             </Button>
                         ))}
                     </div>
+                    <div className="flex gap-2 pt-1">
+                        <Button fullWidth onClick={handleDelete} className="text-danger hover:text-danger">
+                            <span>Delete Selected</span>
+                        </Button>
+                        <Button fullWidth onClick={handleDeleteAll} className="text-danger hover:text-danger">
+                            <span>Delete All</span>
+                        </Button>
+                    </div>
                 </div>
             </CollapsibleCard>
 
@@ -104,16 +112,6 @@ export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block })
                     batchAction={batchAction}
                 />
             </CollapsibleCard>
-
-            {/* Delete */}
-            <div className="flex items-center gap-2 px-1">
-                <Button onClick={handleDelete} className="flex-1 text-danger hover:text-danger">
-                    <span>Delete Block</span>
-                </Button>
-                <Button onClick={handleDeleteAll} className="flex-1 text-danger hover:text-danger">
-                    <span>Delete All</span>
-                </Button>
-            </div>
         </div>
     );
 };

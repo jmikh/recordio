@@ -188,10 +188,15 @@ export const useUIStore = create<UIState>((set, get) => ({
         }
         set((state) => {
             if (selectedZoomId) {
+                // The zoom is edited in the Motion tab's Zoom card (badged
+                // "1 selected"), so open and expand it rather than swapping
+                // the panel for a separate inspector.
                 return {
                     selectedZoomId,
                     canvasMode: CanvasMode.ZoomEdit,
                     isPlaying: false,
+                    settingsPanelActiveTab: 'motion' as SettingsPanelTab,
+                    showCollapsibleZoom: true,
                 };
             }
             return { selectedZoomId: null, canvasMode: CanvasMode.Preview, };
@@ -209,10 +214,14 @@ export const useUIStore = create<UIState>((set, get) => ({
         }
         set((state) => {
             if (selectedSpotlightId) {
+                // Edited in the Motion tab's Spotlight card (badged
+                // "1 selected"), same as a selected zoom.
                 return {
                     selectedSpotlightId,
                     canvasMode: CanvasMode.SpotlightEdit,
                     isPlaying: false,
+                    settingsPanelActiveTab: 'motion' as SettingsPanelTab,
+                    showCollapsibleSpotlight: true,
                 };
             }
             return { selectedSpotlightId: null, canvasMode: CanvasMode.Preview };
