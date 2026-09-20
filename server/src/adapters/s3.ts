@@ -7,6 +7,7 @@
  * path-style addressing against an S3-compatible endpoint.
  */
 import {
+    CopyObjectCommand,
     DeleteObjectsCommand,
     GetObjectCommand,
     ListObjectsV2Command,
@@ -53,6 +54,16 @@ export function createS3Adapter(config: S3AdapterConfig): S3Port {
         async getObject(key) {
             const res = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
             return new Uint8Array(await res.Body!.transformToByteArray());
+        },
+        async copyObject(sourceKey, destKey) {
+            await client.send(
+                new CopyObjectCommand({
+                    Bucket: BUCKET,
+                    // CopySource is bucket-qualified and URI-encoded
+                    CopySource: `${BUCKET}/${sourceKey}`.split('/').map(encodeURIComponent).join('/'),
+                    Key: destKey,
+                }),
+            );
         },
         async listObjects(prefix) {
             const keys: string[] = [];

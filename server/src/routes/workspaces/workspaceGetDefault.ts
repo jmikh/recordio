@@ -14,6 +14,7 @@
  * Response: { id, name, owner_id, role, seats, created_at, updated_at }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import { resolveDefaultWorkspaceId } from '../../services/defaultWorkspace.js';
 
 export const workspaceGetDefaultRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -25,37 +26,10 @@ export const workspaceGetDefaultRoutes: FastifyPluginAsyncTypebox = async (app) 
             const userId = req.user!.id;
             const db = app.deps.db;
 
-            // 1. Stored default if still owned or a live membership
-            // (owner has no workspace_members row — owner is its own state)
-            const { rows: storedRows } = await db.query(
-                `SELECT w.id
-                 FROM user_profiles up
-                 JOIN workspaces w ON w.id = up.default_workspace_id
-                 WHERE up.user_id = $1
-                   AND w.deleted_at IS NULL
-                   AND (
-                       w.owner_id = $1
-                       OR EXISTS (
-                           SELECT 1 FROM workspace_members wm
-                           WHERE wm.workspace_id = w.id AND wm.user_id = $1
-                       )
-                   )`,
-                [userId],
-            );
-            let workspaceId = (storedRows[0] as { id: string } | undefined)?.id ?? null;
-
-            // 2. Oldest owned live workspace
-            if (!workspaceId) {
-                const { rows } = await db.query(
-                    `SELECT w.id
-                     FROM workspaces w
-                     WHERE w.owner_id = $1 AND w.deleted_at IS NULL
-                     ORDER BY w.created_at ASC
-                     LIMIT 1`,
-                    [userId],
-                );
-                workspaceId = (rows[0] as { id: string } | undefined)?.id ?? null;
-            }
+            // 1. Stored default if still owned or a live membership,
+            //    2. else the oldest owned live workspace (shared with
+            //    /project-clone, which resolves this for another user)
+            const workspaceId = await resolveDefaultWorkspaceId(db, userId);
 
             if (!workspaceId) {
                 req.log.error({ 'user.id': userId }, 'user owns no workspace — signup bootstrap invariant violated');

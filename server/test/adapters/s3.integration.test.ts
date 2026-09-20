@@ -56,6 +56,14 @@ describe.runIf(hasEnv)('S3 adapter (real endpoint)', () => {
         expect(res.ok).toBe(true);
     });
 
+    it('copyObject duplicates the object server-side', async () => {
+        const dest = `_adapter-test/${randomUUID()}/copy.txt`;
+        await s3.putObject(key, body, 'text/plain');
+        await s3.copyObject(key, dest);
+        expect(await s3.getObject(dest)).toEqual(body);
+        await s3.deleteObjects([dest]);
+    });
+
     it('listObjects is recursive under the prefix; deleteObjects removes in batch', async () => {
         const prefix = `_adapter-test/${randomUUID()}/`;
         await s3.putObject(`${prefix}top.txt`, body, 'text/plain');

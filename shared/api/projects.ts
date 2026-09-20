@@ -126,6 +126,27 @@ export interface ProjectListResponse {
     projects: CloudProjectSummary[];
 }
 
+// ── POST /project-clone ──────────────────────────────────────────
+
+/**
+ * Clone resolves by id OR slug, exactly like project-get (the caller is
+ * the impersonation toolbar, which only has the URL's slug).
+ */
+export const ProjectCloneRequestSchema = Type.Object({
+    projectId: Type.Optional(Type.String({ minLength: 1 })),
+    slug: Type.Optional(Type.String({ minLength: 1 })),
+});
+export type ProjectCloneRequest = Static<typeof ProjectCloneRequestSchema>;
+
+/** The new project — owned by the ADMIN behind the impersonation, in their default workspace. */
+export const ProjectCloneResponseSchema = Type.Object({
+    projectId: Type.String(),
+    slug: Type.String(),
+    workspaceId: Type.String(),
+    name: Type.String(),
+});
+export type ProjectCloneResponse = Static<typeof ProjectCloneResponseSchema>;
+
 // ── POST /project-update ─────────────────────────────────────────
 
 // Omittable ints are Optional, NEVER Union([Integer, Null]): Ajv's

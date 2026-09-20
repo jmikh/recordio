@@ -36,6 +36,7 @@ import { projectEditorRemoveRoutes } from './routes/projects/projectEditorRemove
 import { projectDeleteRoutes } from './routes/projects/projectDelete.js';
 import { projectRestoreRoutes } from './routes/projects/projectRestore.js';
 import { projectConfirmUploadRoutes } from './routes/projects/projectConfirmUpload.js';
+import { projectCloneRoutes } from './routes/projects/projectClone.js';
 import { renderJobGetStatusRoutes } from './routes/renderJobGetStatus.js';
 import { workspaceGetRoutes } from './routes/workspaces/workspaceGet.js';
 import { workspaceListRoutes } from './routes/workspaces/workspaceList.js';
@@ -264,6 +265,9 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
         adminEmails: opts.adminEmails,
         supabaseJwtSecret: opts.supabaseJwtSecret,
     });
+    // Admin-only today (the impersonation toolbar's Clone button), which
+    // is why it takes the same allowlist — see the route's header
+    app.register(projectCloneRoutes, { adminEmails: opts.adminEmails });
 
     app.get('/health', {
         schema: {

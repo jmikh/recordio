@@ -32,6 +32,12 @@ export function createFakeS3(): FakeS3 {
             if (!obj) throw new Error(`FakeS3: no such object ${key}`);
             return obj.body;
         },
+        async copyObject(sourceKey, destKey) {
+            const obj = fake.objects.get(sourceKey);
+            // Parity with S3: copying a missing key is an error, not a no-op
+            if (!obj) throw new Error(`FakeS3: no such object ${sourceKey}`);
+            fake.objects.set(destKey, { ...obj });
+        },
         async listObjects(prefix) {
             return [...fake.objects.keys()].filter((k) => k.startsWith(prefix));
         },

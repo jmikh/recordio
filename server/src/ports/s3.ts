@@ -10,6 +10,12 @@ export interface S3Port {
     presignUpload(key: string, expiresInSeconds?: number): Promise<string>;
     putObject(key: string, body: Uint8Array, contentType: string): Promise<void>;
     getObject(key: string): Promise<Uint8Array>;
+    /**
+     * Server-side copy within the bucket — the bytes never pass through
+     * this process (project media is gigabytes). Rejects if the source
+     * key does not exist.
+     */
+    copyObject(sourceKey: string, destKey: string): Promise<void>;
     /** All keys under the prefix, RECURSIVE (unlike Supabase Storage's one-level list) */
     listObjects(prefix: string): Promise<string[]>;
     /** Batch delete; no-op on an empty array */

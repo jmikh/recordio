@@ -50,8 +50,12 @@ export function startImpersonation(minted: AdminImpersonateResponse): void {
     window.location.href = '/';
 }
 
-/** End impersonation — the reload restores the admin's real session. */
-export function stopImpersonation(): void {
+/**
+ * End impersonation — the reload restores the admin's real session.
+ * `redirectTo` lands the admin somewhere other than /admin (the Clone
+ * button sends them straight to the copy in their own workspace).
+ */
+export function stopImpersonation(redirectTo = '/admin'): void {
     sessionStorage.removeItem(STORAGE_KEY);
-    window.location.href = '/admin';
+    window.location.href = redirectTo;
 }
