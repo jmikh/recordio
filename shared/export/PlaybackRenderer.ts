@@ -5,6 +5,7 @@ import { drawCamera } from '../painters/cameraPainter';
 import { drawKeyboardOverlay } from '../painters/keyboardPainter';
 import { drawCaptions } from '../painters/captionPainter';
 import { drawOverlays } from '../painters/overlayPainter';
+import { paintFocusAreaDebug } from '../painters/focusAreaDebugPainter';
 
 import { getViewportStateAtTime } from '../animators/zoomAnimator';
 import { getSpotlightStateAtTime } from '../animators/spotlightAnimator';
@@ -233,6 +234,19 @@ export class PlaybackRenderer {
                     outputSize
                 );
             });
+        }
+
+        // DEBUG: focus area overlay (DebugBar "Overlays" toggle). Drawn last so it
+        // sits on top and is never sampled into the spotlight snapshot.
+        if (state.showDebugOverlays && state.focusAreas?.length && viewMapper) {
+            paintFocusAreaDebug(
+                ctx,
+                state.focusAreas,
+                timeMapper.mapOutputToSourceTime(currentTimeMs),
+                effectiveViewport,
+                viewMapper,
+                outputSize
+            );
         }
     }
 }

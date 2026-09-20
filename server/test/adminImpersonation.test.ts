@@ -6,6 +6,10 @@
  * non-admins, fail-closed without an allowlist, case-insensitive match.
  * E2e tier: list content + activity ordering, minting, and the minted
  * token authenticating as the target on an existing route.
+ *
+ * Plus the read-only confinement of the minted token itself
+ * (shared/api/impersonation.ts): reads pass, writes 403, and the reads
+ * that pass leave no trace in the target's account.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { decodeJwt } from 'jose';
@@ -144,6 +148,87 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             { userId: 'no-such-user' },
         );
         expect(res.statusCode).toBe(404);
+    });
+
+    it('refuses every write on a minted token, allows the reads', async () => {
+        const target = await seedAuthUser(pool, { name: 'Read Only', keepBootstrapWorkspace: true });
+        createdUsers.push(target.id);
+        const project = await seedProject(pool, { ownerId: target.id, uploadStatus: 'ready' });
+        createdProjects.push(project.id);
+
+        const app = testApp();
+        const { token } = (await post(
+            app,
+            '/admin-impersonate',
+            await userToken({ sub: 'admin-user-id', email: ADMIN_EMAIL }),
+            { userId: target.id },
+        )).json() as { token: string };
+
+        // Reads the admin needs to look around: allowed
+        for (const route of ['/project-get', '/project-list', '/workspace-get-default']) {
+            const body = route === '/project-get'
+                ? { projectId: project.id }
+                : route === '/project-list'
+                    ? { workspaceId: (await pool.query('SELECT workspace_id FROM projects WHERE id = $1', [project.id])).rows[0].workspace_id }
+                    : {};
+            expect((await post(app, route, token, body)).statusCode, route).toBe(200);
+        }
+
+        // Every write on the target's account: refused. Bodies are
+        // schema-valid on purpose — validation runs BEFORE the preHandler
+        // gate, so an invalid one would 400 and prove nothing.
+        const writes: Array<[string, Record<string, unknown>]> = [
+            ['/project-update', { projectId: project.id, projectData: { hacked: true } }],
+            ['/project-update-name', { projectId: project.id, name: 'Renamed' }],
+            ['/project-delete', { projectId: project.id }],
+            ['/project-share', { projectId: project.id, sharePolicy: 'public' }],
+            ['/user-project-defaults-set', { schemaVersion: 1, settings: {} }],
+            ['/user-review-set', {}],
+            ['/workspace-set-default', { workspaceId: 'w' }],
+            ['/transcribe', { projectId: project.id }],
+        ];
+        for (const [route, body] of writes) {
+            const res = await post(app, route, token, body);
+            expect(res.statusCode, route).toBe(403);
+        }
+
+        // …and the project really is untouched
+        const { rows } = await pool.query(
+            'SELECT name, project_data, deleted_at FROM projects WHERE id = $1',
+            [project.id],
+        );
+        expect(rows[0].name).toBe(project.name);
+        expect(rows[0].deleted_at).toBeNull();
+        expect(rows[0].project_data).toEqual({});
+    });
+
+    it('leaves no trace: project-get does not bump last_accessed_at', async () => {
+        const target = await seedAuthUser(pool, { name: 'Untouched', keepBootstrapWorkspace: true });
+        createdUsers.push(target.id);
+        const project = await seedProject(pool, { ownerId: target.id, uploadStatus: 'ready' });
+        createdProjects.push(project.id);
+        await pool.query(
+            `UPDATE projects SET last_accessed_at = now() - interval '30 days' WHERE id = $1`,
+            [project.id],
+        );
+        const before = (await pool.query(
+            'SELECT last_accessed_at FROM projects WHERE id = $1', [project.id],
+        )).rows[0].last_accessed_at;
+
+        const app = testApp();
+        const { token } = (await post(
+            app,
+            '/admin-impersonate',
+            await userToken({ sub: 'admin-user-id', email: ADMIN_EMAIL }),
+            { userId: target.id },
+        )).json() as { token: string };
+        expect((await post(app, '/project-get', token, { projectId: project.id })).statusCode).toBe(200);
+
+        const after = (await pool.query(
+            'SELECT last_accessed_at FROM projects WHERE id = $1', [project.id],
+        )).rows[0].last_accessed_at;
+        // A real session WOULD have bumped this — the admin list orders on it
+        expect(after).toEqual(before);
     });
 
     it('mints a token that authenticates as the target', async () => {

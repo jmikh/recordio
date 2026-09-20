@@ -46,7 +46,7 @@ export const createDefaultSettings = (): ProjectSettings => ({
     zoom: {
         enabled: true,
         autoGenerate: true,
-        maxZoom: 2,
+        maxZoom: 1.8,
         transitionDurationMs: 750,
         easing: 'ease-in-out'
     },
@@ -66,9 +66,9 @@ export const createDefaultSettings = (): ProjectSettings => ({
         mouseClickEnabled: true,
         mouseDragEnabled: false,
         effectType: 'ring',
-        color: '#8b5cf6',
-        size: 1.0,
-        soundEnabled: false,
+        color: '#696969',
+        size: 0.8,
+        soundEnabled: true,
         soundVolume: 0.5,
     },
 

@@ -22,6 +22,9 @@ import { Button, Tooltip } from '@shared/components';
 import { ShareModal } from '../../../share/ShareModal';
 import { useProjectMetaStore } from '../../../share/useProjectMetaStore';
 
+/** Debug button visibility — opt in with VITE_SHOW_DEBUG=true, hidden otherwise. */
+const showDebugButton = import.meta.env.VITE_SHOW_DEBUG === 'true';
+
 export const Header = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -84,7 +87,7 @@ export const Header = () => {
                     <div className="h-4 w-[1px] bg-border"></div>
                     <SetAsDefaultsButton />
 
-                    {import.meta.env.MODE !== 'production' && (
+                    {showDebugButton && (
                         <>
                             <div className="h-4 w-[1px] bg-border mx-2"></div>
 

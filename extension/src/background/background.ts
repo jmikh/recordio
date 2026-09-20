@@ -626,12 +626,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     const sessionId = crypto.randomUUID();
                     const syncTimestamp = Date.now();
 
+                    // Re-read the tab so the recording is named after its current title
+                    // (it may have changed during the countdown). Falls back to the title
+                    // captured at query time, and finally to a generic name offscreen-side.
+                    let tabTitle: string | undefined;
+                    try {
+                        const freshTab = await chrome.tabs.get(activeTab.id);
+                        tabTitle = freshTab.title?.trim() || undefined;
+                    } catch {
+                        tabTitle = activeTab.title?.trim() || undefined;
+                    }
+
                     await ProjectStorage.clearAll();
 
                     // Send init payload to offscreen (doc was already created before countdown)
                     await chrome.runtime.sendMessage({
                         type: MSG_TYPES.BACKGROUND_OFFSCREEN_INIT,
-                        payload: { tabStreamId, hasAudio, audioDeviceId, hasVideo, videoDeviceId, sessionId, tabViewportSize, captureMaxWidth, captureMaxHeight },
+                        payload: { tabStreamId, hasAudio, audioDeviceId, hasVideo, videoDeviceId, sessionId, tabViewportSize, captureMaxWidth, captureMaxHeight, tabTitle },
                     });
 
                     await saveState({

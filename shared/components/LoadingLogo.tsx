@@ -10,8 +10,8 @@ interface LoadingLogoProps {
 
 /**
  * Full-parent loading state: the Recordio mark and a message held at a fixed
- * size in the middle of the container. A reflection loops across the mark to
- * signal work in progress.
+ * size in the middle of the container. Four quarter slices step around the
+ * mark's plate in discrete frames to signal work in progress.
  *
  * Transparent by default — the parent supplies the backdrop (e.g. the media
  * surface where the canvas will sit). It is absolutely positioned, so the
@@ -25,7 +25,12 @@ export const LoadingLogo = ({ text = 'Loading...', className }: LoadingLogoProps
     >
         <div className="loading-logo-mark w-16 h-16">
             <img src={logoSvg} alt="" className="w-full h-full" />
-            <span className="loading-logo-shine" aria-hidden="true" />
+            <span className="loading-logo-pie" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+            </span>
         </div>
         <span className="text-sm text-text-on-media">{text}</span>
     </div>

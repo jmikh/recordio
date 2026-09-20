@@ -143,7 +143,7 @@ export const MSG_TYPES = {
 
     // ── New: Background → Offscreen ─────────────────────────────────────────
     /** Background → Offscreen: initialize recording with tab stream + settings
-     *  payload: { tabStreamId, hasAudio, audioDeviceId?, hasVideo, videoDeviceId?, sessionId } */
+     *  payload: { tabStreamId, hasAudio, audioDeviceId?, hasVideo, videoDeviceId?, sessionId, tabTitle? } */
     BACKGROUND_OFFSCREEN_INIT: 'BACKGROUND_OFFSCREEN_INIT',
     /** Background → Offscreen: pause the recorder */
     BACKGROUND_OFFSCREEN_PAUSE: 'BACKGROUND_OFFSCREEN_PAUSE',

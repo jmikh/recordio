@@ -14,6 +14,7 @@ import { adaptDefaultsToSources } from '../core/projectDefaults';
 import type { ProjectSettings } from '@shared/types/settings';
 import { cloudStoragePath, hydrateMediaUrls } from './projectBlobs';
 import { dataHash } from './dataHash';
+import { getImpersonation } from '../auth/impersonation';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -565,6 +566,17 @@ export class CloudProjectService {
     static async saveProject(project: Project, userId: string): Promise<void> {
         const projectId = project.id;
 
+        // Impersonation is read-only: the editor's 2s auto-save would
+        // otherwise rewrite a stranger's project the moment an admin
+        // opened it. Dropped here rather than at the API so the sync
+        // indicator never claims to be saving something it won't. The
+        // editor says so once per session (ImpersonationReadOnlyNotice);
+        // this line is the per-save trace in devtools.
+        if (getImpersonation()) {
+            console.warn('[CloudProjectService.saveProject] dropped: impersonation is read-only', projectId);
+            return;
+        }
+
         // Hold saves while THIS project's media is still uploading — edits
         // buffer locally and flush when the upload completes. Per project:
         // the dashboard may be resuming other projects' uploads meanwhile.
@@ -753,6 +765,10 @@ export class CloudProjectService {
         // Cache locally for dashboard display
         const storagePath = `${projectId}/thumbnail.webp`;
         await BlobCache.put(storagePath, blob);
+
+        // Read-only while impersonating: the local cache above is fine
+        // (this browser only), the upload would touch the user's project
+        if (getImpersonation()) return;
 
         // Upload to cloud (non-blocking)
         CloudStorage.uploadThumbnail(projectId, blob)

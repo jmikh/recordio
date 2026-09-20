@@ -1,54 +1,85 @@
-/* LoadingLogo: the Recordio mark with a reflection sweeping across it, over a
+/* LoadingLogo: the Recordio mark with quarter slices stepping around it, over a
    scrim that dims whatever is behind. Sizing/colour stay in the component;
-   only the sweep — which needs a mask and keyframes — lives here. */
+   only the slices — which need masks and keyframes — live here. */
 
 .loading-logo-mark {
    position: relative;
 }
 
-/* The sweep is clipped to the logo silhouette so the highlight rides the mark
-   itself rather than its bounding box. */
-.loading-logo-shine {
+/* The slices are clipped to logo-plate.svg: the rounded plate with the two glyph
+   shapes punched out. Masking to logo.svg instead would clip to the whole tile
+   and wash white straight over the mark. */
+.loading-logo-pie {
    position: absolute;
    inset: 0;
-   overflow: hidden;
-   mask-image: url('../assets/logo.svg');
+   mask-image: url('../assets/logo-plate.svg');
    mask-size: contain;
    mask-repeat: no-repeat;
    mask-position: center;
-   -webkit-mask-image: url('../assets/logo.svg');
+   -webkit-mask-image: url('../assets/logo-plate.svg');
    -webkit-mask-size: contain;
    -webkit-mask-repeat: no-repeat;
    -webkit-mask-position: center;
 }
 
-.loading-logo-shine::before {
-   content: '';
+/* Each slice is a full-bleed white sheet clipped to its own quarter wedge, and
+   runs one 150ms frame behind the slice before it. Four slices share four
+   distinct opacities, so the ramp wraps exactly once and the bright quarter
+   jumps round the mark. step-end is what keeps it from reading as a shimmer. */
+.loading-logo-pie span {
    position: absolute;
-   top: -25%;
-   bottom: -25%;
-   left: 0;
-   width: 40%;
-   background: linear-gradient(90deg,
-         transparent 0%,
-         oklch(100% 0 0 / 75%) 50%,
-         transparent 100%);
-   animation: loadingLogoShine 1.8s ease-in-out infinite;
+   inset: 0;
+   background: oklch(100% 0 0);
+   mask-size: 100% 100%;
+   -webkit-mask-size: 100% 100%;
+   animation: loadingLogoPie 600ms step-end infinite;
 }
 
-@keyframes loadingLogoShine {
-   from {
-      transform: translateX(-140%) skewX(-16deg);
+.loading-logo-pie span:nth-child(1) {
+   mask-image: conic-gradient(from 0deg, #000 0 90deg, transparent 90deg);
+   -webkit-mask-image: conic-gradient(from 0deg, #000 0 90deg, transparent 90deg);
+   animation-delay: -600ms;
+}
+
+.loading-logo-pie span:nth-child(2) {
+   mask-image: conic-gradient(from 90deg, #000 0 90deg, transparent 90deg);
+   -webkit-mask-image: conic-gradient(from 90deg, #000 0 90deg, transparent 90deg);
+   animation-delay: -450ms;
+}
+
+.loading-logo-pie span:nth-child(3) {
+   mask-image: conic-gradient(from 180deg, #000 0 90deg, transparent 90deg);
+   -webkit-mask-image: conic-gradient(from 180deg, #000 0 90deg, transparent 90deg);
+   animation-delay: -300ms;
+}
+
+.loading-logo-pie span:nth-child(4) {
+   mask-image: conic-gradient(from 270deg, #000 0 90deg, transparent 90deg);
+   -webkit-mask-image: conic-gradient(from 270deg, #000 0 90deg, transparent 90deg);
+   animation-delay: -150ms;
+}
+
+@keyframes loadingLogoPie {
+   0% {
+      opacity: 0.35;
    }
 
-   to {
-      transform: translateX(340%) skewX(-16deg);
+   25% {
+      opacity: 0.233;
+   }
+
+   50% {
+      opacity: 0.117;
+   }
+
+   75% {
+      opacity: 0;
    }
 }
 
-/* No travelling highlight for reduced motion — the mark breathes instead. */
+/* No stepping slices for reduced motion — the mark breathes instead. */
 @media (prefers-reduced-motion: reduce) {
-   .loading-logo-shine::before {
+   .loading-logo-pie span {
       animation: none;
       opacity: 0;
    }

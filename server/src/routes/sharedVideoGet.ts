@@ -72,6 +72,7 @@ import {
     PUBLISH_COOLDOWN_SECONDS,
     type PublishAttemptState,
 } from '../services/sharedVideoPublish.js';
+import { isImpersonating } from '../plugins/auth.js';
 
 /** VideoPage polls every 5s (12/min); 60/min per IP leaves headroom without inviting scraping. */
 const RATE_LIMIT_PER_MINUTE = 60;
@@ -285,6 +286,14 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
             // Media never finished uploading — a render would only fail.
             // Same answer as before this route could self-heal.
             if (project.upload_status !== 'ready') {
+                return base;
+            }
+
+            // An impersonating admin is LOOKING at this page, not
+            // publishing from it: a page view must never dispatch a
+            // render against the user's account or spend their attempt
+            // budget. They see what exists today, nothing more.
+            if (isImpersonating(req)) {
                 return base;
             }
 

@@ -25,6 +25,10 @@ import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import type { BackgroundSettings, CameraSettings, Rect, SourceMetadata } from '@shared/types';
 import type { OverlayItem } from '@shared/types/overlay';
 
+/** Breathing room between the letterboxed rect and the canvas itself.
+ *  Shared with the editor's loading placeholder so the two line up. */
+export const CANVAS_INSET_PX = 8;
+
 export const CanvasContainer = () => {
     const project = useProjectData();
     const canvasMode = useUIStore(s => s.canvasMode);
@@ -412,7 +416,11 @@ export const CanvasContainer = () => {
         canvasMode === CanvasMode.OverlayEdit;
 
     return (
-        <div id="canvas-container" className={`relative w-full h-full flex items-center justify-center p-2`}>
+        <div
+            id="canvas-container"
+            className="relative w-full h-full flex items-center justify-center"
+            style={{ padding: `${CANVAS_INSET_PX}px` }}
+        >
 
             {/* ASPECT RATIO WRAPPER */}
             <div

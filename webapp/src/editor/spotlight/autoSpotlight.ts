@@ -18,7 +18,7 @@ import { TimeMapper } from '@shared/mappers/timeMapper';
 export const K_SPOTLIGHT_BUFFER_MS = 250;
 
 /** Minimum spotlight duration (ms) */
-export const K_MIN_AUTO_SPOTLIGHT_DURATION_MS = 2500;
+export const K_MIN_AUTO_SPOTLIGHT_DURATION_MS = 3500;
 
 /** Safety margin fraction for viewport bounds (2%) */
 const K_VIEWPORT_MARGIN = 0.98;

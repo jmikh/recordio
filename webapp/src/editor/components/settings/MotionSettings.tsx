@@ -83,7 +83,7 @@ export const MotionSettings = () => {
                     <Slider
                         label="Max zoom"
                         min={1.2}
-                        max={4}
+                        max={3}
                         value={zoom.maxZoom}
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}

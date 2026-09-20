@@ -92,7 +92,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             }
 
             case MSG_TYPES.BACKGROUND_OFFSCREEN_INIT: {
-                const { tabStreamId, hasAudio, audioDeviceId, hasVideo, videoDeviceId, sessionId, tabViewportSize, captureMaxWidth, captureMaxHeight } = message.payload || {};
+                const { tabStreamId, hasAudio, audioDeviceId, hasVideo, videoDeviceId, sessionId, tabViewportSize, captureMaxWidth, captureMaxHeight, tabTitle } = message.payload || {};
+
+                // Name the recording after the captured tab; fall back when the title is
+                // unavailable (e.g. chrome:// pages, or a tab that never set one).
+                const recordingName: string = (typeof tabTitle === 'string' && tabTitle.trim()) || 'Tab Recording';
 
                 try {
                     // Convert the tabCapture stream ID into a live MediaStream.
@@ -135,7 +139,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                         audioDeviceId: audioDeviceId || undefined,
                         videoDeviceId: videoDeviceId || undefined,
                         displayStream: tabStream,
-                        sourceName: 'Tab Recording',
+                        sourceName: recordingName,
                         tabViewportSize: tabViewportSize || undefined,
                         isTabCapture: true,
                         warmCameraStream: preWarmedCamera || undefined,
@@ -147,7 +151,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
                     await recorder.prepare(config);
 
-                    await recorder.start('Tab Recording');
+                    await recorder.start(recordingName);
 
                     sendResponse({ success: true });
                 } catch (err: any) {

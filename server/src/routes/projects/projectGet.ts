@@ -14,6 +14,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ProjectGetRequestSchema } from '@shared/api/projects';
 import { canEditProject } from '../../services/projectAccess.js';
+import { isImpersonating } from '../../plugins/auth.js';
 
 export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -46,11 +47,15 @@ export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 return reply.code(403).send({ error: 'Not an editor of this project' });
             }
 
-            await app.deps.db.query(
-                `UPDATE projects SET last_accessed_at = NOW()
-                 WHERE id = $1 AND deleted_at IS NULL`,
-                [projectId],
-            );
+            // An impersonating admin leaves no trace: bumping this would
+            // reorder the user's own dashboard behind their back
+            if (!isImpersonating(req)) {
+                await app.deps.db.query(
+                    `UPDATE projects SET last_accessed_at = NOW()
+                     WHERE id = $1 AND deleted_at IS NULL`,
+                    [projectId],
+                );
+            }
 
             const { rows } = await app.deps.db.query(
                 `SELECT jsonb_build_object(

@@ -10,6 +10,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ScreenshotGetRequestSchema } from '@shared/api/screenshots';
 import { canEditScreenshot } from '../../services/screenshotAccess.js';
+import { isImpersonating } from '../../plugins/auth.js';
 
 export const screenshotGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -42,11 +43,14 @@ export const screenshotGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 return reply.code(403).send({ error: 'Not an editor of this screenshot' });
             }
 
-            await app.deps.db.query(
-                `UPDATE screenshots SET last_accessed_at = NOW()
-                 WHERE id = $1 AND deleted_at IS NULL`,
-                [screenshotId],
-            );
+            // Same rule as project-get: impersonation leaves no trace
+            if (!isImpersonating(req)) {
+                await app.deps.db.query(
+                    `UPDATE screenshots SET last_accessed_at = NOW()
+                     WHERE id = $1 AND deleted_at IS NULL`,
+                    [screenshotId],
+                );
+            }
 
             const { rows } = await app.deps.db.query(
                 `SELECT jsonb_build_object(

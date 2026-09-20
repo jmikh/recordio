@@ -15,6 +15,7 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { resolveDefaultWorkspaceId } from '../../services/defaultWorkspace.js';
+import { isImpersonating } from '../../plugins/auth.js';
 
 export const workspaceGetDefaultRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -37,13 +38,17 @@ export const workspaceGetDefaultRoutes: FastifyPluginAsyncTypebox = async (app) 
             }
             req.logCtx.set({ 'workspace.id': workspaceId });
 
-            // 3. Heal the stored default (unconditional, SQL parity)
-            await db.query(
-                `UPDATE user_profiles
-                 SET default_workspace_id = $1, updated_at = now()
-                 WHERE user_id = $2`,
-                [workspaceId, userId],
-            );
+            // 3. Heal the stored default (unconditional, SQL parity) —
+            //    except under impersonation, which writes nothing to the
+            //    user's account, not even a self-heal
+            if (!isImpersonating(req)) {
+                await db.query(
+                    `UPDATE user_profiles
+                     SET default_workspace_id = $1, updated_at = now()
+                     WHERE user_id = $2`,
+                    [workspaceId, userId],
+                );
+            }
 
             const { rows: blobRows } = await db.query(
                 `SELECT jsonb_build_object(

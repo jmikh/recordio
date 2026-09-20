@@ -1,7 +1,23 @@
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
 import type { ApiRoutes } from '@shared/api';
+import { IMPERSONATION_READ_ONLY_MESSAGE, isAllowedWhileImpersonating } from '@shared/api';
 import { authAwareFetch, notifyUnauthorized, supabase } from '../supabase/client';
 import { getImpersonation } from '../auth/impersonation';
+
+/**
+ * A write attempted while impersonating — refused before it left the
+ * browser (the server refuses it too; see shared/api/impersonation.ts).
+ * A distinct type so a call site can tell "not allowed here" apart from
+ * "the request failed"; apiErrorMessage surfaces its reason verbatim.
+ * The editor's background writers don't even get this far — auto-save
+ * and thumbnail upload bail out in CloudProjectService.
+ */
+export class ImpersonationReadOnlyError extends Error {
+    constructor() {
+        super(IMPERSONATION_READ_ONLY_MESSAGE);
+        this.name = 'ImpersonationReadOnlyError';
+    }
+}
 
 export type InvokeResult<T> =
     | { data: T; error: null }
@@ -47,6 +63,13 @@ export async function invokeFunction(name: string, body?: unknown): Promise<Invo
     // server then treats every call as the target user
     const impersonation = getImpersonation();
     if (impersonation) {
+        // Impersonation is read-only (shared/api/impersonation.ts). The
+        // server enforces this — it has to, the token is a real session —
+        // so this is purely to fail instantly, and to keep background
+        // writers (auto-save, thumbnails) from logging 403s as bugs.
+        if (!isAllowedWhileImpersonating(name)) {
+            return { data: null, error: new ImpersonationReadOnlyError() };
+        }
         headers.Authorization = `Bearer ${impersonation.token}`;
     } else if (supabase) {
         const { data: { session } } = await supabase.auth.getSession();
@@ -92,6 +115,9 @@ export async function invokeFunctionUpload<T = unknown>(
     }
 
     let token: string | undefined = getImpersonation()?.token;
+    if (token && !isAllowedWhileImpersonating(name)) {
+        return { data: null, error: new ImpersonationReadOnlyError() };
+    }
     if (!token && supabase) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) token = session.access_token;
@@ -140,6 +166,9 @@ export async function invokeFunctionUpload<T = unknown>(
  * the fallback. Reads a clone so the Response stays usable by callers.
  */
 export async function apiErrorMessage(error: unknown, fallback: string): Promise<string> {
+    // Say why rather than the caller's generic fallback — "read-only" is
+    // the actionable half of the message
+    if (error instanceof ImpersonationReadOnlyError) return error.message;
     if (error instanceof FunctionsHttpError && error.context instanceof Response) {
         try {
             const body = (await error.context.clone().json()) as { error?: unknown };

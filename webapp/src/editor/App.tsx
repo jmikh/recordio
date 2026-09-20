@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CanvasContainer } from './components/canvas/CanvasContainer';
+import { CanvasContainer, CANVAS_INSET_PX } from './components/canvas/CanvasContainer';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 
 import { useProjectStore, useProjectData, useProjectHistory } from './stores/useProjectStore';
@@ -18,6 +18,7 @@ import { DebugBar } from './components/DebugBar';
 import { Header } from './components/header/Header';
 import { ConflictModal } from './components/ConflictModal';
 import { SyncFailedModal } from './components/SyncFailedModal';
+import { ImpersonationReadOnlyNotice } from './components/ImpersonationReadOnlyNotice';
 import { AuthModal } from '../auth/AuthModal';
 import { NavDrawer } from '../components/NavDrawer';
 import { useNavDrawerStore } from '../components/useNavDrawerStore';
@@ -237,22 +238,31 @@ function Editor() {
     const videoAspect = projectOutputSize && projectOutputSize.width > 0
         ? projectOutputSize.width / projectOutputSize.height
         : 16 / 9;
+    // Letterbox `videoAspect` inside a box, returning pixel dimensions.
+    const fitAspect = (boxW: number, boxH: number) => (
+        boxW / boxH > videoAspect
+            ? { width: boxH * videoAspect, height: boxH }
+            : { width: boxW, height: boxW / videoAspect }
+    );
+
     let renderedStyle = { width: '100%', height: '100%' };
+    // The loading placeholder stands in for the canvas, which CanvasContainer
+    // insets by CANVAS_INSET_PX and re-fits — so fit inside the same padded box.
+    let placeholderStyle = { width: '100%', height: '100%' };
     if (containerSize.width > 0 && containerSize.height > 0) {
-        const containerAspect = containerSize.width / containerSize.height;
-
-        let rw, rh;
-        if (containerAspect > videoAspect) {
-            rh = containerSize.height;
-            rw = rh * videoAspect;
-        } else {
-            rw = containerSize.width;
-            rh = rw / videoAspect;
-        }
-
+        const rect = fitAspect(containerSize.width, containerSize.height);
         renderedStyle = {
-            width: `${rw}px`,
-            height: `${rh}px`
+            width: `${rect.width}px`,
+            height: `${rect.height}px`
+        };
+
+        const inner = fitAspect(
+            Math.max(rect.width - CANVAS_INSET_PX * 2, 1),
+            Math.max(rect.height - CANVAS_INSET_PX * 2, 1)
+        );
+        placeholderStyle = {
+            width: `${inner.width}px`,
+            height: `${inner.height}px`
         };
     }
 
@@ -334,7 +344,7 @@ function Editor() {
                                 <div
                                     id="canvas-loading-placeholder"
                                     className="relative bg-surface-media"
-                                    style={renderedStyle}
+                                    style={placeholderStyle}
                                 >
                                     <LoadingLogo text={loadingStatus} />
                                 </div>
@@ -358,6 +368,7 @@ function Editor() {
 
             <ConflictModal />
             <SyncFailedModal onRetry={() => { saveProject(); }} />
+            <ImpersonationReadOnlyNotice />
             <NavDrawer />
         </div>
     );

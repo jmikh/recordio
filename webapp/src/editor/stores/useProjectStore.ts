@@ -182,9 +182,9 @@ export const useProjectStore = create<ProjectState>()(
                             mouseClickEnabled: true,
                             mouseDragEnabled: false,
                             effectType: 'ring',
-                            color: '#8b5cf6',
-                            size: 1.0,
-                            soundEnabled: false,
+                            color: '#696969',
+                            size: 0.8,
+                            soundEnabled: true,
                             soundVolume: 0.5,
                         };
                     }

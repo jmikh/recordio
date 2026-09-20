@@ -1,10 +1,12 @@
 /**
  * Persistent banner shown on every page while impersonating a user
- * (plans/admin-user-impersonation-oneshot.md) — the guardrail for
- * full read-write impersonation. Impersonation state only changes via
- * full reloads (start/stopImpersonation), so reading it once per mount
- * is enough; the current path is not, hence the navigation subscription
- * for the Clone button.
+ * (plans/admin-user-impersonation-oneshot.md). Impersonation is
+ * read-only — the API refuses every write on the token (see
+ * shared/api/impersonation.ts) — and this banner is what says so.
+ * Impersonation state only changes via full reloads
+ * (start/stopImpersonation), so reading it once per mount is enough;
+ * the current path is not, hence the navigation subscription for the
+ * Clone button.
  *
  * Clone (/project-clone) copies the project the admin is currently
  * looking at — media and all — into the admin's OWN default workspace,
@@ -85,7 +87,7 @@ export function ImpersonationBanner() {
             className="fixed bottom-0 inset-x-0 z-[9999] flex items-center justify-center gap-4 bg-surface-raised border-t border-destructive/30 shadow-float px-4 py-2"
         >
             <span className="text-sm text-destructive">
-                Viewing as <span className="font-bold">{who}</span> — full access, changes are real.
+                Viewing as <span className="font-bold">{who}</span> — read-only, nothing you do is saved.
             </span>
             {projectRef && (
                 <Button variant="base" icon={LuCopy} disabled={cloning} onClick={clone}>

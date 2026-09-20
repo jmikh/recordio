@@ -5,16 +5,16 @@ import { EventType, type BaseEvent, type Point } from '@shared/types';
 // ============================================================================
 
 /** Radius of the hover detection circle (fraction of larger screen dimension) */
-const K_HOVER_RADIUS_FRACTION = 0.1;
+const K_HOVER_RADIUS_FRACTION = 0.2;
 
 /** Minimum time mouse must stay in a region to be considered a hover (ms) */
-const K_HOVER_MIN_DURATION_MS = 1000;
+const K_HOVER_MIN_DURATION_MS = 2000;
 
 /** Maximum time gap between consecutive positions before breaking a hover (ms) */
 const K_MAX_GAP_MS = 1000;
 
 /** Minimum total path distance within the circle to count as "active" (fraction of larger screen dimension) */
-const K_MIN_ACTIVITY_FRACTION = 0.1;
+const K_MIN_ACTIVITY_FRACTION = 0.2;
 
 // ============================================================================
 // Utility Functions

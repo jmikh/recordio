@@ -15,6 +15,18 @@ const K_CLICK_MAX_RECT_FRACTION = 0.4;
 /** Fallback click box size when targetRect is too large or missing (fraction of larger screen dimension) */
 const K_CLICK_FALLBACK_BOX_FRACTION = 0.10;
 
+/** How long before a click its focus area opens, so the zoom is settled by the time the click lands */
+const K_CLICK_LEAD_MS = 500;
+
+/**
+ * Quiet period after a scroll focus area ends. Scrolling zooms out, and snapping
+ * straight back in on the click or hover that follows reads as a jitter — so
+ * nothing is allowed to take focus for this long afterwards. Events that merely
+ * *start* inside the window are dropped; a range event still running past it
+ * (typing, a long hover) picks up at the window's end instead.
+ */
+const K_SCROLL_COOLDOWN_MS = 1000;
+
 
 
 // ============================================================================
@@ -24,7 +36,7 @@ const K_CLICK_FALLBACK_BOX_FRACTION = 0.10;
 /**
  * FocusManager emits focus areas as pure measured facts:
  *
- * - Clicks: instant (start = end = clickTime). AutoZoom decides hold duration.
+ * - Clicks: [clickTime - K_CLICK_LEAD_MS, clickTime]. AutoZoom decides hold duration.
  * - Range events (typing, scroll, hover, hovered cards): [measuredStart, measuredEnd]
  * - URL changes: sentinel with rect = fullViewport (forces zoom out)
  *
@@ -88,6 +100,7 @@ class FocusManager {
     /**
      * Gets the next focus area after currentSourceTime.
      * Returns focus rects in order, detecting hovers between explicit events.
+     * Returns null once the source is exhausted.
      */
     public getNextFocusArea(): FocusArea | null {
         const nextTarget = this.findNextTarget();
@@ -162,10 +175,11 @@ class FocusManager {
     // ========================================================================
 
     /**
-     * Processes a target and returns its focus area.
+     * Processes a target and returns its focus area, or null once the target
+     * lies beyond the end of the source.
      * FocusAreas are pure measured facts — no timing padding added.
      */
-    private processTarget(target: BaseEvent): FocusArea {
+    private processTarget(target: BaseEvent): FocusArea | null {
         let sourceStartTimeMs: number;
         let sourceEndTimeMs: number;
 
@@ -174,8 +188,13 @@ class FocusManager {
             sourceStartTimeMs = target.timestamp;
             sourceEndTimeMs = target.timestamp;
         } else if (target.type === EventType.CLICK) {
-            // Click: instant — autoZoom decides hold duration
-            sourceStartTimeMs = target.timestamp;
+            // Click: the event itself is instantaneous — the recorder stores no
+            // endTime — but the focus area covers the approach to it, opening
+            // K_CLICK_LEAD_MS early so the zoom has arrived by the time the click
+            // lands and closing on the click itself. Never opens earlier than the
+            // previous focus area, which would break the sorted-by-time contract
+            // that autoZoom and the debug overlay rely on.
+            sourceStartTimeMs = Math.max(target.timestamp - K_CLICK_LEAD_MS, this.currentSourceTime);
             sourceEndTimeMs = target.timestamp;
         } else if (target.endTime !== undefined) {
             // Range events (typing, scroll, hovered cards, hover): measured time range
@@ -187,11 +206,22 @@ class FocusManager {
             sourceEndTimeMs = target.timestamp;
         }
 
+        // Nothing at or past the end of the source is visible. Events can outlive
+        // the source — a trimmed recording, or currentSourceTime pushed past the
+        // end by the scroll cooldown — and clamping only the end would emit an
+        // inverted area (start > end), breaking the sorted, non-overlapping
+        // contract. Stop instead: every remaining event starts later still.
+        if (sourceStartTimeMs >= this.sourceDuration) {
+            return null;
+        }
+
         // Clamp to source duration
         sourceEndTimeMs = Math.min(sourceEndTimeMs, this.sourceDuration);
 
-        // Advance currentSourceTime past this focus area
-        this.currentSourceTime = sourceEndTimeMs + 1;
+        // Advance currentSourceTime past this focus area. After a scroll, push it
+        // a full cooldown further so the zoom-out is allowed to settle.
+        this.currentSourceTime = sourceEndTimeMs + 1
+            + (target.type === EventType.SCROLL ? K_SCROLL_COOLDOWN_MS : 0);
 
         // Advance hover detector — only for explicit events (hovers handle their own index)
         if (target.type !== EventType.HOVER) {
@@ -279,7 +309,8 @@ class FocusManager {
  * Operates entirely in source time — no TimeMapper needed.
  *
  * Returns focus areas as pure measured facts:
- * - Clicks/URL changes are instants (startTime === endTime)
+ * - URL changes are instants (startTime === endTime)
+ * - Clicks span the lead-in up to the click itself
  * - Range events use their measured time range
  * - URL changes have rect = fullViewport (sentinel for forced zoom out)
  */

@@ -16,6 +16,10 @@
  * role key) are JWTs signed with the same HS256 secret. A user token must
  * also carry `sub` and `role: 'authenticated'`.
  *
+ * An IMPERSONATION token (minted by /admin-impersonate) verifies like any
+ * other user token, but `requireUser` then confines it to the read-only
+ * allowlist in shared/api/impersonation.ts — see the check itself.
+ *
  * Stripe/Mux webhook signature preHandlers land with their webhook routes
  * (Wave D) — verification itself is already behind StripePort/MuxPort.
  */
@@ -23,6 +27,10 @@ import fp from 'fastify-plugin';
 import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from 'jose';
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import {
+    IMPERSONATION_READ_ONLY_MESSAGE,
+    isAllowedWhileImpersonating,
+} from '@shared/api/impersonation';
 
 export interface AuthUser {
     id: string;
@@ -116,6 +124,19 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
         const user = await verifyUser(req);
         if (!user) return unauthorized(reply);
         attachUser(req, user);
+        // An impersonation token is a LOOKING token: it only opens the
+        // routes on the shared allowlist, so an admin browsing someone's
+        // account can't mutate it (the editor's 2s auto-save was enough
+        // to rewrite a stranger's project just by opening it). Fails
+        // closed — see shared/api/impersonation.ts.
+        if (user.impersonatedBy) {
+            const route = (req.routeOptions.url ?? '').replace(/^\//, '');
+            if (!isAllowedWhileImpersonating(route)) {
+                // The canonical event already carries the 403 and
+                // impersonated_by — that pair IS the audit line
+                return reply.code(403).send({ error: IMPERSONATION_READ_ONLY_MESSAGE });
+            }
+        }
     });
 
     // For routes serving both anonymous and signed-in callers
@@ -128,6 +149,19 @@ export const authPlugin = fp<AuthPluginOptions>(async (app, opts) => {
         }
     });
 }, { name: 'auth' });
+
+/**
+ * True when this request is riding an admin impersonation token.
+ *
+ * The allowlisted read routes use it to skip their INCIDENTAL writes —
+ * `last_accessed_at` bumps, the stored-default heal, the shared page's
+ * self-heal publish. An admin looking at an account must leave no trace
+ * in it: a bumped timestamp reorders the user's own dashboard and makes
+ * a dormant user look active in the admin list.
+ */
+export function isImpersonating(req: FastifyRequest): boolean {
+    return Boolean(req.user?.impersonatedBy);
+}
 
 /**
  * preHandler factory for machine-to-machine routes (render-worker callback,

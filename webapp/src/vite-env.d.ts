@@ -5,6 +5,8 @@ interface ImportMetaEnv {
     readonly VITE_SUPABASE_ANON_KEY?: string;
     /** Fastify API server base URL — REQUIRED (all API calls go through it since the edge-fn decommission). Local dev: http://localhost:8080 */
     readonly VITE_API_URL?: string;
+    /** Set to 'true' to show the editor header Debug button. Hidden unless explicitly enabled. */
+    readonly VITE_SHOW_DEBUG?: string;
 }
 
 declare module '*.png' {

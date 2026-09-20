@@ -144,6 +144,9 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                     ...project,
                     timeline: {
                         ...project.timeline,
+                        // Persist the recomputed areas too — they're what these segments
+                        // were derived from, and what the debug overlay reads back.
+                        focusAreas,
                         zoomSegments
                     }
                 }

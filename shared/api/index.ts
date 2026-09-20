@@ -103,6 +103,7 @@ import type {
 
 export * from './admin';
 export * from './assets';
+export * from './impersonation';
 export * from './entitlements';
 export * from './projects';
 export * from './renderJobs';
