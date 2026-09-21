@@ -26,23 +26,29 @@ const aspectRatioOptions: DropdownOption<AspectRatioPreset>[] = ASPECT_RATIO_PRE
 
 const CDN = `${CDN_ORIGIN}/backgrounds`;
 
-const BACKGROUND_IMAGES = [
-    { name: 'Dark Glass', url: `${CDN}/bg4.avif`, thumbnail: `${CDN}/bg4-small.avif` },
-    { name: 'Bubble Funky', url: `${CDN}/bg3.avif`, thumbnail: `${CDN}/bg3-small.avif` },
-    { name: 'Dark Pink Washed', url: `${CDN}/bg6.avif`, thumbnail: `${CDN}/bg6-small.avif` },
-    { name: 'Dark Pink Splatter', url: `${CDN}/bg5.avif`, thumbnail: `${CDN}/bg5-small.avif` },
-    { name: 'Blue Purple Layers', url: `${CDN}/bg1.avif`, thumbnail: `${CDN}/bg1-small.avif` },
-    { name: 'Layered Purples', url: `${CDN}/bg8.avif`, thumbnail: `${CDN}/bg8-small.avif` },
-    { name: 'Blue Purple Wash', url: `${CDN}/bg2.avif`, thumbnail: `${CDN}/bg2-small.avif` },
-    { name: 'Pink Blue Washed', url: `${CDN}/bg10.avif`, thumbnail: `${CDN}/bg10-small.avif` },
-    { name: 'Pink Purple Funky', url: `${CDN}/bg15.avif`, thumbnail: `${CDN}/bg15-small.avif` },
-    { name: 'Purple Pink Funky', url: `${CDN}/bg14.avif`, thumbnail: `${CDN}/bg14-small.avif` },
-    { name: 'Pink Purple Splash', url: `${CDN}/bg12.avif`, thumbnail: `${CDN}/bg12-small.avif` },
-    { name: 'Pink Clouds', url: `${CDN}/bg11.avif`, thumbnail: `${CDN}/bg11-small.avif` },
-    { name: 'Orange Teal Funky', url: `${CDN}/bg9.avif`, thumbnail: `${CDN}/bg9-small.avif` },
-    { name: 'Pink Teal Funky', url: `${CDN}/bg13.avif`, thumbnail: `${CDN}/bg13-small.avif` },
-    { name: 'Fluorescent Stripes', url: `${CDN}/bg7.avif`, thumbnail: `${CDN}/bg7-small.avif` },
+const BACKGROUND_FILES = [
+    'nature1',
+    'nature2',
+    'nature3',
+    'nature4',
+    'geometric1',
+    'geometric2',
+    'layers5',
+    'layers4',
+    'layers3',
+    'layers1',
+    'layers2',
+    'layers6',
+    'liquid-glass',
+    'glass',
+    'pink-sky',
 ];
+
+const BACKGROUND_IMAGES = BACKGROUND_FILES.map(file => ({
+    file,
+    url: `${CDN}/${file}.avif`,
+    thumbnail: `${CDN}/${file}-small.avif`,
+}));
 
 export const BackgroundSettings = () => {
     const project = useProjectData();
@@ -399,9 +405,8 @@ export const BackgroundSettings = () => {
                                         ? 'outline outline-2 outline-offset-2 outline-primary'
                                         : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
                                     onClick={() => handlePresetSelect(img.url)}
-                                    title={img.name}
                                 >
-                                    <img src={img.thumbnail} alt={img.name} className="w-full h-full object-cover" />
+                                    <img src={img.thumbnail} alt={img.file} className="w-full h-full object-cover" />
                                 </div>
                             );
                         })}

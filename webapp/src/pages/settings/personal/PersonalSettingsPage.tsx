@@ -18,6 +18,7 @@ import { usePersonalDefaultsStore } from './usePersonalDefaultsStore';
 import { useDefaultsPreviewStore } from '../../../editor/stores/useDefaultsPreviewStore';
 import { DefaultsSettingsPanel } from './DefaultsSettingsPanel';
 import { DefaultsPreview } from './DefaultsPreview';
+import { DashboardTopBar } from '../../dashboard/DashboardTopBar';
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -33,7 +34,13 @@ const serialize = (settings: ProjectSettings) => JSON.stringify(keepOnlyEditable
  * template", lets the editor's settings panels edit it next to a live
  * preview, and saves explicitly. Rendered inside the dashboard layout.
  */
-export function PersonalSettingsPage() {
+interface PersonalSettingsPageProps {
+    isAuthenticated: boolean;
+    onOpenSupport: () => void;
+    onOpenAuthModal: () => void;
+}
+
+export function PersonalSettingsPage({ isAuthenticated, onOpenSupport, onOpenAuthModal }: PersonalSettingsPageProps) {
     const { addToast } = useToast();
     const [loadState, setLoadState] = useState<LoadState>('loading');
     const [hasStored, setHasStored] = useState(false);
@@ -139,39 +146,48 @@ export function PersonalSettingsPage() {
             ? { label: 'Custom defaults', variant: 'primary' }
             : { label: 'Using Recordio defaults', variant: 'default' };
 
-    return (
-        <div className="flex flex-col flex-1 min-h-0 gap-4">
-            {/* Page header + actions */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <h1 className="heading-2">Personal settings</h1>
-                        {ready && <StatusBadge variant={status.variant}>{status.label}</StatusBadge>}
-                    </div>
-                    <p className="text-sm text-text-muted mt-1">
-                        Defaults for every new project you create. Existing projects aren’t affected.
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        onClick={() => setConfirmReset(true)}
-                        disabled={!ready || busy !== null || (!hasStored && !isDirty)}
-                    >
-                        Reset to Recordio defaults
-                    </Button>
-                    {isDirty && (
-                        <Button variant="base" onClick={handleDiscard} disabled={busy !== null}>
-                            Discard
-                        </Button>
-                    )}
-                    <Button variant="primary" onClick={handleSave} disabled={!isDirty || busy !== null}>
-                        {busy === 'save' ? 'Saving…' : 'Save defaults'}
-                    </Button>
-                </div>
+    // Status + actions ride in the top bar's second row, like the library's tabs
+    const actionsRow = (
+        <div className="flex items-center justify-between gap-4 py-2">
+            <div className="flex items-center gap-3 min-w-0">
+                {ready && <StatusBadge variant={status.variant}>{status.label}</StatusBadge>}
+                <p className="text-sm text-text-muted truncate">
+                    Defaults for every new project you create. Existing projects aren’t affected.
+                </p>
             </div>
 
+            <div className="flex items-center gap-2 shrink-0">
+                <Button
+                    variant="base"
+                    onClick={() => setConfirmReset(true)}
+                    disabled={!ready || busy !== null || (!hasStored && !isDirty)}
+                >
+                    Reset
+                </Button>
+                {isDirty && (
+                    <Button variant="base" onClick={handleDiscard} disabled={busy !== null}>
+                        Discard
+                    </Button>
+                )}
+                <Button variant="primary" onClick={handleSave} disabled={!isDirty || busy !== null}>
+                    {busy === 'save' ? 'Saving…' : 'Save defaults'}
+                </Button>
+            </div>
+        </div>
+    );
+
+    return (
+        <>
+            <DashboardTopBar
+                title="Personal settings"
+                isAuthenticated={isAuthenticated}
+                onOpenSupport={onOpenSupport}
+                onOpenAuthModal={onOpenAuthModal}
+                bottom={actionsRow}
+            />
+
+            {/* bounded height: the editor-like card scrolls its own settings column */}
+            <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden p-6">
             {/* The editor-like surface: settings column + preview, framed as a card */}
             {loadState === 'loading' ? (
                 <div className={`${CARD} flex items-center gap-2 text-text-muted text-sm p-6`}>
@@ -209,6 +225,7 @@ export function PersonalSettingsPage() {
                     </Button>
                 </div>
             </Modal>
-        </div>
+            </main>
+        </>
     );
 }

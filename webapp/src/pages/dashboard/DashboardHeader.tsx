@@ -1,6 +1,7 @@
 import { LuSearch } from 'react-icons/lu';
 import { Button } from '@shared/components';
 import { Dropdown } from '@shared/components/Dropdown';
+import { DashboardTopBar } from './DashboardTopBar';
 
 /** Which kind of item the current library view lists ('all' interleaves both) */
 export type ContentKind = 'all' | 'videos' | 'screenshots';
@@ -33,6 +34,11 @@ interface DashboardHeaderProps {
     onSortChange: (sort: SortOrder) => void;
     /** Trash is ordered by deletion time, so it hides the sort control */
     showSort?: boolean;
+    /** Library view name shown top left */
+    title: string;
+    isAuthenticated: boolean;
+    onOpenSupport: () => void;
+    onOpenAuthModal: () => void;
 }
 
 export function DashboardHeader({
@@ -45,6 +51,10 @@ export function DashboardHeader({
     sortOrder,
     onSortChange,
     showSort = true,
+    title,
+    isAuthenticated,
+    onOpenSupport,
+    onOpenAuthModal,
 }: DashboardHeaderProps) {
     const tabs: KindTab[] = [
         { value: 'all', label: 'All', count: videoCount + screenshotCount },
@@ -55,64 +65,68 @@ export function DashboardHeader({
     // A remembered duration sort has no screenshot equivalent — show the same fallback the grid sorts by
     const sortValue = sortOptions.some(o => o.value === sortOrder) ? sortOrder : 'last_created';
 
-    return (
-        <div className="px-6 pt-4">
-            {/* Search row */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="relative w-72">
-                    <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 icon-sm text-text-muted pointer-events-none" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={e => onSearchChange(e.target.value)}
-                        aria-label="Search library"
-                        placeholder={activeKind === 'screenshots' ? 'Search screenshots...' : 'Search recordings, transcripts...'}
-                        className="w-full h-9 pl-9 pr-3 text-sm bg-surface border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+    const tabsRow = (
+        <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-1" role="tablist" aria-label="Library content">
+                {tabs.map(tab => {
+                    const isActive = activeKind === tab.value;
+                    return (
+                        <Button
+                            key={tab.value}
+                            variant="ghost"
+                            role="tab"
+                            aria-selected={isActive}
+                            onClick={() => onKindChange(tab.value)}
+                            className={`relative px-3 py-2.5 rounded-t-lg rounded-b-none ${isActive ? 'text-text-highlighted' : 'text-text-muted'}`}
+                        >
+                            {tab.label}
+                            <span className={`text-badge px-1.5 py-1 rounded-full ${
+                                isActive ? 'bg-primary/20 text-primary' : 'bg-state-inactive text-text-muted'
+                            }`}>
+                                {tab.count}
+                            </span>
+                            {isActive && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                            )}
+                        </Button>
+                    );
+                })}
+            </div>
+
+            {showSort && (
+                <div className="pb-1">
+                    <Dropdown
+                        options={sortOptions}
+                        value={sortValue}
+                        onChange={onSortChange}
+                        fullWidth={false}
+                        buttonClassName="h-8"
+                        ariaLabel="Sort by"
                     />
                 </div>
-            </div>
-
-            {/* Kind tabs + sort */}
-            <div className="flex items-center gap-1 border-b border-border">
-                <div className="flex items-center gap-1 flex-1" role="tablist" aria-label="Library content">
-                    {tabs.map(tab => {
-                        const isActive = activeKind === tab.value;
-                        return (
-                            <Button
-                                key={tab.value}
-                                variant="ghost"
-                                role="tab"
-                                aria-selected={isActive}
-                                onClick={() => onKindChange(tab.value)}
-                                className={`relative px-3 py-2.5 rounded-t-lg rounded-b-none ${isActive ? 'text-text-highlighted' : 'text-text-muted'}`}
-                            >
-                                {tab.label}
-                                <span className={`text-badge px-1.5 py-1 rounded-full ${
-                                    isActive ? 'bg-primary/20 text-primary' : 'bg-state-inactive text-text-muted'
-                                }`}>
-                                    {tab.count}
-                                </span>
-                                {isActive && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                                )}
-                            </Button>
-                        );
-                    })}
-                </div>
-
-                {showSort && (
-                    <div className="pb-1">
-                        <Dropdown
-                            options={sortOptions}
-                            value={sortValue}
-                            onChange={onSortChange}
-                            fullWidth={false}
-                            buttonClassName="h-8"
-                            ariaLabel="Sort by"
-                        />
-                    </div>
-                )}
-            </div>
+            )}
         </div>
+    );
+
+    return (
+        <DashboardTopBar
+            title={title}
+            isAuthenticated={isAuthenticated}
+            onOpenSupport={onOpenSupport}
+            onOpenAuthModal={onOpenAuthModal}
+            bottom={tabsRow}
+        >
+            <div className="relative w-72">
+                <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 icon-sm text-text-muted pointer-events-none" />
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => onSearchChange(e.target.value)}
+                    aria-label="Search library"
+                    placeholder={activeKind === 'screenshots' ? 'Search screenshots...' : 'Search recordings, transcripts...'}
+                    className="w-full h-9 pl-9 pr-3 text-sm bg-surface-body border border-border rounded-(--radius-interactive) text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+                />
+            </div>
+        </DashboardTopBar>
     );
 }

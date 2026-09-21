@@ -18,8 +18,6 @@ import { invokeFunction } from '../api/client';
 import { navigate } from '../lib/navigate';
 import { captureError } from '../lib/sentry';
 import { trackNewRecordingClicked } from '../analytics';
-import { SupportModal } from './SupportModal';
-import { AuthModal } from '../auth/AuthModal';
 import { useNavDrawerStore } from './useNavDrawerStore';
 
 /**
@@ -75,8 +73,6 @@ export function NavDrawer() {
     const [members, setMembers] = useState<{ workspaceId: string; count: number } | null>(null);
     const memberCount = members?.workspaceId === workspaceId ? members.count : null;
 
-    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
     // Esc closes, like the modals
     useEffect(() => {
@@ -184,9 +180,6 @@ export function NavDrawer() {
                             trackNewRecordingClicked(workspaceId);
                             window.open(CHROME_EXTENSION_URL, '_blank');
                         }}
-                        isAuthenticated={isAuthenticated}
-                        onOpenSupport={() => setIsSupportModalOpen(true)}
-                        onOpenAuthModal={() => setIsAuthModalOpen(true)}
                         workspaces={workspaceList}
                         currentWorkspaceId={workspaceId}
                         currentWorkspaceName={workspaceName}
@@ -200,8 +193,6 @@ export function NavDrawer() {
                 </div>
             </div>
 
-            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
-            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
         </>,
         document.body,
     );

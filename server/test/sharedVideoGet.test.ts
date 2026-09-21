@@ -413,7 +413,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K', progress: 0.42,
+            projectId: project.id, cloudVersion: 1, quality: '1080p', progress: 0.42,
         });
 
         const res = await post(app, { slug: project.slug });
@@ -425,7 +425,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         const project = await seed();
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
-        await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1, quality: '2K' });
+        await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1, quality: '1080p' });
 
         const res = await post(app, { slug: project.slug });
         expect(res.json()).not.toHaveProperty('progress');
@@ -437,7 +437,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'completed', progress: 1,
         });
 
@@ -445,13 +445,13 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         expect(res.json()).toMatchObject({ status: 'pending', progress: 1 });
     });
 
-    it('pending: a 1080p download render is NOT the source of progress', async () => {
+    it('pending: a non-Mux-quality download render is NOT the source of progress', async () => {
         const { app, deps } = testApp();
         const project = await seed();
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '1080p', progress: 0.9,
+            projectId: project.id, cloudVersion: 1, quality: '4K', progress: 0.9,
         });
 
         const res = await post(app, { slug: project.slug });
@@ -604,7 +604,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
             { status: 'pending', attempt: 1, cloud_version: 3 },
         ]);
         expect(await renderRow(project.id)).toEqual([
-            { status: 'pending', attempt_count: 1, quality: '2K' },
+            { status: 'pending', attempt_count: 1, quality: '1080p' },
         ]);
     });
 
@@ -633,7 +633,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         );
         expect(rows[0]).toMatchObject({ user_id: SEEDED_USER_ID });
         expect((rows[0] as { render_storage_path: string }).render_storage_path)
-            .toBe(`${SEEDED_USER_ID}/${project.id}/renders/v1_2K.mp4`);
+            .toBe(`${SEEDED_USER_ID}/${project.id}/renders/v1.mp4`);
     });
 
     it('a second poll does not dispatch again — the pending row latches it', async () => {
@@ -678,7 +678,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 3 });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'failed', attemptCount: 3,
         });
 
@@ -689,7 +689,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
             { status: 'pending', attempt: 4, cloud_version: 1 },
         ]);
         expect(await renderRow(project.id)).toEqual([
-            { status: 'pending', attempt_count: 4, quality: '2K' },
+            { status: 'pending', attempt_count: 4, quality: '1080p' },
         ]);
     });
 
@@ -699,7 +699,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 5 });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'failed', attemptCount: 5,
         });
 
@@ -722,7 +722,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
             attempt: 5, error: 'Render failed',
         });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'failed', attemptCount: 5, error: 'Worker unresponsive',
         });
 
@@ -745,7 +745,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
             attempt: 5, error: 'Mux API error: 401',
         });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'failed', attemptCount: 5, error: 'Worker unresponsive',
         });
 
@@ -773,7 +773,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
             attempt: 5, updatedAt: hoursAgo(2),
         });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'failed', attemptCount: 5, updatedAt: hoursAgo(2),
         });
 
@@ -791,7 +791,7 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         // can stop the re-upload loop
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'failed', attempt: 5 });
         await seedRenderJob(pool, {
-            projectId: project.id, cloudVersion: 1, quality: '2K',
+            projectId: project.id, cloudVersion: 1, quality: '1080p',
             status: 'completed', attemptCount: 1, progress: 1,
         });
 

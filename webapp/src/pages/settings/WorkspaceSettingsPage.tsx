@@ -148,9 +148,6 @@ export function WorkspaceSettingsPage() {
     if (accessDenied) {
         return (
             <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-16">
-                <div>
-                    <h1 className="heading-2">Workspace settings</h1>
-                </div>
                 <div role="status" className={`${SECTION_CARD} flex items-start gap-3`}>
                     <LuLock className="icon-lg text-text-muted shrink-0 mt-0.5" />
                     <div>
@@ -170,10 +167,9 @@ export function WorkspaceSettingsPage() {
 
     return (
         <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-16">
-            {/* Page header */}
+            {/* Page intro — the title lives in the dashboard top bar */}
             <div>
-                <h1 className="heading-2">Workspace settings</h1>
-                <p className="text-sm text-text-muted mt-1">
+                <p className="text-sm text-text-muted">
                     Name, members, and plan for {workspaceName ?? 'your workspace'}.
                 </p>
             </div>

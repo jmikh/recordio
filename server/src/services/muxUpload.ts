@@ -18,12 +18,12 @@ import { MuxApiError } from '../ports/mux.js';
 
 /**
  * The single render quality that feeds Mux — shared projects stream at
- * 1440p (`2K`). mux-video-create requests exactly this quality, and the
+ * 1080p. mux-video-create requests exactly this quality, and the
  * render-job webhook only uploads a completed render to Mux when it
  * matches, so a different-quality render for the same version (e.g. a
- * 1080p download export) can never hijack the pending mux_video.
+ * 4K download export) can never hijack the pending mux_video.
  */
-export const MUX_RENDER_QUALITY: ExportQuality = '2K';
+export const MUX_RENDER_QUALITY: ExportQuality = '1080p';
 
 export interface MuxUploadResult {
     success: boolean;

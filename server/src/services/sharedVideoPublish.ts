@@ -67,7 +67,7 @@ export interface PublishAttemptState {
     muxAttempt: number | null;
     /** mux_videos.updated_at is inside the cooldown window */
     muxRecent: boolean | null;
-    /** render_jobs.attempt_count for the target (project, cloudVersion, 2K); null when no row */
+    /** render_jobs.attempt_count for the target (project, cloudVersion, MUX_RENDER_QUALITY); null when no row */
     renderAttemptCount: number | null;
     /** render_jobs.updated_at is inside the cooldown window */
     renderRecent: boolean | null;
@@ -156,7 +156,7 @@ export async function publishProjectToMux(
             projectId,
             userId: ownerId,
             cloudVersion,
-            // Mux streams a single quality (1440p) regardless of what the
+            // Mux streams a single quality (1080p) regardless of what the
             // user picks for downloads — cached per (project, version,
             // quality), so this is its own render job.
             quality: MUX_RENDER_QUALITY,

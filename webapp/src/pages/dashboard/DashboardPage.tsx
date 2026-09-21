@@ -17,6 +17,7 @@ import { useScreenshotMetaStore } from '../../screenshot/store/useScreenshotMeta
 import { ScreenshotShareModal } from '../../screenshot/components/ScreenshotShareModal';
 import { screenshotEditPath, screenshotViewPath } from '../../lib/screenshotUrls';
 import { DashboardHeader, type ContentKind, type SortOrder } from './DashboardHeader';
+import { DashboardTopBar } from './DashboardTopBar';
 import { WorkspaceSettingsPage } from '../settings/WorkspaceSettingsPage';
 import { PersonalSettingsPage } from '../settings/personal/PersonalSettingsPage';
 import { usePersonalDefaultsStore } from '../settings/personal/usePersonalDefaultsStore';
@@ -39,6 +40,15 @@ import { captureError } from '../../lib/sentry';
 
 import { navigate } from '../../lib/navigate';
 import { editorPath, viewPath } from '../../lib/videoUrls';
+
+/** Top-bar title per library view — matches the sidebar nav labels */
+const LIBRARY_TITLES: Record<DashboardView, string> = {
+    all: 'Yours',
+    workspace: 'Workspace',
+    trash: 'Trash',
+    settings: 'Workspace settings',
+    personal: 'Personal settings',
+};
 
 /** One entry of the mixed "All" grid — a video or a screenshot with the date it sorts by */
 type MediaItem =
@@ -697,9 +707,6 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                     screenshotCap={entitlements.screenshotCap}
                     trashCount={sidebarCounts.trashCount}
                     onRecord={handleRecord}
-                    isAuthenticated={isAuthenticated}
-                    onOpenSupport={() => setIsSupportModalOpen(true)}
-                    onOpenAuthModal={() => setIsAuthModalOpen(true)}
                     workspaces={workspaceList}
                     currentWorkspaceId={workspaceId}
                     currentWorkspaceName={workspaceName}
@@ -714,9 +721,13 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 {/* Main Content */}
                 <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
                     {settingsPage === 'personal' ? (
-                        // bounded height: the editor-like card scrolls its own settings column
-                        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden p-6">
-                            <PersonalSettingsPage />
+                        <>
+                            {/* Renders its own top bar — the save/reset row lives in it */}
+                            <PersonalSettingsPage
+                                isAuthenticated={isAuthenticated}
+                                onOpenSupport={() => setIsSupportModalOpen(true)}
+                                onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                            />
                             <Modal
                                 isOpen={pendingView !== null}
                                 onClose={() => setPendingView(null)}
@@ -732,11 +743,19 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                     <Button variant="destructive" onClick={discardAndGo}>Discard</Button>
                                 </div>
                             </Modal>
-                        </main>
+                        </>
                     ) : showSettings ? (
-                        <main className="flex-1 overflow-y-auto p-8">
-                            <WorkspaceSettingsPage />
-                        </main>
+                        <>
+                            <DashboardTopBar
+                                title="Workspace settings"
+                                isAuthenticated={isAuthenticated}
+                                onOpenSupport={() => setIsSupportModalOpen(true)}
+                                onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                            />
+                            <main className="flex-1 overflow-y-auto p-8">
+                                <WorkspaceSettingsPage />
+                            </main>
+                        </>
                     ) : (
                         <>
                             <DashboardHeader
@@ -749,6 +768,10 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                 sortOrder={sortOrder}
                                 onSortChange={setSortOrder}
                                 showSort={!isTrash}
+                                title={LIBRARY_TITLES[activeView]}
+                                isAuthenticated={isAuthenticated}
+                                onOpenSupport={() => setIsSupportModalOpen(true)}
+                                onOpenAuthModal={() => setIsAuthModalOpen(true)}
                             />
 
                             <main className="flex-1 overflow-y-auto p-6">

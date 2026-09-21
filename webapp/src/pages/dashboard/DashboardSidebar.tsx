@@ -1,7 +1,5 @@
-import { LuBug, LuLayoutGrid, LuPanelLeftClose, LuPlus, LuSettings, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
+import { LuLayoutGrid, LuPanelLeftClose, LuPlus, LuSettings, LuTrash2, LuUserCog, LuUserPlus, LuUsers } from 'react-icons/lu';
 import { Button, StatusBadge, LogoLink, SidebarNav, SidebarNavItem, type StatusBadgeVariant } from '@shared/components';
-import { ThemeToggle } from '../../theme/ThemeToggle';
-import { UserMenu } from '../../components/UserMenu';
 import { WorkspaceDropdown } from '../../components/WorkspaceDropdown';
 import { TrialExtendLink } from '../../billing/TrialExtendLink';
 import type { WorkspaceListItem } from '../../workspace/useWorkspaceStore';
@@ -33,9 +31,6 @@ interface DashboardSidebarProps {
     screenshotCap: number | null;
     trashCount?: number;
     onRecord: () => void;
-    isAuthenticated: boolean;
-    onOpenSupport: () => void;
-    onOpenAuthModal: () => void;
     workspaces: WorkspaceListItem[];
     currentWorkspaceId: string | null;
     currentWorkspaceName: string | null;
@@ -105,9 +100,6 @@ export function DashboardSidebar({
     screenshotCap,
     trashCount,
     onRecord,
-    isAuthenticated,
-    onOpenSupport,
-    onOpenAuthModal,
     workspaces,
     currentWorkspaceId,
     currentWorkspaceName,
@@ -253,21 +245,6 @@ export function DashboardSidebar({
                 )}
             </div>
 
-            {/* Bottom — account row; bug report + theme live inside the menu */}
-            <div className="px-2 py-2 border-t border-border">
-                {isAuthenticated ? (
-                    <UserMenu openDirection="up" variant="row" onOpenSupportModal={onOpenSupport} />
-                ) : (
-                    <div className="flex items-center gap-1 px-1">
-                        <Button variant="ghost" icon={LuBug} onClick={onOpenSupport} title="Report a Bug" />
-                        <ThemeToggle />
-                        <div className="flex-1" />
-                        <Button variant="ghost" onClick={onOpenAuthModal}>
-                            Sign In
-                        </Button>
-                    </div>
-                )}
-            </div>
         </aside>
     );
 }

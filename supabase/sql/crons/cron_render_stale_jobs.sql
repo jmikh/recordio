@@ -7,10 +7,10 @@
 -- inline): terminal the pending job, cascade the failure to any pending
 -- mux_videos at the same (project_id, cloud_version).
 --
--- The cascade is gated to the Mux render quality ('2K' = 1440p, mirrors
+-- The cascade is gated to the Mux render quality ('1080p', mirrors
 -- MUX_RENDER_QUALITY in server/src/services/muxUpload.ts): a mux_video
--- tracks its own 2K render, so a stale render at another quality (e.g. a
--- 1080p download export for the same version) must not fail it.
+-- tracks its own 1080p render, so a stale render at another quality (e.g. a
+-- 4K download export for the same version) must not fail it.
 --
 -- Schedule: every minute
 -- Pattern:  A (pure SQL, no edge function needed)
@@ -40,7 +40,7 @@ SELECT cron.schedule(
     FROM stale
     WHERE mv.project_id = stale.project_id
       AND mv.cloud_version = stale.cloud_version
-      AND stale.quality = '2K'
+      AND stale.quality = '1080p'
       AND mv.status = 'pending';
     $$
 );

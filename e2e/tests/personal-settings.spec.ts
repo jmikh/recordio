@@ -69,7 +69,7 @@ test.describe('personal settings (authenticated)', () => {
         await expect(page.getByText('Loading defaults…')).toBeHidden();
 
         // Start clean whatever an earlier run left behind
-        const reset = page.getByRole('button', { name: 'Reset to Recordio defaults' });
+        const reset = page.getByRole('button', { name: 'Reset', exact: true });
         if (await reset.isEnabled()) {
             await reset.click();
             await page.getByRole('dialog', { name: 'Reset to Recordio defaults' })

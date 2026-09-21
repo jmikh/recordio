@@ -234,7 +234,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
             projectId: project.id,
             cloudVersion: 2,
             renderStoragePath: renderPath,
-            quality: '2K', // only the Mux quality feeds Mux
+            quality: '1080p', // only the Mux quality feeds Mux
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -285,7 +285,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
             projectId: project.id,
             cloudVersion: 1,
             renderStoragePath: `u/${project.id}/renders/v1.mp4`,
-            quality: '2K', // only the Mux quality feeds Mux
+            quality: '1080p', // only the Mux quality feeds Mux
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -308,7 +308,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         const jobId = await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 1,
-            quality: '2K', // only the Mux quality cascades to the mux_video
+            quality: '1080p', // only the Mux quality cascades to the mux_video
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -335,7 +335,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         const jobId = await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 1,
-            quality: '2K', // only the Mux quality cascades to the mux_video
+            quality: '1080p', // only the Mux quality cascades to the mux_video
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -350,15 +350,15 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
     });
 
     it('completed at a NON-Mux quality: pending mux_video is left alone, no mux/S3 calls', async () => {
-        // A 1080p download export for a version that also has a shared
-        // (2K) mux_video must not hijack it — Mux streams the 2K render.
+        // A 4K download export for a version that also has a shared
+        // (1080p) mux_video must not hijack it — Mux streams the 1080p render.
         const { app, deps } = testApp();
         const project = await seed();
         const jobId = await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 3,
             renderStoragePath: `u/${project.id}/renders/v3.mp4`,
-            quality: '1080p',
+            quality: '4K',
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -382,7 +382,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         const jobId = await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 3,
-            quality: '1080p',
+            quality: '4K',
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,

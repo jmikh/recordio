@@ -2,6 +2,7 @@ import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, UserEvents, ProjectSettings } from '@shared/types';
+import { CDN_ORIGIN } from '@shared/types/bridge';
 import { ProjectImpl, EMPTY_USER_EVENTS } from '../../core/Project';
 import { buildDefaultsTemplateProject } from '../../core/defaultsTemplate';
 import { CloudProjectService } from '../../storage/cloudProjectService';
@@ -153,7 +154,7 @@ export const useProjectStore = create<ProjectState>()(
                             gradientDirection: 135,
                             colorMode: 'gradient',
                             backgroundBlurPx: 0,
-                            imageUrl: 'https://cdn.recordio.io/backgrounds/bg8.avif',
+                            imageUrl: `${CDN_ORIGIN}/backgrounds/nature4.avif`,
                         };
                     }
                     if (!(projectWithoutEvents.settings as any).zoom) {

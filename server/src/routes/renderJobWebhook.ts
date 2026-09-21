@@ -163,7 +163,7 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                 }
                 // $4 gates the cascade to the Mux quality only: a pending
                 // mux_video tracks its own MUX_RENDER_QUALITY render, so a
-                // failed render at another quality (e.g. a 1080p download
+                // failed render at another quality (e.g. a 4K download
                 // export for the same version) must not fail it. The job's
                 // own status update is unconditional (data-modifying CTEs
                 // always run to completion regardless of the outer WHERE).
@@ -194,9 +194,9 @@ export const renderJobWebhookRoutes: FastifyPluginAsyncTypebox<RenderJobWebhookR
                     });
 
                     // Render done → upload to Mux if a pending mux_video
-                    // awaits this version. Only the Mux quality (1440p)
+                    // awaits this version. Only the Mux quality (1080p)
                     // feeds Mux: a completed render at another quality (e.g.
-                    // a 1080p download export for the same version) must not
+                    // a 4K download export for the same version) must not
                     // hijack the pending mux_video — mux-video-create always
                     // enqueues its own MUX_RENDER_QUALITY render.
                     if (job.quality === MUX_RENDER_QUALITY && job.render_storage_path) {
