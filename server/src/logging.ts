@@ -62,6 +62,11 @@ export interface DomainLogFields {
     'mux.attempt'?: number;
     /** A shared link self-healed: the watch page dispatched its own render */
     'mux.auto_started'?: boolean;
+    /**
+     * The served video is behind the project's current version and a render
+     * for that version is in flight — the watch page is offering an update.
+     */
+    'mux.newer_version_rendering'?: boolean;
     'stripe.event_type'?: string;
     'stripe.plan'?: string;
     'stripe.interval'?: string;

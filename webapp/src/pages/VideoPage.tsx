@@ -25,7 +25,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import MuxPlayer, { type MuxPlayerRefAttributes } from '@mux/mux-player-react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { LuCircleAlert, LuCopy, LuLock, LuPanelRightClose, LuPanelRightOpen, LuPencil } from 'react-icons/lu';
+import { LuCircleAlert, LuCopy, LuLock, LuPanelRightClose, LuPanelRightOpen, LuPencil, LuRefreshCw } from 'react-icons/lu';
 import { LogoLink } from '@shared/components/LogoLink';
 import { Button } from '@shared/components';
 import type { SharedVideoGetResponse } from '@shared/api';
@@ -65,9 +65,9 @@ function PlayerPlaceholder({ children }: { children: ReactNode }) {
     );
 }
 
-/** The spinner idiom, on the dark ground. */
-function PlaceholderSpinner() {
-    return <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />;
+/** The spinner idiom, on the dark ground. Sized down for the inline strip. */
+function PlaceholderSpinner({ className = 'w-8 h-8' }: { className?: string }) {
+    return <div className={`${className} border-2 border-primary border-t-transparent rounded-full animate-spin`} />;
 }
 
 /**
@@ -111,6 +111,16 @@ export function VideoPage() {
     };
     const isAuthenticated = useUserStore(s => s.isAuthenticated);
     const playerRef = useRef<MuxPlayerRefAttributes | null>(null);
+    /**
+     * The playback id the viewer is actually watching, pinned the first
+     * time one arrives. The server always serves the NEWEST completed
+     * version, so without this pin a render landing mid-session would swap
+     * the video out from under someone — losing their position, and their
+     * place in a video they may be part-way through discussing. Instead the
+     * pin holds, the poll notices the served id has moved, and the viewer
+     * is offered the update as a button.
+     */
+    const [playingId, setPlayingId] = useState<string | null>(null);
 
     // The nav slides out over the video, so stop it first
     const openNav = () => {
@@ -146,7 +156,15 @@ export function VideoPage() {
             }
 
             setState({ kind: 'ready', data });
-            if (data.status !== 'pending') stopPolling();
+            // Pin the first playback id the server hands us; every later
+            // change is an update the viewer opts into (see playingId).
+            const served = data.status === 'completed' ? data.muxPlaybackId : undefined;
+            if (served) setPlayingId(prev => prev ?? served);
+            // Keep polling past 'completed' while a newer version renders —
+            // that poll is what turns into the update button. Once it lands
+            // (or the catch-up stops being offered) there is nothing left to
+            // watch for; an edit made after that needs a reload.
+            if (data.status !== 'pending' && !data.newerVersion) stopPolling();
         };
 
         load();
@@ -227,6 +245,12 @@ export function VideoPage() {
     const captions = data?.status === 'completed' ? data.captions : undefined;
     const openExtension = () => { window.open(CHROME_EXTENSION_URL, '_blank'); };
 
+    // What the server is serving now vs. what is on screen. They differ
+    // only after a newer version finished rendering mid-session.
+    const servedId = data?.status === 'completed' ? data.muxPlaybackId : undefined;
+    const shownId = playingId ?? servedId;
+    const updateReady = Boolean(servedId && playingId && servedId !== playingId);
+
     return (
         <div className="h-screen bg-surface-body flex flex-col">
             {/* Header — nav at the far left, actions at the far right */}
@@ -269,14 +293,28 @@ export function VideoPage() {
                                     <PlaceholderSpinner />
                                     <span className="text-sm text-text-on-media" role="status">Loading video...</span>
                                 </PlayerPlaceholder>
-                            ) : data.status === 'completed' && data.muxPlaybackId ? (
+                            ) : data.status === 'completed' && shownId ? (
                                 <MuxPlayer
                                     ref={playerRef}
-                                    playbackId={data.muxPlaybackId}
+                                    playbackId={shownId}
                                     streamType="on-demand"
                                     onTimeUpdate={() => setCurrentTimeMs((playerRef.current?.currentTime ?? 0) * 1000)}
                                     onSeeked={() => setCurrentTimeMs((playerRef.current?.currentTime ?? 0) * 1000)}
-                                    style={{ width: '100%', borderRadius: '0.75rem', overflow: 'hidden' }}
+                                    // mux-player is a web component, so its box
+                                    // is styled inline rather than by class.
+                                    // aspectRatio is load-bearing: with only a
+                                    // width the element has no height until Mux
+                                    // reads the media's metadata, so the player
+                                    // renders as a squat strip for a frame and
+                                    // then snaps to full height. 16/9 matches
+                                    // PlayerPlaceholder, so the box is the same
+                                    // size before and after the video attaches.
+                                    style={{
+                                        width: '100%',
+                                        aspectRatio: '16 / 9',
+                                        borderRadius: '0.75rem',
+                                        overflow: 'hidden',
+                                    }}
                                 />
                             ) : data.status === 'failed' ? (
                                 <PlayerPlaceholder>
@@ -326,6 +364,32 @@ export function VideoPage() {
                                     <span className="text-sm text-text-on-media">Could not find video</span>
                                 </PlayerPlaceholder>
                             )}
+                            {/* Version strip — only while the share is behind
+                                the project. Sits under the player rather than
+                                over it so it never covers the video. */}
+                            {updateReady ? (
+                                <div className="mt-3 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border bg-surface px-4 py-2.5">
+                                    <span className="text-sm" role="status">
+                                        A newer version of this video is ready.
+                                    </span>
+                                    <Button
+                                        variant="primary"
+                                        icon={LuRefreshCw}
+                                        onClick={() => setPlayingId(servedId ?? null)}
+                                    >
+                                        Update player
+                                    </Button>
+                                </div>
+                            ) : data?.newerVersion ? (
+                                <div className="mt-3 flex items-center gap-2.5 rounded-[var(--radius-md)] border border-border bg-surface px-4 py-2.5">
+                                    <PlaceholderSpinner className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="text-label" role="status">
+                                        {data.newerVersion.progress === undefined
+                                            ? 'A newer version is being prepared — you can keep watching this one.'
+                                            : `A newer version is rendering (${Math.round(data.newerVersion.progress * 100)}%) — you can keep watching this one.`}
+                                    </span>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </main>

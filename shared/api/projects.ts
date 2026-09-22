@@ -291,5 +291,22 @@ export const SharedVideoGetResponseSchema = Type.Object({
      * anonymous viewers; omitted rather than false for view-only ones.
      */
     canEdit: Type.Optional(Type.Literal(true)),
+    /**
+     * Present only while the served video is BEHIND the project's current
+     * version and a render for that version is in flight. The watch page
+     * keeps playing `muxPlaybackId` (the older, still-complete video) and
+     * shows a "new version rendering" note; when the render lands, a later
+     * poll returns the new `muxPlaybackId` with this key gone, which is
+     * the page's cue to offer an update button rather than swap underneath
+     * the viewer. Absent on an up-to-date share AND on a stale one whose
+     * re-render is blocked (attempt budget spent, media not ready) — a
+     * viewer is never shown a promise the server can't keep.
+     */
+    newerVersion: Type.Optional(
+        Type.Object({
+            /** Its render_jobs.progress 0–1; absent = queued, not yet reporting */
+            progress: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+        }),
+    ),
 });
 export type SharedVideoGetResponse = Static<typeof SharedVideoGetResponseSchema>;

@@ -648,15 +648,101 @@ describe.runIf(hasTestDb())('POST /shared-video-get (e2e, real Postgres)', () =>
         expect(deps.renderWorker.submissions).toHaveLength(1);
     });
 
-    it('an older completed video still plays and does NOT render the newer version', async () => {
+    it('an older completed video still plays while the newer version renders', async () => {
         const { app, deps } = testApp();
         const project = await seedReady({ cloudVersion: 2 });
         nameOwner(deps, project.ownerId, { full_name: 'Jane' });
         await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old' });
 
         const res = await post(app, { slug: project.slug });
+        // The viewer keeps the video that exists; the catch-up runs behind it
+        expect(res.json()).toMatchObject({
+            status: 'completed', muxPlaybackId: 'pb-old', newerVersion: {},
+        });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+        // Dispatched for the CURRENT version, not the one being served
+        const { rows } = await pool.query(
+            `SELECT cloud_version FROM render_jobs WHERE project_id = $1`, [project.id],
+        );
+        expect(rows).toMatchObject([{ cloud_version: 2 }]);
+    });
+
+    it('the catch-up dispatches once, then reports the in-flight render progress', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ cloudVersion: 2 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old' });
+
+        await post(app, { slug: project.slug });
+        // The pending row the first call created now short-circuits the poll
+        await pool.query(
+            `UPDATE render_jobs SET progress = 0.4 WHERE project_id = $1`, [project.id],
+        );
+        const res = await post(app, { slug: project.slug });
+
+        expect(res.json()).toMatchObject({
+            muxPlaybackId: 'pb-old', newerVersion: { progress: 0.4 },
+        });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+    });
+
+    it('a stale share whose budget is spent plays on, with no update promised', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ cloudVersion: 2 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old' });
+        // The current version's render has burnt its attempts inside the cooldown
+        await seedRenderJob(pool, {
+            projectId: project.id, cloudVersion: 2, quality: '1080p',
+            status: 'failed', attemptCount: 5,
+        });
+
+        const res = await post(app, { slug: project.slug });
         expect(res.json()).toMatchObject({ status: 'completed', muxPlaybackId: 'pb-old' });
+        expect(res.json()).not.toHaveProperty('newerVersion');
         expect(deps.renderWorker.submissions).toHaveLength(0);
+    });
+
+    it('a leftover pending row below the served version is not the update', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ cloudVersion: 3 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        // v2 plays; the v1 render died without a heartbeat and the stale-job
+        // cron hasn't swept its mux row yet
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 2, status: 'completed', muxPlaybackId: 'pb-v2' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'pending' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).toMatchObject({ muxPlaybackId: 'pb-v2', newerVersion: {} });
+        // v3 dispatched — the stale v1 row did not stand in for it
+        const { rows } = await pool.query(
+            `SELECT cloud_version FROM render_jobs WHERE project_id = $1`, [project.id],
+        );
+        expect(rows).toMatchObject([{ cloud_version: 3 }]);
+    });
+
+    it('an up-to-date completed video promises no newer version', async () => {
+        const { app, deps } = testApp();
+        const project = await seedReady({ cloudVersion: 1 });
+        nameOwner(deps, project.ownerId, { full_name: 'Jane' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-1' });
+
+        const res = await post(app, { slug: project.slug });
+        expect(res.json()).not.toHaveProperty('newerVersion');
+        expect(deps.renderWorker.submissions).toHaveLength(0);
+    });
+
+    it('the newer render completing hands the page the new playback id', async () => {
+        const { app } = testApp();
+        const project = await seedReady({ cloudVersion: 2 });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 1, status: 'completed', muxPlaybackId: 'pb-old' });
+        await seedMuxVideo(pool, { projectId: project.id, cloudVersion: 2, status: 'completed', muxPlaybackId: 'pb-new' });
+
+        const res = await post(app, { slug: project.slug });
+        // cloud_version DESC picks the newest; the page diffs it against
+        // what it is playing and offers the update button
+        expect(res.json()).toMatchObject({ muxPlaybackId: 'pb-new' });
+        expect(res.json()).not.toHaveProperty('newerVersion');
     });
 
     it('a completed row without a playback id reads as pending, not a re-render', async () => {

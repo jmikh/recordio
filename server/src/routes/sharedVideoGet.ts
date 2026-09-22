@@ -61,6 +61,7 @@
  *           | 403 { error: 'auth_required' } | 404 { error: 'not_found' }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import type { Deps } from '../deps.js';
 import { Type } from '@sinclair/typebox';
 import { SharedVideoGetRequestSchema, SharedVideoGetResponseSchema } from '@shared/api/projects';
 import { canViewProject, getProjectIfEditor } from '../services/projectAccess.js';
@@ -89,6 +90,7 @@ interface ProjectRow {
 
 interface MuxVideoRow {
     status: string;
+    cloud_version: number;
     mux_playback_id: string | null;
     render_progress: number | null;
 }
@@ -109,6 +111,133 @@ export interface SharedVideoGetRoutesOptions {
     statusCallbackUrl?: string;
     /** NODE_ENV — outside production the failure reason is sent to the page */
     env?: string;
+}
+
+/**
+ * The publish state of ONE (project, cloud_version) pair: the mux row and
+ * its render job, plus whether each was touched inside the cooldown. Both
+ * cooldown comparisons are made in SQL, against the same now() that wrote
+ * the columns — never against the app clock.
+ *
+ * Read by both automatic dispatch paths (self-heal and the stale-version
+ * catch-up), always for the project's CURRENT version, since that is the
+ * version either one would publish.
+ */
+async function loadPublishState(
+    db: Deps['db'],
+    projectId: string,
+    cloudVersion: number,
+): Promise<PublishStateRow | undefined> {
+    const { rows } = await db.query(
+        `SELECT mv.status        AS mux_status,
+                mv.error         AS mux_error,
+                mv.attempt       AS mux_attempt,
+                mv.updated_at    > now() - make_interval(secs => $4) AS mux_recent,
+                rj.status        AS render_status,
+                rj.error         AS render_error,
+                rj.attempt_count AS render_attempt_count,
+                rj.updated_at    > now() - make_interval(secs => $4) AS render_recent
+         FROM (SELECT $1::uuid AS project_id, $2::int AS cloud_version) k
+         LEFT JOIN mux_videos mv
+                ON mv.project_id = k.project_id AND mv.cloud_version = k.cloud_version
+         LEFT JOIN render_jobs rj
+                ON rj.project_id = k.project_id AND rj.cloud_version = k.cloud_version
+               AND rj.quality = $3`,
+        [projectId, cloudVersion, MUX_RENDER_QUALITY, PUBLISH_COOLDOWN_SECONDS],
+    );
+    return rows[0] as PublishStateRow | undefined;
+}
+
+/** The attempt-budget slice of a publish state row. */
+function attemptStateOf(state: PublishStateRow | undefined): PublishAttemptState {
+    return {
+        muxAttempt: state?.mux_attempt ?? null,
+        muxRecent: state?.mux_recent ?? null,
+        renderAttemptCount: state?.render_attempt_count ?? null,
+        renderRecent: state?.render_recent ?? null,
+    };
+}
+
+/** Structural sink for the catch-up's warnings (req.log satisfies it). */
+interface WarnLog {
+    warn(obj: object, msg?: string): void;
+}
+
+/**
+ * A share whose newest playable video is behind the project's current
+ * version. Starts the current version rendering and reports whether one
+ * is in flight, so the page can tell the viewer an update is coming.
+ *
+ * Contract: this must NEVER change what the viewer is served or fail the
+ * request — the older video plays either way. Unlike self-heal it fires
+ * on a HEALTHY share, on ordinary traffic, so every blocker (budget
+ * spent, media not ready, an impersonating admin, a dispatch that threw)
+ * resolves to `undefined`: no indicator, no error, just the old video.
+ * The page must not be promised a version the server isn't rendering.
+ *
+ * Dispatch is deliberately open to ANY viewer, anonymous included — the
+ * same reasoning as self-heal (the link is already public, and the render
+ * is reproducible from project_data), bounded by the same two-counter
+ * budget. The loop closes on the pending row: once a render is in flight
+ * this returns early on it, so the 5s poll reports progress instead of
+ * re-dispatching. Only a FAILED catch-up re-enters the dispatch, spending
+ * an attempt each time until the budget stops it.
+ *
+ * A pending row at any version is treated as "the newer render": if the
+ * project has moved on again since it started, the next poll after it
+ * completes finds the share still behind and dispatches afresh.
+ */
+async function catchUpStaleShare(args: {
+    deps: Deps;
+    project: ProjectRow;
+    pending: MuxVideoRow | undefined;
+    /** cloud_version of the video being served — what we are catching up FROM */
+    servedVersion: number;
+    statusCallbackUrl: string | undefined;
+    impersonating: boolean;
+    log: WarnLog;
+}): Promise<{ progress?: number } | undefined> {
+    const { deps, project, pending, servedVersion, statusCallbackUrl, impersonating, log } = args;
+
+    // Already rendering something newer than what we serve — report it,
+    // don't dispatch another. A pending row at or BELOW the served version
+    // is a leftover (its render died without a heartbeat and the stale-job
+    // cron hasn't swept it yet): it is not the update, so ignore it and
+    // dispatch, rather than promise a version nothing is working on.
+    if (pending && pending.cloud_version > servedVersion) {
+        return pending.render_progress !== null
+            ? { progress: pending.render_progress }
+            : {};
+    }
+    // Media never finished uploading; an impersonating admin is LOOKING
+    // at the page, not publishing from it. Same guards as self-heal.
+    if (project.upload_status !== 'ready' || impersonating) return undefined;
+    if (!statusCallbackUrl) return undefined;
+
+    // No completed-row check here: the caller only reaches this when the
+    // NEWEST completed version is older than the project's, so the current
+    // version cannot already be completed.
+    const state = await loadPublishState(deps.db, project.id, project.cloud_version);
+    if (!canAttemptPublish(attemptStateOf(state))) return undefined;
+
+    try {
+        await publishProjectToMux(deps, {
+            projectId: project.id,
+            ownerId: project.owner_id,
+            cloudVersion: project.cloud_version,
+            statusCallbackUrl,
+            log,
+        });
+        return {};
+    } catch (err) {
+        // publishProjectToMux already marked the row failed. The viewer
+        // still has a working video, so this is a warning, not a failure.
+        log.warn(
+            { err, 'project.id': project.id },
+            'shared video catch-up render failed to dispatch',
+        );
+        return undefined;
+    }
 }
 
 export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoutesOptions> = async (
@@ -199,7 +328,8 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
                 // no writers yet ("Render/Mux simplification Step 2").
                 app.deps.db.query(
                     `SELECT DISTINCT ON (mv.status)
-                            mv.status, mv.mux_playback_id, rj.progress AS render_progress
+                            mv.status, mv.cloud_version, mv.mux_playback_id,
+                            rj.progress AS render_progress
                      FROM mux_videos mv
                      LEFT JOIN render_jobs rj
                             ON rj.project_id = mv.project_id
@@ -232,12 +362,33 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
             if (completed?.mux_playback_id) {
                 req.logCtx.set({ 'mux.video_status': 'completed' });
                 const captions = getOutputCaptions(project.timeline);
+                // A playable video that is BEHIND the project's current
+                // version: serve it anyway — a viewer always gets the video
+                // that exists — and start the current version rendering in
+                // the background so the link catches up. This is the only
+                // thing that ever refreshes a shared video short of the
+                // owner re-opening the Share modal.
+                const newerVersion = completed.cloud_version < project.cloud_version
+                    ? await catchUpStaleShare({
+                        deps: app.deps,
+                        project,
+                        pending: byStatus.get('pending'),
+                        servedVersion: completed.cloud_version,
+                        statusCallbackUrl,
+                        impersonating: isImpersonating(req),
+                        log: req.log,
+                    })
+                    : undefined;
+                if (newerVersion) req.logCtx.set({ 'mux.newer_version_rendering': true });
                 return {
                     ...base,
                     status: 'completed' as const,
                     muxPlaybackId: completed.mux_playback_id,
                     // Key omitted (not []) when there is nothing to show
                     ...(captions.length > 0 && { captions }),
+                    // Key omitted when up to date, or when the catch-up
+                    // couldn't be started — see the schema's contract
+                    ...(newerVersion && { newerVersion }),
                 };
             }
             const pending = byStatus.get('pending');
@@ -257,24 +408,9 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
             // budget is read from that version's pair of rows.
             // Both cooldown comparisons are made HERE, against the same
             // NOW() that wrote the columns — never against the app clock.
-            const { rows: stateRows } = await app.deps.db.query(
-                `SELECT mv.status        AS mux_status,
-                        mv.error         AS mux_error,
-                        mv.attempt       AS mux_attempt,
-                        mv.updated_at    > now() - make_interval(secs => $4) AS mux_recent,
-                        rj.status        AS render_status,
-                        rj.error         AS render_error,
-                        rj.attempt_count AS render_attempt_count,
-                        rj.updated_at    > now() - make_interval(secs => $4) AS render_recent
-                 FROM (SELECT $1::uuid AS project_id, $2::int AS cloud_version) k
-                 LEFT JOIN mux_videos mv
-                        ON mv.project_id = k.project_id AND mv.cloud_version = k.cloud_version
-                 LEFT JOIN render_jobs rj
-                        ON rj.project_id = k.project_id AND rj.cloud_version = k.cloud_version
-                       AND rj.quality = $3`,
-                [project.id, project.cloud_version, MUX_RENDER_QUALITY, PUBLISH_COOLDOWN_SECONDS],
+            const state = await loadPublishState(
+                app.deps.db, project.id, project.cloud_version,
             );
-            const state = stateRows[0] as PublishStateRow | undefined;
 
             // A completed row whose playback id hasn't landed yet (the
             // parity fallthrough above): the Mux webhook is still coming.
@@ -297,12 +433,7 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
                 return base;
             }
 
-            const attemptState: PublishAttemptState = {
-                muxAttempt: state?.mux_attempt ?? null,
-                muxRecent: state?.mux_recent ?? null,
-                renderAttemptCount: state?.render_attempt_count ?? null,
-                renderRecent: state?.render_recent ?? null,
-            };
+            const attemptState = attemptStateOf(state);
             if (!canAttemptPublish(attemptState)) {
                 req.logCtx.set({
                     'mux.attempt': attemptState.muxAttempt ?? 0,
