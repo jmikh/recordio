@@ -28,11 +28,13 @@ import type { FullPageScrollToPayload, FullPageWaitForGrowthPayload, PageInfo } 
 // Initialize Sentry for error tracking
 initSentry('content');
 
-// Cleanup mechanism for previous instances
-const cleanupEvent = new Event('recordio-cleanup');
-window.dispatchEvent(cleanupEvent);
+// Cleanup mechanism for previous instances of THIS extension. DOM events cross
+// isolated worlds, so the name carries the extension id — otherwise a second
+// Recordio install (e.g. store + unpacked dev build) would tear down ours.
+const CLEANUP_EVENT = `recordio-cleanup:${chrome.runtime.id}`;
+window.dispatchEvent(new Event(CLEANUP_EVENT));
 
-window.addEventListener('recordio-cleanup', () => {
+window.addEventListener(CLEANUP_EVENT, () => {
     if (eventRecorder) {
         eventRecorder.stop();
         eventRecorder = null;

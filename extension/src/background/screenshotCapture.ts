@@ -255,13 +255,32 @@ export function screenshotNameFor(url: string | undefined, title: string | undef
     return 'Screenshot';
 }
 
-/** Makes sure the content script is present (tabs opened before install/update lack it). */
-export async function ensureContentScript(tabId: number, contentScriptPath: string): Promise<void> {
+const CONTENT_SCRIPT_READY_TIMEOUT_MS = 3000;
+const CONTENT_SCRIPT_READY_POLL_MS = 50;
+
+async function pingContentScript(tabId: number): Promise<boolean> {
     try {
         await chrome.tabs.sendMessage(tabId, { type: MSG_TYPES.BACKGROUND_CONTENT_GET_PAGE_INFO });
+        return true;
     } catch {
-        await chrome.scripting.executeScript({ target: { tabId }, files: [contentScriptPath] });
+        return false;
     }
+}
+
+/**
+ * Makes sure the content script is present (tabs opened before install/update lack it).
+ * The injected file is a crxjs loader that `import()`s the real module, so
+ * executeScript resolves before the message listener exists — poll until it answers.
+ */
+export async function ensureContentScript(tabId: number, contentScriptPath: string): Promise<void> {
+    if (await pingContentScript(tabId)) return;
+    await chrome.scripting.executeScript({ target: { tabId }, files: [contentScriptPath] });
+    const deadline = Date.now() + CONTENT_SCRIPT_READY_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+        if (await pingContentScript(tabId)) return;
+        await sleep(CONTENT_SCRIPT_READY_POLL_MS);
+    }
+    throw new Error('Could not load the page helper. Reload the page and try again.');
 }
 
 // ============================================================================

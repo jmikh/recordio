@@ -1,11 +1,11 @@
 ---
 name: cdn
-description: CDN asset hosting at cdn.recordio.cc — why assets live on CDN (render module runs both locally and server-side for cloud rendering) and directory conventions. Use when adding, referencing, or modifying CDN-hosted assets, or working with asset URLs in project JSON or render code.
+description: CDN asset hosting at cdn.recordio.io — why assets live on CDN (render module runs both locally and server-side for cloud rendering) and directory conventions. Use when adding, referencing, or modifying CDN-hosted assets, or working with asset URLs in project JSON or render code.
 ---
 
-# CDN Skill — cdn.recordio.cc
+# CDN Skill — cdn.recordio.io
 
-Static public assets served via CDN at `https://cdn.recordio.cc/<folder>/<file>`.
+Static public assets served via CDN at `https://cdn.recordio.io/<folder>/<file>`.
 
 ## Why CDN?
 
