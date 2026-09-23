@@ -63,6 +63,12 @@ async function track(eventName: string, properties: Record<string, any> = {}) {
             event: eventName,
             properties: {
                 token: MIXPANEL_TOKEN,
+                // Simplified ID Merge links identities through `$device_id`/`$user_id`,
+                // never through a bare distinct_id — an event carrying only the latter
+                // is its own island. `distinct_id` is sent alongside because Mixpanel
+                // derives it from `$device_id` anyway and the two agree, so events from
+                // before this property existed resolve to the same id.
+                $device_id: distinctId,
                 distinct_id: distinctId,
                 time: Math.floor(Date.now() / 1000),
                 $insert_id: crypto.randomUUID(),
@@ -86,12 +92,13 @@ async function track(eventName: string, properties: Record<string, any> = {}) {
 // Public API
 // ============================================================================
 
-// The distinct_id stays the anonymous UUID for the life of the install. Linking it
-// to a signed-in user is the webapp's job: the import handoff hands it our
-// distinct_id (see extensionDistinctId in shared/types/bridge.ts) and the webapp
-// emits the Simplified-ID-Merge $identify once it knows the email. The extension
-// has no reliable moment to do that itself, and the $create_alias it used to send
-// is not part of the Simplified ID Merge API at all.
+// The device id stays the anonymous UUID for the life of the install — the extension
+// has no auth of its own and so no moment at which it could identify anyone. Linking
+// it to a signed-in user is the webapp's job: the import handoff hands over this UUID
+// (see extensionDistinctId in shared/types/bridge.ts) and the webapp emits one event
+// carrying it as $device_id alongside the user's $user_id, which is what creates the
+// mapping under Simplified ID Merge. Neither $create_alias nor $identify is part of
+// that API — both are ignored on ingest.
 
 export type CaptureType = 'tab' | 'current_window' | 'another_window' | 'desktop';
 

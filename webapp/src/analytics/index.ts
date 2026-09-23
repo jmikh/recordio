@@ -126,12 +126,16 @@ export function rememberExtensionDistinctId(extensionDistinctId: string) {
  * page when the handoff arrives while already signed in — whichever happens last
  * is the one that does the work. Clears the stored ID so the link is emitted once.
  *
- * Under Simplified ID Merge an `$identify` event is what links an anonymous ID to
- * a user ID. We emit that event ourselves rather than calling mixpanel.identify(),
- * because identify() can only ever use the SDK's *own* previous distinct_id as
- * $anon_distinct_id — it has no way to link a third ID originating elsewhere.
- * This is the same event identify() emits internally, and it is an ordinary
- * track() call: same batcher, same /api/v2/m proxy as every other event.
+ * Under Simplified ID Merge the mapping is created the first time a `$device_id` and
+ * a `$user_id` appear on the *same* event — `$identify`/`$anon_distinct_id` is the
+ * Original ID Merge API and is ignored on ingest, so it cannot do this. We therefore
+ * send one ordinary event whose `$device_id` we override with the extension's, while
+ * `$user_id` stays the signed-in user. Same batcher, same /api/v2/m proxy as every
+ * other event. Overriding `$device_id` here is safe: the webapp's own device is
+ * already mapped to this user by every other event it sends.
+ *
+ * mixpanel.identify() cannot stand in for this — it can only ever link the SDK's own
+ * previous distinct_id, not a third ID originating elsewhere.
  */
 export function linkExtensionIdentity(email: string) {
     if (isImpersonating()) return;
@@ -151,13 +155,19 @@ export function linkExtensionIdentity(email: string) {
     if (extensionDistinctId === email) return;
 
     if (!IS_PRODUCTION) {
-        console.log('[Analytics] $identify', { distinct_id: email, $anon_distinct_id: extensionDistinctId });
+        console.log('[Analytics] extension_linked', { $device_id: extensionDistinctId, $user_id: email });
         return;
     }
     try {
-        mixpanel.track('$identify', { distinct_id: email, $anon_distinct_id: extensionDistinctId });
+        mixpanel.track('extension_linked', {
+            $device_id: extensionDistinctId,
+            // Both are already in persistence from identifyUser(), but the merge depends
+            // on them, so don't rely on call ordering to put them there.
+            $user_id: email,
+            distinct_id: email,
+        });
     } catch (e) {
-        console.error('[Analytics] Mixpanel $identify failed:', e);
+        console.error('[Analytics] Mixpanel extension_linked failed:', e);
     }
 }
 
