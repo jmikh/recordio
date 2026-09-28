@@ -1,11 +1,41 @@
 /**
- * Client↔server contract for the admin-only impersonation routes
- * (plans/admin-user-impersonation-oneshot.md). Both routes 403 unless
- * the caller's verified JWT email is in the server's ADMIN_EMAILS
- * allowlist — the webapp's /admin page uses that 403 as its
- * "am I admin" probe.
+ * Client↔server contract for the admin-only routes
+ * (plans/admin-user-impersonation-oneshot.md). Every route here 403s
+ * unless the caller's verified JWT email is in the server's
+ * ADMIN_EMAILS allowlist.
  */
 import { Type, type Static } from '@sinclair/typebox';
+
+// ── POST /admin-status ───────────────────────────────────────────
+
+/**
+ * The webapp's "am I admin" probe: 200 for admins, 403 otherwise. The
+ * /admin page renders nothing until this answers, and a 403 becomes a
+ * plain 404 so the page's existence is never revealed. Empty body.
+ */
+export interface AdminStatusResponse {
+    ok: true;
+}
+
+// ── POST /admin-growth-stats ─────────────────────────────────────
+
+/** Rows created on one UTC day (`day` is YYYY-MM-DD). Days with zero rows are omitted. */
+export interface AdminDailyCount {
+    day: string;
+    count: number;
+}
+
+/**
+ * Empty body. Signups (auth.users) and project creations per UTC day,
+ * ascending, since the first row of each. Sparse — the page fills the
+ * gaps and re-buckets (day/week/month, rate/cumulative) client-side.
+ * Projects count every row ever created, deleted ones included: this
+ * is a creation-rate chart, not an inventory.
+ */
+export interface AdminGrowthStatsResponse {
+    accounts: AdminDailyCount[];
+    projects: AdminDailyCount[];
+}
 
 // ── POST /admin-user-list ────────────────────────────────────────
 

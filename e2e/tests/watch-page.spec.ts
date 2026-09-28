@@ -62,7 +62,7 @@ test('signed in + editor: Edit button, flush transcript panel, header pinned to 
     await expect(page.getByRole('heading', { name: seeded.name })).toBeVisible();
 
     await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Record for free' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeHidden();
     await expect(page.getByRole('region', { name: 'Transcript' })).toBeVisible();
     await expect(page.getByText('Record your screen free')).toBeHidden();
 
@@ -93,7 +93,7 @@ test('signed in + editor: Edit button, flush transcript panel, header pinned to 
     await expect(page).toHaveURL(new RegExp(`/video/${slug}/edit`));
 });
 
-test('signed out: no Edit, promo pinned in the panel, Record for free in the header', async ({ browser, page }) => {
+test('signed out: no Edit, promo pinned in the panel, Sign in in the header', async ({ browser, page }) => {
     const slug = await slugOf(page);
     // The fixture seeds a private project; anonymous viewers need it published
     const { token } = await signIn();
@@ -107,7 +107,7 @@ test('signed out: no Edit, promo pinned in the panel, Record for free in the hea
 
     await expect(anon.getByRole('button', { name: 'Edit' })).toBeHidden();
     await expect(anon.getByRole('button', { name: 'Open navigation' })).toBeHidden();
-    await expect(anon.getByRole('button', { name: 'Record for free' })).toBeVisible();
+    await expect(anon.getByRole('button', { name: 'Sign in' })).toBeVisible();
     await expect(anon.getByText('Record your screen free')).toBeVisible();
     // The panel is there even without a transcript (the fixture has none)
     await expect(anon.getByRole('complementary', { name: 'Video details' })).toBeVisible();

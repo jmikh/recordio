@@ -55,6 +55,8 @@ import { userProjectDefaultsClearRoutes } from './routes/userProjectDefaultsClea
 import { workspaceGetDefaultRoutes } from './routes/workspaces/workspaceGetDefault.js';
 import { subscriptionGetRoutes } from './routes/billing/subscriptionGet.js';
 import { trialExtendRoutes } from './routes/billing/trialExtend.js';
+import { adminStatusRoutes } from './routes/admin/adminStatus.js';
+import { adminGrowthStatsRoutes } from './routes/admin/adminGrowthStats.js';
 import { adminUserListRoutes } from './routes/admin/adminUserList.js';
 import { adminImpersonateRoutes } from './routes/admin/adminImpersonate.js';
 import { screenshotCreateRoutes } from './routes/screenshots/screenshotCreate.js';
@@ -259,7 +261,10 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(screenshotRenderUploadRoutes);
     app.register(sharedScreenshotGetRoutes);
 
-    // Admin user impersonation (plans/admin-user-impersonation-oneshot.md)
+    // Admin surface (plans/admin-user-impersonation-oneshot.md): the
+    // /admin page's gate probe, its growth dashboard, and impersonation
+    app.register(adminStatusRoutes, { adminEmails: opts.adminEmails });
+    app.register(adminGrowthStatsRoutes, { adminEmails: opts.adminEmails });
     app.register(adminUserListRoutes, { adminEmails: opts.adminEmails });
     app.register(adminImpersonateRoutes, {
         adminEmails: opts.adminEmails,

@@ -9,6 +9,7 @@ import { VideoPage } from './pages/VideoPage';
 import { UninstallPage } from './pages/UninstallPage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { AdminPage } from './pages/admin/AdminPage';
+import { adminSectionFromPath } from './pages/admin/adminSection';
 import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { ToastProvider } from './components/Toast';
 import { AuthManager } from './auth/AuthManager';
@@ -75,10 +76,11 @@ export function App() {
             return <AcceptInvitePage />;
         }
 
-        // Hidden admin page (impersonation) — auth-required; the server
-        // 403s non-admins
-        if (path === '/admin') {
-            return <AdminPage />;
+        // Hidden admin surface (/admin, /admin/growth) — auth-required;
+        // the page itself renders nothing until the server confirms the
+        // caller is an admin, and 404s otherwise
+        if (path === '/admin' || path.startsWith('/admin/')) {
+            return <AdminPage section={adminSectionFromPath(path)} />;
         }
 
         // Settings renders inside the dashboard layout; legacy tab paths

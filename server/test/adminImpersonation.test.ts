@@ -51,12 +51,20 @@ describe('admin routes (auth, no db)', () => {
         expect(res.statusCode).toBe(401);
     });
 
-    it('403 for a non-admin user on both routes', async () => {
+    it('403 for a non-admin user on every admin route', async () => {
         const token = await userToken({ email: 'someone@else.com' });
-        const list = await post(app(ADMIN_EMAIL), '/admin-user-list', token);
-        expect(list.statusCode).toBe(403);
+        for (const route of ['/admin-status', '/admin-growth-stats', '/admin-user-list']) {
+            expect((await post(app(ADMIN_EMAIL), route, token)).statusCode, route).toBe(403);
+        }
         const mint = await post(app(ADMIN_EMAIL), '/admin-impersonate', token, { userId: 'x' });
         expect(mint.statusCode).toBe(403);
+    });
+
+    it('admin-status answers 200 for an admin without touching the db', async () => {
+        // The fake db throws — a 200 proves the probe never queries it
+        const res = await post(app(ADMIN_EMAIL), '/admin-status', await userToken({ email: ADMIN_EMAIL }));
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({ ok: true });
     });
 
     it('403 when no allowlist is configured (fail closed)', async () => {
@@ -138,6 +146,41 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
         // The freshly-updated project puts the active user ahead of the dormant one
         expect(users.findIndex(u => u.id === active.id))
             .toBeLessThan(users.findIndex(u => u.id === dormant.id));
+    });
+
+    it('counts signups and project creations per UTC day, sparse and ascending', async () => {
+        const user = await seedAuthUser(pool, { name: 'Growth User', keepBootstrapWorkspace: true });
+        createdUsers.push(user.id);
+        // Two projects on one old day, one deleted — deletion doesn't
+        // change that it was created
+        const oldDay = '2001-02-03';
+        const a = await seedProject(pool, { ownerId: user.id, createdAt: `${oldDay}T10:00:00Z` });
+        const b = await seedProject(pool, {
+            ownerId: user.id,
+            createdAt: `${oldDay}T23:59:59Z`,
+            permanentlyDeleted: true,
+        });
+        createdProjects.push(a.id, b.id);
+
+        const res = await post(testApp(), '/admin-growth-stats', await userToken({ email: ADMIN_EMAIL }));
+        expect(res.statusCode).toBe(200);
+        const { accounts, projects } = res.json() as {
+            accounts: Array<{ day: string; count: number }>;
+            projects: Array<{ day: string; count: number }>;
+        };
+
+        const today = new Date().toISOString().slice(0, 10);
+        const todayAccounts = accounts.find(r => r.day === today);
+        expect(todayAccounts).toBeDefined();
+        expect(todayAccounts!.count).toBeGreaterThanOrEqual(1);
+
+        const oldProjects = projects.find(r => r.day === oldDay);
+        expect(oldProjects).toEqual({ day: oldDay, count: 2 });
+        // Ascending by day
+        const days = projects.map(r => r.day);
+        expect(days).toEqual([...days].sort());
+        // Every day listed has at least one row
+        expect(projects.every(r => r.count >= 1)).toBe(true);
     });
 
     it('404 for an unknown target (malformed id included)', async () => {

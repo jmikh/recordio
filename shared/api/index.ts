@@ -82,8 +82,10 @@ import type {
     WorkspaceSetDefaultResponse,
 } from './workspaces';
 import type {
+    AdminGrowthStatsResponse,
     AdminImpersonateRequest,
     AdminImpersonateResponse,
+    AdminStatusResponse,
     AdminUserListResponse,
 } from './admin';
 import type {
@@ -155,6 +157,8 @@ export interface ApiRoutes {
     'workspace-get-default': { request: EmptyRequest; response: DefaultWorkspace };
     'subscription-get': { request: SubscriptionGetRequest; response: SubscriptionGetResponse };
     'trial-extend': { request: TrialExtendRequest; response: TrialExtendResponse };
+    'admin-status': { request: EmptyRequest; response: AdminStatusResponse };
+    'admin-growth-stats': { request: EmptyRequest; response: AdminGrowthStatsResponse };
     'admin-user-list': { request: EmptyRequest; response: AdminUserListResponse };
     'admin-impersonate': { request: AdminImpersonateRequest; response: AdminImpersonateResponse };
 }

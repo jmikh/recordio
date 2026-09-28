@@ -14,29 +14,32 @@
  * viewer is usually not the person who can re-share it.
  *
  * Layout: full-bleed. The header pins navigation to the far left and
- * actions to the far right; the player takes everything left of a
- * flush side panel. The panel is always there — transcript or an empty
- * state — plus the "Try Recordio" promo pinned underneath for signed-out
- * viewers only; signed-in viewers instead get an Edit button when the
- * server says they can (canEdit). On wide screens the panel collapses to
- * a rail so the video can take the full width; the choice sticks per
- * browser. Narrow screens stack the panel under the video and ignore it.
+ * the account menu (or a Sign in button) to the far right, like every
+ * other header; the video's own actions — copy link, and Edit when the
+ * server says the viewer may (canEdit) — sit as icon buttons opposite
+ * the title. The player takes everything left of a flush side panel.
+ * The panel is always there — transcript or an empty state — plus the
+ * "Try Recordio" promo pinned underneath for signed-out viewers only.
+ * On wide screens the panel collapses to a rail so the video can take
+ * the full width; the choice sticks per browser. Narrow screens stack
+ * the panel under the video and ignore it.
  */
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import MuxPlayer, { type MuxPlayerRefAttributes } from '@mux/mux-player-react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { LuCircleAlert, LuCopy, LuLock, LuPanelRightClose, LuPanelRightOpen, LuPencil, LuRefreshCw } from 'react-icons/lu';
+import { LuCheck, LuCircleAlert, LuCopy, LuLock, LuPanelRightClose, LuPanelRightOpen, LuPencil, LuRefreshCw } from 'react-icons/lu';
 import { LogoLink } from '@shared/components/LogoLink';
-import { Button } from '@shared/components';
+import { Button, LoadingLogo } from '@shared/components';
 import type { SharedVideoGetResponse } from '@shared/api';
 import { CHROME_EXTENSION_URL, MARKETING_ORIGIN, SUPPORT_EMAIL } from '@shared/types/bridge';
-import { ThemeToggle } from '../theme/ThemeToggle';
 import { invokeFunction } from '../api/client';
 import { AuthModal } from '../auth/AuthModal';
 import { useUserStore } from '../auth/useUserStore';
 import { navigate } from '../lib/navigate';
 import { editorPath } from '../lib/videoUrls';
 import { NavDrawer, NavDrawerToggle } from '../components/NavDrawer';
+import { SupportModal } from '../components/SupportModal';
+import { UserMenu } from '../components/UserMenu';
 import { useNavDrawerStore } from '../components/useNavDrawerStore';
 import { VideoTranscript } from '../components/VideoTranscript';
 
@@ -56,10 +59,11 @@ type PageState =
  * 16:9 stand-in for the player while there is nothing to play. Dark in
  * both themes (--surface-media), so the slot reads as a video surface
  * rather than as page background — hence the text-on-media foreground.
+ * `relative` so LoadingLogo (absolute, full-parent) can fill it.
  */
 function PlayerPlaceholder({ children }: { children: ReactNode }) {
     return (
-        <div className="aspect-video w-full bg-surface-media rounded-xl border border-border flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="relative aspect-video w-full bg-surface-media rounded-xl border border-border flex flex-col items-center justify-center gap-3 px-6 text-center">
             {children}
         </div>
     );
@@ -99,6 +103,7 @@ export function VideoPage() {
     const [state, setState] = useState<PageState>(() =>
         slug ? { kind: 'loading' } : { kind: 'error', message: 'Invalid link' });
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     // Player position in output ms — drives the transcript highlight
     const [currentTimeMs, setCurrentTimeMs] = useState(0);
@@ -253,26 +258,17 @@ export function VideoPage() {
 
     return (
         <div className="h-screen bg-surface-body flex flex-col">
-            {/* Header — nav at the far left, actions at the far right */}
+            {/* Header — nav at the far left, account menu / CTA at the far right */}
             <header className="h-header shrink-0 border-b border-border bg-surface flex items-center justify-between px-4">
                 {/* Signed-out viewers have no library to navigate to */}
                 {isAuthenticated ? <NavDrawerToggle onOpen={openNav} /> : <LogoLink />}
-                <div className="flex items-center gap-2">
-                    <ThemeToggle />
-                    <Button icon={LuCopy} onClick={copyLink}>
-                        {linkCopied ? 'Copied!' : 'Copy link'}
+                {isAuthenticated ? (
+                    <UserMenu onOpenSupportModal={() => setIsSupportModalOpen(true)} />
+                ) : (
+                    <Button variant="primary" onClick={() => setIsAuthModalOpen(true)}>
+                        Sign in
                     </Button>
-                    {data?.canEdit && slug && (
-                        <Button variant="primary" icon={LuPencil} onClick={() => navigate(editorPath(slug))}>
-                            Edit
-                        </Button>
-                    )}
-                    {!isAuthenticated && (
-                        <Button variant="primary" onClick={openExtension}>
-                            Record for free
-                        </Button>
-                    )}
-                </div>
+                )}
             </header>
 
             <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
@@ -280,18 +276,39 @@ export function VideoPage() {
                     screen the width cap keeps a 16:9 player from pushing
                     below the fold (taller aspect ratios just scroll) */}
                 <main className="flex-1 min-w-0 min-h-0 overflow-y-auto scrollbar-thin">
-                    <div className="px-6 pt-5 pb-4">
-                        {/* Non-breaking spaces hold the two lines' height
-                            while loading, so the player never shifts up */}
-                        <h1 className="heading-2 truncate">{data?.name ?? ' '}</h1>
-                        <p className="text-label mt-0.5">{data?.userName ?? ' '}</p>
+                    <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            {/* Non-breaking spaces hold the two lines' height
+                                while loading, so the player never shifts up */}
+                            <h1 className="heading-2 truncate">{data?.name ?? ' '}</h1>
+                            <p className="text-label mt-0.5">{data?.userName ?? ' '}</p>
+                        </div>
+                        {/* The accessible names stay fixed (tests select by
+                            them); the copied state shows in the glyph + tooltip */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                                variant="ghost"
+                                icon={linkCopied ? LuCheck : LuCopy}
+                                onClick={copyLink}
+                                aria-label="Copy link"
+                                title={linkCopied ? 'Copied!' : 'Copy link'}
+                            />
+                            {data?.canEdit && slug && (
+                                <Button
+                                    variant="ghost"
+                                    icon={LuPencil}
+                                    onClick={() => navigate(editorPath(slug))}
+                                    aria-label="Edit"
+                                    title="Edit"
+                                />
+                            )}
+                        </div>
                     </div>
                     <div className="px-6 pb-6">
                         <div className="w-full max-w-[calc((100vh-11rem)*16/9)] mx-auto">
                             {!data ? (
                                 <PlayerPlaceholder>
-                                    <PlaceholderSpinner />
-                                    <span className="text-sm text-text-on-media" role="status">Loading video...</span>
+                                    <LoadingLogo text="Loading video..." />
                                 </PlayerPlaceholder>
                             ) : data.status === 'completed' && shownId ? (
                                 <MuxPlayer
@@ -465,6 +482,8 @@ export function VideoPage() {
             </div>
 
             <NavDrawer />
+            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
         </div>
     );
 }
