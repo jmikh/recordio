@@ -94,6 +94,40 @@ export interface AdminProjectListResponse {
     projects: AdminProjectSummary[];
 }
 
+// ── POST /admin-subscriber-list ──────────────────────────────────
+
+/**
+ * One row of the admin's subscribers list: a workspace that has (or
+ * had) a Stripe subscription, with the user who bought it. There is a
+ * single plan (per-seat Pro), so the "plan" is the billing interval
+ * plus seats. `status` is Stripe's verbatim ('active', 'past_due',
+ * 'trialing', 'canceled', …); a scheduled cancellation is a live
+ * status with `cancel_at` set.
+ */
+export interface AdminSubscriberSummary {
+    workspace_id: string;
+    workspace_name: string;
+    user_id: string;
+    email: string | null;
+    name: string | null;
+    status: string;
+    billing_interval: 'monthly' | 'yearly' | null;
+    seats: number;
+    /** When the subscription will end if a cancellation is scheduled. */
+    cancel_at: string | null;
+    current_period_end: string | null;
+    stripe_customer_id: string | null;
+    /** First subscribed — the subscriptions row's creation (upserts keep it). */
+    subscribed_at: string | null;
+    /** The buyer's auth.users signup. */
+    account_created_at: string | null;
+}
+
+/** Empty body. Every subscriptions row, newest subscriber first. */
+export interface AdminSubscriberListResponse {
+    subscribers: AdminSubscriberSummary[];
+}
+
 // ── POST /admin-impersonate ──────────────────────────────────────
 
 export const AdminImpersonateRequestSchema = Type.Object({

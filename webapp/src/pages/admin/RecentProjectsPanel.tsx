@@ -6,7 +6,7 @@
  * One fetch (admin-project-list, ~100 rows, newest-updated first). Each
  * row shows the project, its owner, the recording length, and an icon
  * per feature the project carries (camera, mic, captions, zooms,
- * spotlights, blurs — dimmed when absent). Clicking a row mints an
+ * spotlights, blurs — primary-coloured when present, dimmed when absent). Clicking a row mints an
  * impersonation token for the OWNER and reboots the app straight into
  * that project's editor, so the admin sees exactly what the owner sees.
  */
@@ -44,7 +44,7 @@ function FeatureIcons({ project }: { project: AdminProjectSummary }) {
                 return (
                     <Tooltip key={key} text={text}>
                         <span role="img" aria-label={text} className="flex">
-                            <Icon className={`icon-md ${on ? 'text-text-main' : 'text-text-disabled'}`} />
+                            <Icon className={`icon-md ${on ? 'text-primary' : 'text-text-disabled'}`} />
                         </span>
                     </Tooltip>
                 );

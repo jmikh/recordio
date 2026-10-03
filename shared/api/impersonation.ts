@@ -53,6 +53,19 @@ export function isAllowedWhileImpersonating(routeName: string): boolean {
     return IMPERSONATION_ALLOWED_ROUTES.has(routeName);
 }
 
+/**
+ * The /admin-* routes are the ADMIN's own, never the target's: the webapp
+ * sends them with the admin's real session token even mid-impersonation,
+ * so the /admin page keeps working (its gate probe would otherwise be
+ * refused as a write on the impersonation token) and the admin can hop
+ * to another user or project without exiting first. The server side is
+ * unchanged — an impersonation token is still refused on these routes,
+ * since they are absent from the allowlist above.
+ */
+export function isAdminRoute(routeName: string): boolean {
+    return routeName.startsWith('admin-');
+}
+
 /** Shown by both sides when a write is refused — one wording, one meaning. */
 export const IMPERSONATION_READ_ONLY_MESSAGE =
     'Read-only while impersonating — this action would change the user\'s account';

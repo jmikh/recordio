@@ -87,6 +87,7 @@ import type {
     AdminImpersonateResponse,
     AdminProjectListResponse,
     AdminStatusResponse,
+    AdminSubscriberListResponse,
     AdminUserListResponse,
 } from './admin';
 import type {
@@ -162,5 +163,6 @@ export interface ApiRoutes {
     'admin-growth-stats': { request: EmptyRequest; response: AdminGrowthStatsResponse };
     'admin-user-list': { request: EmptyRequest; response: AdminUserListResponse };
     'admin-project-list': { request: EmptyRequest; response: AdminProjectListResponse };
+    'admin-subscriber-list': { request: EmptyRequest; response: AdminSubscriberListResponse };
     'admin-impersonate': { request: AdminImpersonateRequest; response: AdminImpersonateResponse };
 }

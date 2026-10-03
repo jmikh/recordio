@@ -1,5 +1,5 @@
 /**
- * /admin, /admin/projects and /admin/growth — the hidden admin surface
+ * /admin and its sections — the hidden admin surface
  * (plans/admin-user-impersonation-oneshot.md).
  *
  * Gated up front: nothing renders but the bare page background until
@@ -9,16 +9,18 @@
  *
  *   /admin           Users    — impersonation picker (ImpersonatePanel)
  *   /admin/projects  Projects — recent projects, click to open as owner (RecentProjectsPanel)
+ *   /admin/subscribers  Subscribers — every Stripe subscription and its state (SubscribersPanel)
  *   /admin/growth    Growth   — accounts/projects over time (GrowthPanel)
  */
 import { useEffect, useState } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { LuChartLine, LuUsers, LuVideo } from 'react-icons/lu';
+import { LuChartLine, LuCreditCard, LuUsers, LuVideo } from 'react-icons/lu';
 import { Button, LogoLink, Modal, SidebarNav, SidebarNavItem } from '@shared/components';
 import { invokeFunction } from '../../api/client';
 import { navigate } from '../../lib/navigate';
 import { ImpersonatePanel } from './ImpersonatePanel';
 import { RecentProjectsPanel } from './RecentProjectsPanel';
+import { SubscribersPanel } from './SubscribersPanel';
 import { GrowthPanel } from './GrowthPanel';
 import { ADMIN_SECTION_PATHS, type AdminSection } from './adminSection';
 
@@ -27,6 +29,7 @@ type Gate = 'checking' | 'ready' | 'forbidden' | 'error';
 const SECTIONS: Array<{ id: AdminSection; label: string; icon: typeof LuUsers }> = [
     { id: 'users', label: 'Users', icon: LuUsers },
     { id: 'projects', label: 'Projects', icon: LuVideo },
+    { id: 'subscribers', label: 'Subscribers', icon: LuCreditCard },
     { id: 'growth', label: 'Growth', icon: LuChartLine },
 ];
 
@@ -127,6 +130,7 @@ export function AdminPage({ section }: AdminPageProps) {
                 <div className="w-full max-w-3xl">
                     {section === 'users' && <ImpersonatePanel />}
                     {section === 'projects' && <RecentProjectsPanel />}
+                    {section === 'subscribers' && <SubscribersPanel />}
                     {section === 'growth' && <GrowthPanel />}
                 </div>
             </main>

@@ -1,5 +1,5 @@
 /**
- * /admin-user-list + /admin-project-list + /admin-impersonate
+ * /admin-user-list + /admin-project-list + /admin-subscriber-list + /admin-impersonate
  * (plans/admin-user-impersonation-oneshot.md).
  *
  * Unit tier: ADMIN_EMAILS gating — 401 without a token, 403 for
@@ -24,6 +24,7 @@ import {
     hasTestDb,
     seedAuthUser,
     seedProject,
+    seedSubscription,
 } from './helpers/db.js';
 
 const ADMIN_EMAIL = 'admin@example.com';
@@ -53,7 +54,7 @@ describe('admin routes (auth, no db)', () => {
 
     it('403 for a non-admin user on every admin route', async () => {
         const token = await userToken({ email: 'someone@else.com' });
-        for (const route of ['/admin-status', '/admin-growth-stats', '/admin-user-list', '/admin-project-list']) {
+        for (const route of ['/admin-status', '/admin-growth-stats', '/admin-user-list', '/admin-project-list', '/admin-subscriber-list']) {
             expect((await post(app(ADMIN_EMAIL), route, token)).statusCode, route).toBe(403);
         }
         const mint = await post(app(ADMIN_EMAIL), '/admin-impersonate', token, { userId: 'x' });
@@ -247,6 +248,51 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
         // Newest-updated first
         expect(projects.findIndex(p => p.id === rich.id))
             .toBeLessThan(projects.findIndex(p => p.id === bare.id));
+    });
+
+    it('lists subscribers with plan, status, cancellation and both start dates', async () => {
+        const buyer = await seedAuthUser(pool, { name: 'Paying Customer', keepBootstrapWorkspace: true });
+        createdUsers.push(buyer.id);
+        const { rows } = await pool.query('SELECT id FROM workspaces WHERE owner_id = $1', [buyer.id]);
+        const workspaceId = (rows[0] as { id: string }).id;
+        const cancelAt = new Date(Date.now() + 10 * 86_400_000).toISOString();
+        await seedSubscription(pool, {
+            workspaceId,
+            userId: buyer.id,
+            status: 'active',
+            billingInterval: 'yearly',
+            seats: 3,
+            cancelAt,
+        });
+
+        const res = await post(testApp(), '/admin-subscriber-list', await userToken({ email: ADMIN_EMAIL }));
+        expect(res.statusCode).toBe(200);
+        const { subscribers } = res.json() as {
+            subscribers: Array<{
+                workspace_id: string;
+                email: string | null;
+                name: string | null;
+                status: string;
+                billing_interval: string | null;
+                seats: number;
+                cancel_at: string | null;
+                subscribed_at: string | null;
+                account_created_at: string | null;
+            }>;
+        };
+        const row = subscribers.find(r => r.workspace_id === workspaceId);
+        expect(row).toMatchObject({
+            email: buyer.email,
+            name: 'Paying Customer',
+            status: 'active',
+            billing_interval: 'yearly',
+            seats: 3,
+        });
+        expect(new Date(row!.cancel_at!).getTime()).toBe(new Date(cancelAt).getTime());
+        expect(row!.subscribed_at).not.toBeNull();
+        expect(row!.account_created_at).not.toBeNull();
+        // Just seeded → newest subscriber, so first
+        expect(subscribers[0].workspace_id).toBe(workspaceId);
     });
 
     it('counts signups and project creations per UTC day, sparse and ascending', async () => {

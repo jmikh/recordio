@@ -1,6 +1,6 @@
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js';
 import type { ApiRoutes } from '@shared/api';
-import { IMPERSONATION_READ_ONLY_MESSAGE, isAllowedWhileImpersonating } from '@shared/api';
+import { IMPERSONATION_READ_ONLY_MESSAGE, isAdminRoute, isAllowedWhileImpersonating } from '@shared/api';
 import { authAwareFetch, notifyUnauthorized, supabase } from '../supabase/client';
 import { getImpersonation } from '../auth/impersonation';
 
@@ -60,8 +60,10 @@ export async function invokeFunction(name: string, body?: unknown): Promise<Invo
         ? {}
         : { 'Content-Type': 'application/json' };
     // Impersonation (admin-only) outranks the real session token — the
-    // server then treats every call as the target user
-    const impersonation = getImpersonation();
+    // server then treats every call as the target user. Except on the
+    // admin's own routes: those stay the admin's, on the real session,
+    // so /admin keeps working mid-impersonation (shared/api/impersonation.ts)
+    const impersonation = isAdminRoute(name) ? null : getImpersonation();
     if (impersonation) {
         // Impersonation is read-only (shared/api/impersonation.ts). The
         // server enforces this — it has to, the token is a real session —
@@ -114,7 +116,7 @@ export async function invokeFunctionUpload<T = unknown>(
         return { data: null, error: new Error('VITE_API_URL is not set') };
     }
 
-    let token: string | undefined = getImpersonation()?.token;
+    let token: string | undefined = isAdminRoute(name) ? undefined : getImpersonation()?.token;
     if (token && !isAllowedWhileImpersonating(name)) {
         return { data: null, error: new ImpersonationReadOnlyError() };
     }
