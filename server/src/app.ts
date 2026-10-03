@@ -58,6 +58,7 @@ import { trialExtendRoutes } from './routes/billing/trialExtend.js';
 import { adminStatusRoutes } from './routes/admin/adminStatus.js';
 import { adminGrowthStatsRoutes } from './routes/admin/adminGrowthStats.js';
 import { adminUserListRoutes } from './routes/admin/adminUserList.js';
+import { adminProjectListRoutes } from './routes/admin/adminProjectList.js';
 import { adminImpersonateRoutes } from './routes/admin/adminImpersonate.js';
 import { screenshotCreateRoutes } from './routes/screenshots/screenshotCreate.js';
 import { screenshotConfirmUploadRoutes } from './routes/screenshots/screenshotConfirmUpload.js';
@@ -266,6 +267,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(adminStatusRoutes, { adminEmails: opts.adminEmails });
     app.register(adminGrowthStatsRoutes, { adminEmails: opts.adminEmails });
     app.register(adminUserListRoutes, { adminEmails: opts.adminEmails });
+    app.register(adminProjectListRoutes, { adminEmails: opts.adminEmails });
     app.register(adminImpersonateRoutes, {
         adminEmails: opts.adminEmails,
         supabaseJwtSecret: opts.supabaseJwtSecret,

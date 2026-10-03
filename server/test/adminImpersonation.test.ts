@@ -1,5 +1,5 @@
 /**
- * /admin-user-list + /admin-impersonate
+ * /admin-user-list + /admin-project-list + /admin-impersonate
  * (plans/admin-user-impersonation-oneshot.md).
  *
  * Unit tier: ADMIN_EMAILS gating — 401 without a token, 403 for
@@ -53,7 +53,7 @@ describe('admin routes (auth, no db)', () => {
 
     it('403 for a non-admin user on every admin route', async () => {
         const token = await userToken({ email: 'someone@else.com' });
-        for (const route of ['/admin-status', '/admin-growth-stats', '/admin-user-list']) {
+        for (const route of ['/admin-status', '/admin-growth-stats', '/admin-user-list', '/admin-project-list']) {
             expect((await post(app(ADMIN_EMAIL), route, token)).statusCode, route).toBe(403);
         }
         const mint = await post(app(ADMIN_EMAIL), '/admin-impersonate', token, { userId: 'x' });
@@ -146,6 +146,107 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
         // The freshly-updated project puts the active user ahead of the dormant one
         expect(users.findIndex(u => u.id === active.id))
             .toBeLessThan(users.findIndex(u => u.id === dormant.id));
+    });
+
+    it('lists recent openable projects newest first with owner and feature flags', async () => {
+        const owner = await seedAuthUser(pool, { name: 'Project Owner', keepBootstrapWorkspace: true });
+        createdUsers.push(owner.id);
+        const now = Date.now();
+        // Every feature present; duration_ms column unset so the timeline fallback is exercised
+        const rich = await seedProject(pool, {
+            ownerId: owner.id,
+            uploadStatus: 'ready',
+            name: 'Rich project',
+            updatedAt: new Date(now).toISOString(),
+            projectData: {
+                cameraSource: { id: 'cam' },
+                microphoneSource: { id: 'mic' },
+                timeline: {
+                    durationMs: 12345.6,
+                    captionSegments: [{ id: 'c' }],
+                    zoomSegments: [{ id: 'z' }],
+                    spotlightSegments: [{ id: 's' }],
+                    overlaySegments: [
+                        { id: 'o1', item: { type: 'text' } },
+                        { id: 'o2', item: { type: 'blur' } },
+                    ],
+                },
+            },
+        });
+        // Nothing at all (empty project_data) — every probe must survive it
+        const bare = await seedProject(pool, {
+            ownerId: owner.id,
+            uploadStatus: 'ready',
+            name: 'Bare project',
+            updatedAt: new Date(now - 60_000).toISOString(),
+            projectData: {},
+        });
+        // Not openable: trashed, and upload never finished
+        const trashed = await seedProject(pool, {
+            ownerId: owner.id,
+            uploadStatus: 'ready',
+            deletedAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+        });
+        const pending = await seedProject(pool, {
+            ownerId: owner.id,
+            updatedAt: new Date(now).toISOString(),
+        });
+        createdProjects.push(rich.id, bare.id, trashed.id, pending.id);
+
+        const res = await post(testApp(), '/admin-project-list', await userToken({ email: ADMIN_EMAIL }));
+        expect(res.statusCode).toBe(200);
+        const { projects } = res.json() as {
+            projects: Array<{
+                id: string;
+                name: string;
+                slug: string;
+                owner_id: string;
+                owner_email: string | null;
+                owner_name: string | null;
+                duration_ms: number | null;
+                has_camera: boolean;
+                has_mic: boolean;
+                has_captions: boolean;
+                has_zooms: boolean;
+                has_spotlights: boolean;
+                has_blurs: boolean;
+            }>;
+        };
+
+        const richRow = projects.find(p => p.id === rich.id);
+        const bareRow = projects.find(p => p.id === bare.id);
+        expect(richRow).toBeDefined();
+        expect(bareRow).toBeDefined();
+        expect(projects.find(p => p.id === trashed.id)).toBeUndefined();
+        expect(projects.find(p => p.id === pending.id)).toBeUndefined();
+
+        expect(richRow).toMatchObject({
+            name: 'Rich project',
+            slug: rich.slug,
+            owner_id: owner.id,
+            owner_email: owner.email,
+            owner_name: 'Project Owner',
+            duration_ms: 12345,
+            has_camera: true,
+            has_mic: true,
+            has_captions: true,
+            has_zooms: true,
+            has_spotlights: true,
+            has_blurs: true,
+        });
+        expect(bareRow).toMatchObject({
+            duration_ms: null,
+            has_camera: false,
+            has_mic: false,
+            has_captions: false,
+            has_zooms: false,
+            has_spotlights: false,
+            has_blurs: false,
+        });
+        // Newest-updated first
+        expect(projects.findIndex(p => p.id === rich.id))
+            .toBeLessThan(projects.findIndex(p => p.id === bare.id));
     });
 
     it('counts signups and project creations per UTC day, sparse and ascending', async () => {

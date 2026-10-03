@@ -1,5 +1,5 @@
 /**
- * /admin and /admin/growth — the hidden admin surface
+ * /admin, /admin/projects and /admin/growth — the hidden admin surface
  * (plans/admin-user-impersonation-oneshot.md).
  *
  * Gated up front: nothing renders but the bare page background until
@@ -7,16 +7,18 @@
  * existence is never revealed, and no admin panel mounts or fetches
  * for a non-admin. Only a confirmed admin gets the sections:
  *
- *   /admin         Users  — impersonation picker (ImpersonatePanel)
- *   /admin/growth  Growth — accounts/projects over time (GrowthPanel)
+ *   /admin           Users    — impersonation picker (ImpersonatePanel)
+ *   /admin/projects  Projects — recent projects, click to open as owner (RecentProjectsPanel)
+ *   /admin/growth    Growth   — accounts/projects over time (GrowthPanel)
  */
 import { useEffect, useState } from 'react';
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import { LuChartLine, LuUsers } from 'react-icons/lu';
+import { LuChartLine, LuUsers, LuVideo } from 'react-icons/lu';
 import { Button, LogoLink, Modal, SidebarNav, SidebarNavItem } from '@shared/components';
 import { invokeFunction } from '../../api/client';
 import { navigate } from '../../lib/navigate';
 import { ImpersonatePanel } from './ImpersonatePanel';
+import { RecentProjectsPanel } from './RecentProjectsPanel';
 import { GrowthPanel } from './GrowthPanel';
 import { ADMIN_SECTION_PATHS, type AdminSection } from './adminSection';
 
@@ -24,6 +26,7 @@ type Gate = 'checking' | 'ready' | 'forbidden' | 'error';
 
 const SECTIONS: Array<{ id: AdminSection; label: string; icon: typeof LuUsers }> = [
     { id: 'users', label: 'Users', icon: LuUsers },
+    { id: 'projects', label: 'Projects', icon: LuVideo },
     { id: 'growth', label: 'Growth', icon: LuChartLine },
 ];
 
@@ -122,7 +125,9 @@ export function AdminPage({ section }: AdminPageProps) {
             </aside>
             <main className="flex-1 min-w-0 px-8 py-10">
                 <div className="w-full max-w-3xl">
-                    {section === 'users' ? <ImpersonatePanel /> : <GrowthPanel />}
+                    {section === 'users' && <ImpersonatePanel />}
+                    {section === 'projects' && <RecentProjectsPanel />}
+                    {section === 'growth' && <GrowthPanel />}
                 </div>
             </main>
         </div>

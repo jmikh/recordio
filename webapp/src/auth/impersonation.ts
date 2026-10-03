@@ -38,8 +38,12 @@ export function getImpersonation(): ImpersonationState | null {
     }
 }
 
-/** Store the minted token and reboot the app as the target user. */
-export function startImpersonation(minted: AdminImpersonateResponse): void {
+/**
+ * Store the minted token and reboot the app as the target user.
+ * `redirectTo` lands somewhere other than the dashboard (the admin's
+ * recent-projects list opens a project's editor directly).
+ */
+export function startImpersonation(minted: AdminImpersonateResponse, redirectTo = '/'): void {
     const state: ImpersonationState = {
         token: minted.token,
         expiresAt: minted.expiresAt,
@@ -47,7 +51,7 @@ export function startImpersonation(minted: AdminImpersonateResponse): void {
     };
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     // Full reload so AuthManager, stores, and all cached state boot as the target
-    window.location.href = '/';
+    window.location.href = redirectTo;
 }
 
 /**

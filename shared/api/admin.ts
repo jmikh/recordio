@@ -58,6 +58,42 @@ export interface AdminUserListResponse {
     users: AdminUserSummary[];
 }
 
+// ── POST /admin-project-list ─────────────────────────────────────
+
+/**
+ * One row of the admin's recent-projects list: a live, ready project
+ * with its owner and the features its project_data carries, so an
+ * admin can pick an interesting one and jump into its editor as the
+ * owner. The `has_*` flags are computed server-side from the jsonb
+ * (sources present, non-empty segment arrays, any blur overlay).
+ */
+export interface AdminProjectSummary {
+    id: string;
+    name: string;
+    slug: string;
+    owner_id: string;
+    owner_email: string | null;
+    owner_name: string | null;
+    created_at: string;
+    updated_at: string;
+    /** Recording length; null when neither the column nor the timeline has it. */
+    duration_ms: number | null;
+    has_camera: boolean;
+    has_mic: boolean;
+    has_captions: boolean;
+    has_zooms: boolean;
+    has_spotlights: boolean;
+    has_blurs: boolean;
+}
+
+/**
+ * Empty body. Most-recently-updated first, capped server-side (~100).
+ * Only ready, non-trashed projects — the ones an editor can open.
+ */
+export interface AdminProjectListResponse {
+    projects: AdminProjectSummary[];
+}
+
 // ── POST /admin-impersonate ──────────────────────────────────────
 
 export const AdminImpersonateRequestSchema = Type.Object({
