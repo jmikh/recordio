@@ -66,7 +66,7 @@ import { Type } from '@sinclair/typebox';
 import { SharedVideoGetRequestSchema, SharedVideoGetResponseSchema } from '@shared/api/projects';
 import { canViewProject, getProjectIfEditor } from '../services/projectAccess.js';
 import { getOutputCaptions, type ProjectTimelineShape } from '../services/projectCaptions.js';
-import { MUX_RENDER_QUALITY } from '../services/muxUpload.js';
+import { MUX_RENDER_QUALITY, MUX_RENDER_FPS } from '../services/muxUpload.js';
 import {
     canAttemptPublish,
     publishProjectToMux,
@@ -142,8 +142,8 @@ async function loadPublishState(
                 ON mv.project_id = k.project_id AND mv.cloud_version = k.cloud_version
          LEFT JOIN render_jobs rj
                 ON rj.project_id = k.project_id AND rj.cloud_version = k.cloud_version
-               AND rj.quality = $3`,
-        [projectId, cloudVersion, MUX_RENDER_QUALITY, PUBLISH_COOLDOWN_SECONDS],
+               AND rj.quality = $3 AND rj.fps = $5`,
+        [projectId, cloudVersion, MUX_RENDER_QUALITY, PUBLISH_COOLDOWN_SECONDS, MUX_RENDER_FPS],
     );
     return rows[0] as PublishStateRow | undefined;
 }
@@ -335,9 +335,10 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
                             ON rj.project_id = mv.project_id
                            AND rj.cloud_version = mv.cloud_version
                            AND rj.quality = $2
+                           AND rj.fps = $3
                      WHERE mv.project_id = $1
                      ORDER BY mv.status, mv.cloud_version DESC`,
-                    [project.id, MUX_RENDER_QUALITY],
+                    [project.id, MUX_RENDER_QUALITY, MUX_RENDER_FPS],
                 ),
                 // Anonymous viewers skip the query entirely
                 req.user ? getProjectIfEditor(app.deps.db, project.id, req.user.id) : null,

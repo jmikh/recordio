@@ -86,6 +86,10 @@ export interface UIState {
     showDebugOverlays: boolean;
     toggleDebugOverlays: () => void;
 
+    // Debug: pixel-verify the frames VFR export skips (slow)
+    vfrVerify: boolean;
+    setVfrVerify: (value: boolean) => void;
+
     // Collapsible Card Visibility
     // -- Effects Settings
     showCollapsibleEffects: boolean;
@@ -362,6 +366,9 @@ export const useUIStore = create<UIState>((set, get) => ({
     showDebugOverlays: false,
     toggleDebugOverlays: () => set((state) => ({ showDebugOverlays: !state.showDebugOverlays })),
 
+    vfrVerify: false,
+    setVfrVerify: (value) => set({ vfrVerify: value }),
+
     // Collapsible Card Visibility
     // -- Effects Settings
     showCollapsibleEffects: true,
@@ -464,6 +471,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             isResizingWindow: false,
             showDebugBar: false,
             showDebugOverlays: false,
+            vfrVerify: false,
             // Collapsible Card Visibility
             showCollapsibleEffects: false,
             showCollapsibleMouse: false,

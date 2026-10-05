@@ -14,6 +14,7 @@ const JOB: RenderJobSubmission = {
     projectData: { screenSource: { storagePath: 'u/p/screen.webm' } },
     projectName: 'Test project',
     quality: '1080p',
+    fps: 30,
     mediaUrls: { 'u/p/screen.webm': 'https://s3/get/u/p/screen.webm' },
     uploadUrl: 'https://s3/put/u/p/renders/v1.mp4',
     statusCallbackUrl: 'https://supabase/functions/v1/render-job-hook',

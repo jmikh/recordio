@@ -30,8 +30,11 @@
  *
  * High-res output (2K/4K) additionally requires can4k — enforced here
  * on top of canBackgroundExport; quality defaults to 1080p when absent.
+ * The client sends the final output quality (it maps the user's choice
+ * onto the recording's size), so the server renders exactly that.
+ * fps (30/60, the VFR maximum) defaults to 30.
  *
- * Request:  { projectId, cloudVersion, quality? }
+ * Request:  { projectId, cloudVersion, quality?, fps? }
  * Response: { jobId, status, renderStoragePath }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
@@ -69,6 +72,8 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                             Type.Literal('4K'),
                         ]),
                     ),
+                    // Mirrors ExportFps (@shared/utils/exportQuality)
+                    fps: Type.Optional(Type.Union([Type.Literal(30), Type.Literal(60)])),
                 }),
                 response: {
                     200: Type.Object({
@@ -91,7 +96,7 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                 throw new Error('renderJobCreateRoutes: statusCallbackUrl not configured');
             }
 
-            const { projectId, cloudVersion, quality = '1080p' } = req.body;
+            const { projectId, cloudVersion, quality = '1080p', fps = 30 } = req.body;
             const userId = req.user!.id;
             req.logCtx.set({ 'project.id': projectId });
 
@@ -117,6 +122,7 @@ export const renderJobCreateRoutes: FastifyPluginAsyncTypebox<RenderJobCreateRou
                 userId,
                 cloudVersion,
                 quality,
+                fps,
                 statusCallbackUrl,
                 log: req.log,
             });

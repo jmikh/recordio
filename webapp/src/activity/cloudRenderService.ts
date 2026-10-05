@@ -5,7 +5,7 @@ import { useProjectMetaStore } from '../share/useProjectMetaStore';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../analytics';
 import { captureError } from '../lib/sentry';
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 import { useActivityStore, renderTaskId, type RenderTask } from './useActivityStore';
 
 const POLL_INTERVAL_MS = 3000;
@@ -87,7 +87,7 @@ export class CloudRenderService {
     }
 
     /** No-op while a render for this project is active; replaces a finished one. */
-    static async start(projectId: string, projectName: string, quality: ExportQuality = '1080p'): Promise<void> {
+    static async start(projectId: string, projectName: string, quality: ExportQuality = '1080p', fps: ExportFps = 30): Promise<void> {
         if (this.isActive(projectId)) return;
 
         // Request notification permission early
@@ -106,6 +106,7 @@ export class CloudRenderService {
             kind: 'render',
             phase: 'saving',
             quality,
+            fps,
             renderStoragePath: null,
             projectId,
             projectName,
@@ -144,7 +145,7 @@ export class CloudRenderService {
                 renderStoragePath: string | null;
                 error?: string;
                 message?: string;
-            }>('render-job-create', { projectId, cloudVersion, quality });
+            }>('render-job-create', { projectId, cloudVersion, quality, fps });
 
             if (error || data?.error) {
                 const msg = data?.message || data?.error || error?.message || 'Failed to start render';
@@ -194,6 +195,7 @@ export class CloudRenderService {
                         project_id: projectId,
                         render_duration_s: Math.round((performance.now() - renderStart) / 1000),
                         quality,
+                        fps,
                         ...projectMeta,
                     });
                     // completed ⇒ the worker stored the render (path set)
@@ -252,7 +254,7 @@ export class CloudRenderService {
         if (task.renderStoragePath) {
             void this.download(projectId);
         } else {
-            void this.start(projectId, task.projectName, task.quality);
+            void this.start(projectId, task.projectName, task.quality, task.fps);
         }
     }
 

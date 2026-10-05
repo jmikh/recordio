@@ -50,6 +50,11 @@ export class PlaybackRenderer {
         return msg;
     }
 
+    /**
+     * Draws one frame. When adding a layer or anything time-dependent here, add it to
+     * `computeFrameSignature` (frameSignature.ts) too — VFR export skips frames whose
+     * signature didn't change.
+     */
     static render(
         resources: RenderResources,
         state: {

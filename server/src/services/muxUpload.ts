@@ -12,18 +12,24 @@
  * S3Port presigned GET instead of a Supabase-Storage signed URL — same
  * object, different URL flavor; Mux just fetches it.
  */
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 import type { Deps } from '../deps.js';
 import { MuxApiError } from '../ports/mux.js';
 
 /**
- * The single render quality that feeds Mux — shared projects stream at
- * 1080p. mux-video-create requests exactly this quality, and the
- * render-job webhook only uploads a completed render to Mux when it
- * matches, so a different-quality render for the same version (e.g. a
- * 4K download export) can never hijack the pending mux_video.
+ * The single render (quality + frame rate) that feeds Mux — shared projects
+ * stream at 1080p, up to 60 fps. mux-video-create requests exactly this
+ * render, and the render-job webhook only uploads a completed render to Mux
+ * when it matches, so a different render for the same version (e.g. a 4K or
+ * 30 fps download export) can never hijack the pending mux_video.
  */
 export const MUX_RENDER_QUALITY: ExportQuality = '1080p';
+export const MUX_RENDER_FPS: ExportFps = 60;
+
+/** Whether a render job is the one that feeds Mux (see MUX_RENDER_QUALITY). */
+export function isMuxRender(job: { quality: string; fps: number }): boolean {
+    return job.quality === MUX_RENDER_QUALITY && job.fps === MUX_RENDER_FPS;
+}
 
 export interface MuxUploadResult {
     success: boolean;

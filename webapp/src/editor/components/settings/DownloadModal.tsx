@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal, XButton, Button, MultiToggle, Toggle, type MultiToggleOption } from '@shared/components';
+import { Modal, XButton, Button, MultiToggle, Toggle, InfoTooltip, type MultiToggleOption } from '@shared/components';
 import { LuLock, LuZap } from 'react-icons/lu';
 import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -7,7 +7,7 @@ import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
 import { ProUpgradeModal } from '../../../billing/ProUpgradeModal';
 import { useEntitlements } from '../../../billing/useEntitlements';
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import { resolveExportQuality, type ExportFps, type ExportQuality, type ExportResolutionChoice } from '@shared/utils/exportQuality';
 import { trackRenderInCloudClicked, trackRenderLocallyClicked, trackRenderLocallyCompleted, trackRenderLocallyFailed, type UpgradeModalReason } from '../../../analytics';
 import { maybeOpenLeaveReviewModal } from '../../../components/LeaveReviewModal';
 
@@ -16,12 +16,10 @@ function formatDurationLabel(ms: number): string {
     return `${Math.max(1, Math.ceil(ms / 60000))} min`;
 }
 
-/** Selectable output qualities — 2K/4K are pro-gated (entitlements.can4k). */
-type RenderQuality = Extract<ExportQuality, '1080p' | '2K' | '4K'>;
-
-const QUALITY_LABELS: Record<RenderQuality, string> = {
-    '1080p': '1080p',
-    '2K': '1440p',
+/** What the user picks — 4K is pro-gated (entitlements.can4k) and renders at
+ *  the closest tier at or above the recording (resolveExportQuality). */
+const RESOLUTION_LABELS: Record<ExportResolutionChoice, string> = {
+    HD: '1080p',
     '4K': '4K',
 };
 
@@ -37,7 +35,7 @@ type ModalView = 'choose' | 'local';
 interface DownloadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onStartCloudRender: (quality: ExportQuality) => void;
+    onStartCloudRender: (quality: ExportQuality, fps: ExportFps) => void;
 }
 
 export function DownloadModal({
@@ -50,8 +48,15 @@ export function DownloadModal({
     const project = useProjectStore(s => s.project);
     const entitlements = useEntitlements();
     // Any setting is freely selectable; entitlements are checked on Export
-    const [quality, setQuality] = useState<RenderQuality>('1080p');
+    const [choice, setChoice] = useState<ExportResolutionChoice>('HD');
     const [cloudExport, setCloudExport] = useState(true);
+    const [fps60, setFps60] = useState(false);
+    const fps: ExportFps = fps60 ? 60 : 30;
+
+    // The quality actually rendered: decided here, so local and cloud renders match
+    const recordingSize = project.screenSource.size;
+    const quality = resolveExportQuality(choice, recordingSize, project.settings.outputSize);
+    const recordedBelow4K = resolveExportQuality('4K', recordingSize, project.settings.outputSize) !== '4K';
     const [isProModalOpen, setIsProModalOpen] = useState(false);
     const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>();
     const [upgradeReason, setUpgradeReason] = useState<UpgradeModalReason>('export');
@@ -77,6 +82,7 @@ export function DownloadModal({
                 onClose={handleClose}
                 onBack={() => setView('choose')}
                 quality={quality}
+                fps={fps}
             />
         );
     }
@@ -85,20 +91,19 @@ export function DownloadModal({
 
     const durationMs = project.timeline.durationMs;
     const durationLabel = formatDurationLabel(durationMs);
-    const resolutionLabel = QUALITY_LABELS[quality];
+    const resolutionLabel = RESOLUTION_LABELS[choice];
     const localEstimate = estimateLocalTime(durationMs);
 
     const lockIcon = entitlements.can4k ? undefined : <LuLock className="icon-sm" />;
-    const qualityOptions: MultiToggleOption<RenderQuality>[] = [
-        { value: '1080p', label: '1080p', tooltip: 'Full HD' },
-        { value: '2K', label: '1440p', icon: lockIcon, tooltip: entitlements.can4k ? 'QHD' : 'QHD — Pro' },
+    const resolutionOptions: MultiToggleOption<ExportResolutionChoice>[] = [
+        { value: 'HD', label: '1080p (HD)', tooltip: 'Full HD' },
         { value: '4K', label: '4K', icon: lockIcon, tooltip: entitlements.can4k ? 'Ultra HD' : 'Ultra HD — Pro' },
     ];
 
     // Entitlements gate on Export, not on selection: pick anything, and if
     // the combination needs Pro the upgrade modal names what's missing
     const handleExport = () => {
-        const needsHiRes = quality !== '1080p' && !entitlements.can4k;
+        const needsHiRes = choice === '4K' && !entitlements.can4k;
         const needsCloud = cloudExport && !entitlements.canBackgroundExport;
         if (needsHiRes || needsCloud) {
             setUpgradeFeature(
@@ -116,7 +121,7 @@ export function DownloadModal({
         }
         if (cloudExport) {
             trackRenderInCloudClicked(project.id);
-            onStartCloudRender(quality);
+            onStartCloudRender(quality, fps);
             handleClose();
         } else {
             trackRenderLocallyClicked(project.id);
@@ -131,19 +136,38 @@ export function DownloadModal({
                     <div>
                         <h2 className="heading-2">Download video</h2>
                         <p className="text-sm text-text-muted mt-0.5">
-                            {durationLabel} · {resolutionLabel} · MP4
+                            {durationLabel} · {resolutionLabel} · {fps} fps · MP4
                         </p>
                     </div>
                     <XButton onClick={handleClose} title="Close" />
                 </div>
 
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-main">Resolution</span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-sm text-text-main">Resolution</span>
+                        {recordedBelow4K && (
+                            <InfoTooltip
+                                size="small"
+                                description="This screen was recorded below 4K, so a 4K export uses the highest resolution your recording supports."
+                            />
+                        )}
+                    </div>
                     <MultiToggle
-                        options={qualityOptions}
-                        value={quality}
-                        onChange={setQuality}
+                        options={resolutionOptions}
+                        value={choice}
+                        onChange={setChoice}
                     />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-text-main">60 fps</span>
+                        <Toggle
+                            value={fps60}
+                            onChange={setFps60}
+                            aria-label="60 fps"
+                        />
+                    </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -188,17 +212,20 @@ function LocalRenderView({
     onClose,
     onBack,
     quality,
+    fps,
 }: {
     isOpen: boolean;
     onClose: () => void;
     onBack: () => void;
     quality: ExportQuality;
+    fps: ExportFps;
 }) {
     const { addToast } = useToast();
     const project = useProjectStore(s => s.project);
     const projectName = useProjectName();
     const videoDecodePreference = useUIStore(s => s.videoDecodePreference);
     const setVideoDecodePreference = useUIStore(s => s.setVideoDecodePreference);
+    const vfrVerify = useUIStore(s => s.vfrVerify);
 
     const { localRenderProgress, startOrCancel } = useLocalRender({
         project,
@@ -206,6 +233,8 @@ function LocalRenderView({
         quality,
         videoDecodePreference,
         onDecodeFallback: () => setVideoDecodePreference('cpu'),
+        fps,
+        verifySkippedFrames: vfrVerify,
     });
 
     const startedRef = useRef(false);
@@ -228,6 +257,7 @@ function LocalRenderView({
                         input_resolution: `${project.screenSource.size.width}x${project.screenSource.size.height}`,
                         output_resolution: `${project.settings.outputSize.width}x${project.settings.outputSize.height}`,
                         quality,
+                        fps,
                     });
                     onClose();
                     void maybeOpenLeaveReviewModal('export_completed');

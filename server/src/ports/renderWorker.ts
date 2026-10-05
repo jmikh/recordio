@@ -7,6 +7,8 @@ export interface RenderJobSubmission {
     projectData: unknown;
     projectName: string;
     quality: string;
+    /** Output frame rate (max — renders are VFR) */
+    fps: number;
     /** storagePath → presigned download URL */
     mediaUrls: Record<string, string>;
     /** presigned PUT URL for the rendered MP4 */

@@ -38,33 +38,33 @@ function getDragPath(
     return path;
 }
 
+// Add a visual lag (there is a mismatch between the drag events and the screen events)
+const DRAG_LAG_MS = 80;
+
+export interface ActiveDrag {
+    /** Index into userEvents.drags */
+    index: number;
+    /** Lagged cursor position along the drag path, in source (event) coordinates */
+    point: Point;
+}
+
 /**
- * Draws drag effects — shows a ring or filled circle (matching the click
- * effect style) at full size for the entire duration of the drag.
+ * Returns the drags whose effect is visible at the given output time, with the
+ * lagged cursor position for each.
  *
  * Event timestamps are source time; they are mapped to output time via timeMapper.
  * Drags in cut/hidden segments are skipped.
  */
-export function drawDragEffects(
-    ctx: CanvasRenderingContext2D,
+export function getActiveDrags(
     userEvents: UserEvents,
     currentOutputTime: number,
-    viewport: Rect,
-    viewMapper: ViewMapper,
-    settings: MouseSettings,
-    timeMapper: TimeMapper,
-    outputSize: Size
-) {
-    // Add a visual lag (there is a mismatch between the drag events and the screen events)
-    const DRAG_LAG_MS = 80;
-
+    timeMapper: TimeMapper
+): ActiveDrag[] {
     const { drags, mousePositions } = userEvents;
-    const [r, g, b, a] = hexToRgba(settings.color);
-    const zoomScale = outputSize.width / viewport.width;
-    const scale = (outputSize.height / REF_OUTPUT_HEIGHT) * zoomScale;
-    const radius = REF_DRAG_RADIUS * settings.size * scale;
+    const active: ActiveDrag[] = [];
 
-    for (const drag of drags) {
+    for (let index = 0; index < drags.length; index++) {
+        const drag = drags[index];
         // Map the drag's source time range to output time range
         const mappedRange = timeMapper.mapSourceRangeToOutputRange(drag.timestamp, drag.endTime);
         if (!mappedRange) continue; // Drag is entirely in a cut/hidden segment
@@ -89,22 +89,46 @@ export function drawDragEffects(
 
             // Position is clamped to the drag path (source time)
             const positionTime = Math.max(drag.timestamp, Math.min(laggedSourceTime, drag.endTime));
-            const currentPoint = getPointAtTime(path, positionTime);
-            const screenPoint = viewMapper.projectEventPointToOutput(currentPoint, viewport);
+            active.push({ index, point: getPointAtTime(path, positionTime) });
+        }
+    }
+    return active;
+}
 
-            // Draw ring or circle at full size (no animation / no fade)
-            ctx.beginPath();
-            ctx.arc(screenPoint.x, screenPoint.y, radius, 0, Math.PI * 2);
+/**
+ * Draws drag effects — shows a ring or filled circle (matching the click
+ * effect style) at full size for the entire duration of the drag.
+ */
+export function drawDragEffects(
+    ctx: CanvasRenderingContext2D,
+    userEvents: UserEvents,
+    currentOutputTime: number,
+    viewport: Rect,
+    viewMapper: ViewMapper,
+    settings: MouseSettings,
+    timeMapper: TimeMapper,
+    outputSize: Size
+) {
+    const [r, g, b, a] = hexToRgba(settings.color);
+    const zoomScale = outputSize.width / viewport.width;
+    const scale = (outputSize.height / REF_OUTPUT_HEIGHT) * zoomScale;
+    const radius = REF_DRAG_RADIUS * settings.size * scale;
 
-            if (settings.effectType === 'ring') {
-                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.7 * a})`;
-                ctx.lineWidth = 3 * scale;
-                ctx.stroke();
-            } else {
-                // 'circle' — filled
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.5 * a})`;
-                ctx.fill();
-            }
+    for (const { point } of getActiveDrags(userEvents, currentOutputTime, timeMapper)) {
+        const screenPoint = viewMapper.projectEventPointToOutput(point, viewport);
+
+        // Draw ring or circle at full size (no animation / no fade)
+        ctx.beginPath();
+        ctx.arc(screenPoint.x, screenPoint.y, radius, 0, Math.PI * 2);
+
+        if (settings.effectType === 'ring') {
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.7 * a})`;
+            ctx.lineWidth = 3 * scale;
+            ctx.stroke();
+        } else {
+            // 'circle' — filled
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.5 * a})`;
+            ctx.fill();
         }
     }
 }

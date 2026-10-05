@@ -11,7 +11,7 @@
  */
 
 import { ExportManager, type ExportEnvironment } from '@shared/export/ExportManager';
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 import type { Project } from '@shared/types';
 import type { RenderContext } from '@shared/utils/renderContext';
 
@@ -21,6 +21,8 @@ interface RenderJob {
     project: Project;
     projectName?: string;
     quality: ExportQuality;
+    /** Output frame rate (max — renders are VFR). Older workers' jobs omit it. */
+    fps?: ExportFps;
     mediaBaseUrl: string; // e.g. http://localhost:8080/media/jobId/
     resultUrl: string;    // e.g. http://localhost:8080/result/jobId
     /** storagePath → local filename */
@@ -67,11 +69,11 @@ async function run() {
         return;
     }
 
-    const { project, projectName, quality, mediaBaseUrl, mediaFileNames: rawMediaFileNames } = job;
+    const { project, projectName, quality, fps = 30, mediaBaseUrl, mediaFileNames: rawMediaFileNames } = job;
     // CDP serialization via addInitScript can produce objects where Object.entries()
     // doesn't iterate. Force a clean plain object via JSON round-trip.
     const mediaFileNames: Record<string, string> = JSON.parse(JSON.stringify(rawMediaFileNames ?? {}));
-    console.log(`Render job received: "${projectName ?? project.id}" @ ${quality}`);
+    console.log(`Render job received: "${projectName ?? project.id}" @ ${quality}, ${fps}fps`);
     console.log(`Media base URL: ${mediaBaseUrl}`);
     console.log(`Media files (${Object.keys(mediaFileNames).length}): ${JSON.stringify(mediaFileNames)}`);
 
@@ -98,7 +100,7 @@ async function run() {
         const result = await exporter.exportProject(project, quality, (progress) => {
             window.__RENDER_FRAMES_DONE__ = progress.framesProcessed;
             window.__RENDER_FRAMES_TOTAL__ = progress.totalFrames;
-        }, { skipDownload: true }, env, projectName);
+        }, { skipDownload: true, fps }, env, projectName);
 
         console.log(`Export complete! Blob size: ${(result.blob!.size / 1024 / 1024).toFixed(2)} MB`);
         console.log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`);

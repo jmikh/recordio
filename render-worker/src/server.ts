@@ -68,6 +68,8 @@ export interface RenderBody {
     projectData: unknown;
     projectName?: string;
     quality: string;
+    /** Output frame rate, 30 or 60 (max — renders are VFR). Defaults to 30. */
+    fps?: number;
     mediaUrls: MediaUrls;
     uploadUrl: string;
     statusCallbackUrl: string;
@@ -198,16 +200,19 @@ export function createApp() {
         }
 
         const body = request.body as RenderBody;
-        const { jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl } = body;
+        const { jobId, projectData, projectName, quality, fps = 30, mediaUrls, uploadUrl, statusCallbackUrl } = body;
 
         if (!jobId || !projectData || !quality || !uploadUrl || !statusCallbackUrl) {
             return reply.code(400).send({ error: 'Missing required fields' });
+        }
+        if (fps !== 30 && fps !== 60) {
+            return reply.code(400).send({ error: 'fps must be 30 or 60' });
         }
 
         // Hold the connection open until the render is done (before upload).
         // This lets Cloud Run see the instance as busy and scale out for
         // concurrent requests instead of routing them to the same instance.
-        const { renderDone } = runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl);
+        const { renderDone } = runRender(jobId, projectData, projectName, quality, fps, mediaUrls, uploadUrl, statusCallbackUrl);
 
         try {
             await renderDone;
@@ -247,6 +252,7 @@ export function runRender(
     projectData: unknown,
     projectName: string | undefined,
     quality: string,
+    fps: number,
     mediaUrls: MediaUrls,
     uploadUrl: string,
     statusCallbackUrl: string,
@@ -258,7 +264,7 @@ export function runRender(
         rejectRenderDone = reject;
     });
 
-    _runRender(jobId, projectData, projectName, quality, mediaUrls, uploadUrl, statusCallbackUrl, resolveRenderDone, rejectRenderDone);
+    _runRender(jobId, projectData, projectName, quality, fps, mediaUrls, uploadUrl, statusCallbackUrl, resolveRenderDone, rejectRenderDone);
 
     return { renderDone };
 }
@@ -268,6 +274,7 @@ async function _runRender(
     projectData: unknown,
     projectName: string | undefined,
     quality: string,
+    fps: number,
     mediaUrls: MediaUrls,
     uploadUrl: string,
     statusCallbackUrl: string,
@@ -352,6 +359,7 @@ async function _runRender(
                 project: projectData,
                 projectName,
                 quality,
+                fps,
                 mediaFileNames,
                 mediaBaseUrl: `http://localhost:${config.PORT}/media/${jobId}/`,
                 renderPageUrl: `http://localhost:${config.PORT}/`,

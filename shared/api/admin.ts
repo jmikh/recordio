@@ -65,7 +65,8 @@ export interface AdminUserListResponse {
  * with its owner and the features its project_data carries, so an
  * admin can pick an interesting one and jump into its editor as the
  * owner. The `has_*` flags are computed server-side from the jsonb
- * (sources present, non-empty segment arrays, any blur overlay).
+ * (sources present, non-empty segment arrays, any overlay of each
+ * type — `has_outlines` is the 'border' overlay the editor calls Outline).
  */
 export interface AdminProjectSummary {
     id: string;
@@ -84,6 +85,9 @@ export interface AdminProjectSummary {
     has_zooms: boolean;
     has_spotlights: boolean;
     has_blurs: boolean;
+    has_text: boolean;
+    has_arrows: boolean;
+    has_outlines: boolean;
 }
 
 /**

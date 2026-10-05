@@ -46,6 +46,11 @@ function isGatedRoute(path: string) {
     return path !== '/uninstall' && path !== '/accept-invite';
 }
 
+/** The video and screenshot editors — full-height layouts with their own header */
+function isEditorRoute(path: string) {
+    return path.startsWith('/editor') || VIDEO_EDIT_PATH.test(path) || SCREENSHOT_EDIT_PATH.test(path);
+}
+
 export function App() {
     const [path, setPath] = useState(window.location.pathname);
     const [authReady, setAuthReady] = useState(false);
@@ -165,8 +170,10 @@ export function App() {
             {/* Toasts for background render/upload transitions — progress
                 itself shows on the editor header and the dashboard cards */}
             <ActivityToasts />
-            {/* Loud on every page while impersonating (admin feature) */}
-            <ImpersonationBanner />
+            {/* Loud on every page while impersonating (admin feature) —
+                except the editors, where it would cover the timeline; they
+                carry ImpersonationHeaderButton in their header instead */}
+            {!isEditorRoute(path) && <ImpersonationBanner />}
             {/* Global host — its triggers live on transient surfaces */}
             <LeaveReviewModal />
         </ToastProvider>

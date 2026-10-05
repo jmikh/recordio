@@ -14,6 +14,62 @@ const REF_PADDING_X = 40;
 const REF_PADDING_Y = 20;
 const REF_CORNER_RADIUS = 16;
 
+const EVENT_DURATION = 1500; // Show for 1.5 seconds
+const FADE_OUT_START = 1000;
+
+/** Canvas font for keystroke labels at the given pixel size. */
+export function getKeyboardFont(fontSizePx: number): string {
+    return `bold ${fontSizePx}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+}
+
+export interface KeyboardOverlayState {
+    /** Index into the events array */
+    index: number;
+    event: KeyboardEvent;
+    opacity: number;
+}
+
+/**
+ * Returns the keystroke shown at the given output time (only the latest active
+ * one is shown) and its opacity, or null when nothing is shown.
+ * Event timestamps are source time; events in cut/hidden segments are skipped.
+ */
+export function getKeyboardOverlayState(
+    events: KeyboardEvent[],
+    currentOutputTime: number,
+    timeMapper: TimeMapper
+): KeyboardOverlayState | null {
+    // Filter relevant events — map source timestamps to output time, skip hidden
+    const activeEvents: { event: KeyboardEvent; index: number; mappedTime: number }[] = [];
+    for (let index = 0; index < events.length; index++) {
+        const e = events[index];
+        const mappedTime = timeMapper.mapSourceToOutputTime(e.timestamp);
+        if (mappedTime < 0) continue; // Event is in a cut/hidden segment
+        if (currentOutputTime >= mappedTime && currentOutputTime <= mappedTime + EVENT_DURATION) {
+            activeEvents.push({ event: e, index, mappedTime });
+        }
+    }
+
+    if (activeEvents.length === 0) return null;
+
+    // Sort active events by mapped output time
+    activeEvents.sort((a, b) => a.mappedTime - b.mappedTime);
+
+    // Only show the latest active event to avoid clutter
+    const latest = activeEvents[activeEvents.length - 1];
+
+    // Calculate Opacity
+    const elapsed = currentOutputTime - latest.mappedTime;
+    let opacity = 1;
+    if (elapsed > FADE_OUT_START) {
+        opacity = 1 - ((elapsed - FADE_OUT_START) / (EVENT_DURATION - FADE_OUT_START));
+    }
+    // Clamp opacity
+    opacity = Math.max(0, Math.min(1, opacity));
+
+    return { index: latest.index, event: latest.event, opacity };
+}
+
 /**
  * Draws keystrokes at the top or bottom of the canvas.
  *
@@ -32,36 +88,10 @@ export function drawKeyboardOverlay(
     timeMapper: TimeMapper,
     settings: KeyboardSettings
 ) {
-    const EVENT_DURATION = 1500; // Show for 1.5 seconds
-    const FADE_OUT_START = 1000;
+    const state = getKeyboardOverlayState(events, currentOutputTime, timeMapper);
+    if (!state) return;
 
-    // Filter relevant events — map source timestamps to output time, skip hidden
-    const activeEvents: { event: KeyboardEvent; mappedTime: number }[] = [];
-    for (const e of events) {
-        const mappedTime = timeMapper.mapSourceToOutputTime(e.timestamp);
-        if (mappedTime < 0) continue; // Event is in a cut/hidden segment
-        if (currentOutputTime >= mappedTime && currentOutputTime <= mappedTime + EVENT_DURATION) {
-            activeEvents.push({ event: e, mappedTime });
-        }
-    }
-
-    if (activeEvents.length === 0) return;
-
-    // Sort active events by mapped output time
-    activeEvents.sort((a, b) => a.mappedTime - b.mappedTime);
-
-    // Only show the latest active event to avoid clutter
-    const latest = activeEvents[activeEvents.length - 1];
-    const latestEvent = latest.event;
-
-    // Calculate Opacity
-    const elapsed = currentOutputTime - latest.mappedTime;
-    let opacity = 1;
-    if (elapsed > FADE_OUT_START) {
-        opacity = 1 - ((elapsed - FADE_OUT_START) / (EVENT_DURATION - FADE_OUT_START));
-    }
-    // Clamp opacity
-    opacity = Math.max(0, Math.min(1, opacity));
+    const { event: latestEvent, opacity } = state;
 
 
     // Construct the Label
@@ -107,7 +137,7 @@ export function drawKeyboardOverlay(
     ctx.save();
 
     // Font Setup
-    ctx.font = `bold ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.font = getKeyboardFont(fontSize);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
 

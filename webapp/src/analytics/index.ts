@@ -431,8 +431,10 @@ interface RenderCompletedParams {
     render_duration_s: number;
     input_resolution: string;
     output_resolution: string;
-    /** Selected export quality ('1080p' | '2K' | '4K') — output_resolution is the project outputSize, not the rendered size. */
+    /** Rendered export quality ('1080p' | '2K' | '4K') — output_resolution is the project outputSize, not the rendered size. */
     quality: string;
+    /** Max output frame rate (renders are VFR) */
+    fps: number;
 }
 
 export function trackRenderLocallyCompleted(params: RenderCompletedParams) {

@@ -5,7 +5,7 @@
  * key; the server never implements that auth path — it dies with the edge
  * fn at decommission).
  *
- * Resolves a render job for (projectId, cloudVersion, quality) via one inline
+ * Resolves a render job for (projectId, cloudVersion, quality, fps) via one inline
  * data-modifying CTE — atomic cache-hit / dedup / retry / insert in a
  * single statement (was the `render_job_get_or_create` SQL fn until the
  * 2026-07-25 sweep; the CTE keeps its exact semantics). On a
@@ -22,7 +22,7 @@
  * edge-fn parity (its admin re-read); reachable-miss only via a delete
  * between the caller's editor check and this read.
  */
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 import type { Deps } from '../deps.js';
 import { getProjectMediaPaths } from './projectMedia.js';
 
@@ -48,8 +48,10 @@ export interface GetOrCreateRenderJobOptions {
     projectId: string;
     userId: string;
     cloudVersion: number;
-    /** Output quality; jobs are cached per (project, version, quality). Defaults to '1080p'. */
+    /** Output quality; jobs are cached per (project, version, quality, fps). Defaults to '1080p'. */
     quality?: ExportQuality;
+    /** Output frame rate (max — renders are VFR). Defaults to 30. */
+    fps?: ExportFps;
     statusCallbackUrl: string;
     log: WarnSink;
 }
@@ -58,7 +60,7 @@ export async function getOrCreateRenderJob(
     deps: Pick<Deps, 'db' | 's3' | 'renderWorker'>,
     opts: GetOrCreateRenderJobOptions,
 ): Promise<RenderJobResolution | null> {
-    const { projectId, userId, cloudVersion, quality = '1080p', statusCallbackUrl, log } = opts;
+    const { projectId, userId, cloudVersion, quality = '1080p', fps = 30, statusCallbackUrl, log } = opts;
 
     const { rows: projectRows } = await deps.db.query(
         `SELECT name, project_data FROM projects
@@ -79,17 +81,15 @@ export async function getOrCreateRenderJob(
     // race profile as the fn: no unique index covers non-completed
     // rows, so a concurrent first render can double-insert (rare,
     // benign — the stale-job cron reaps the loser).
-    // 1080p keeps the legacy suffix-less path so pre-quality completed
-    // rows (all 1080p, DEFAULT-backfilled) stay cache-consistent
-    const renderStoragePath =
-        quality === '1080p'
-            ? `${userId}/${projectId}/renders/v${cloudVersion}.mp4`
-            : `${userId}/${projectId}/renders/v${cloudVersion}_${quality}.mp4`;
+    // The path names every part of the cache key. Older rows keep the
+    // path they were stored with (v{n}.mp4 / v{n}_{quality}.mp4): a cache
+    // hit returns the row's own path, and only new/retried rows get this one.
+    const renderStoragePath = `${userId}/${projectId}/renders/v${cloudVersion}_${quality}_${fps}fps.mp4`;
     const { rows: jobRows } = await deps.db.query(
         `WITH existing AS (
             SELECT id, status, render_storage_path
             FROM render_jobs
-            WHERE project_id = $1 AND cloud_version = $3 AND quality = $5
+            WHERE project_id = $1 AND cloud_version = $3 AND quality = $5 AND fps = $6
         ), retried AS (
             UPDATE render_jobs rj
             SET status = 'pending',
@@ -106,8 +106,8 @@ export async function getOrCreateRenderJob(
             WHERE rj.id = e.id AND e.status NOT IN ('completed', 'pending')
             RETURNING rj.id
         ), inserted AS (
-            INSERT INTO render_jobs (project_id, user_id, cloud_version, render_storage_path, quality)
-            SELECT $1, $2, $3, $4, $5
+            INSERT INTO render_jobs (project_id, user_id, cloud_version, render_storage_path, quality, fps)
+            SELECT $1, $2, $3, $4, $5, $6
             WHERE NOT EXISTS (SELECT 1 FROM existing)
             RETURNING id
         )
@@ -117,7 +117,7 @@ export async function getOrCreateRenderJob(
         SELECT r.id, 'pending', TRUE, $4 FROM retried r
         UNION ALL
         SELECT i.id, 'pending', TRUE, $4 FROM inserted i`,
-        [projectId, userId, cloudVersion, renderStoragePath, quality],
+        [projectId, userId, cloudVersion, renderStoragePath, quality, fps],
     );
     const job = jobRows[0] as JobResolution | undefined;
     if (!job) throw new Error('render job get-or-create returned no row');
@@ -151,6 +151,7 @@ export async function getOrCreateRenderJob(
             projectData: project.project_data,
             projectName: project.name,
             quality,
+            fps,
             mediaUrls,
             uploadUrl,
             statusCallbackUrl,

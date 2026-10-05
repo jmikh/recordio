@@ -1,7 +1,7 @@
 import type { SpotlightSegment, SpotlightSettings, Rect } from '../types';
 import { ViewMapper } from '../mappers/viewMapper';
 
-import { scaleRectFromCenter, clampRectToBounds } from '../utils/geometry';
+import { clampRectToBounds } from '../utils/geometry';
 import { applyEasing } from './easing';
 
 
@@ -15,19 +15,29 @@ import { applyEasing } from './easing';
 export interface SpotlightState {
     /** Whether the spotlight region is visible in the current viewport */
     isVisible: boolean;
-    /** The original spotlight rectangle in OUTPUT coordinates (for dim overlay cut-out). Null if not visible. */
+    /** The spotlight rectangle in OUTPUT coordinates. Null if not visible. */
     originalRect: Rect | null;
-    /** The scaled spotlight rectangle in OUTPUT coordinates (for enlarged content clipping). Null if not visible. */
-    scaledRect: Rect | null;
     /** The source rectangle (in source video coordinates) */
     sourceRect: Rect;
     /** Border radius in pixels for each corner [topLeft, topRight, bottomRight, bottomLeft] (in OUTPUT coordinates) */
     borderRadiusPx: [number, number, number, number];
     /** Current animated dim value (0 to settings.dimOpacity) */
     dimOpacity: number;
-    /** Current animated scale (1.0 to settings.enlargeScale) */
-    scale: number;
+    /** Feathered edge width in OUTPUT px (0 = hard edge) */
+    featherPx: number;
+    /** Eased transition progress, 0 (fully off) to 1 (fully on) */
+    progress: number;
+    /** Which part of the transition we're in */
+    phase: 'in' | 'hold' | 'out';
+    /** How the spotlight transitions (see SpotlightSettings.featherTransition) */
+    featherTransition: 'fade' | 'closeIn';
+    /** The target dim opacity at full effect (dimOpacity is this × progress) */
+    fullDimOpacity: number;
 }
+
+/** Defaults for the optional feather settings (filled on project load, see migrateProject) */
+export const DEFAULT_SPOTLIGHT_FEATHER_PX = 60;
+export const DEFAULT_SPOTLIGHT_FEATHER_TRANSITION: NonNullable<SpotlightSettings['featherTransition']> = 'closeIn';
 
 // ============================================================================
 // Core Logic
@@ -71,26 +81,32 @@ export function getSpotlightStateAtTime(
     const halfDuration = duration / 2;
 
     let animationProgress: number;
+    let phase: SpotlightState['phase'];
 
     if (duration < transitionDurationMs * 2) {
         // Short spotlight: use halfway as the pivot.
         // Fade in until halfway, then fade out from whatever progress was reached.
         if (elapsed <= halfDuration) {
             animationProgress = elapsed / transitionDurationMs;
+            phase = 'in';
         } else {
             const peakProgress = halfDuration / transitionDurationMs;
             const fadeOutElapsed = elapsed - halfDuration;
             animationProgress = peakProgress - (fadeOutElapsed / transitionDurationMs) * peakProgress;
+            phase = 'out';
         }
     } else if (elapsed < transitionDurationMs) {
         // Phase 2: Fade in
         animationProgress = elapsed / transitionDurationMs;
+        phase = 'in';
     } else if (remaining < transitionDurationMs) {
         // Phase 4: Fade out
         animationProgress = remaining / transitionDurationMs;
+        phase = 'out';
     } else {
         // Phase 3: Hold at full effect
         animationProgress = 1.0;
+        phase = 'hold';
     }
 
     // Apply easing
@@ -98,7 +114,8 @@ export function getSpotlightStateAtTime(
 
     // Interpolate values
     const currentDimOpacity = dimOpacity * easedProgress;
-    const currentScale = 1.0 + (s.scale - 1.0) * easedProgress;
+    const featherPx = settings.featherPx ?? DEFAULT_SPOTLIGHT_FEATHER_PX;
+    const featherTransition = settings.featherTransition ?? DEFAULT_SPOTLIGHT_FEATHER_TRANSITION;
 
     // Map source rect to output coordinates using the viewport
     const mappedRect = viewMapper.projectEventToOutput(s.sourceRect, viewport);
@@ -131,16 +148,18 @@ export function getSpotlightStateAtTime(
     if (isVisible) {
         // Clamp to output bounds
         const clampedRect = clampRectToBounds(mappedRect, outputSize);
-        const scaledRect = scaleRectFromCenter(clampedRect, currentScale);
 
         return {
             isVisible: true,
             originalRect: clampedRect,
-            scaledRect,
             sourceRect: s.sourceRect,
             borderRadiusPx: zoomedBorderRadiusPx,
             dimOpacity: currentDimOpacity,
-            scale: currentScale
+            featherPx,
+            progress: easedProgress,
+            phase,
+            featherTransition,
+            fullDimOpacity: dimOpacity
         };
     } else {
         // Spotlight is active but not visible in current viewport
@@ -148,11 +167,14 @@ export function getSpotlightStateAtTime(
         return {
             isVisible: false,
             originalRect: null,
-            scaledRect: null,
             sourceRect: s.sourceRect,
             borderRadiusPx: zoomedBorderRadiusPx,
             dimOpacity: currentDimOpacity,
-            scale: currentScale
+            featherPx,
+            progress: easedProgress,
+            phase,
+            featherTransition,
+            fullDimOpacity: dimOpacity
         };
     }
 }

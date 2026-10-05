@@ -1,5 +1,6 @@
 import { useProjectStore, useProjectData } from '../stores/useProjectStore';
 import { useUIStore } from '../stores/useUIStore';
+import { Toggle } from '@shared/components';
 
 import { getAllFocusAreas } from '../zoom';
 import { useToast, type ToastType } from '../../components/Toast';
@@ -15,6 +16,8 @@ export const DebugBar = () => {
     const project = useProjectData();
     const showDebugOverlays = useUIStore(s => s.showDebugOverlays);
     const toggleDebugOverlays = useUIStore(s => s.toggleDebugOverlays);
+    const vfrVerify = useUIStore(s => s.vfrVerify);
+    const setVfrVerify = useUIStore(s => s.setVfrVerify);
     const { addToast } = useToast();
 
     const showTestToast = (type: ToastType) => {
@@ -75,6 +78,9 @@ export const DebugBar = () => {
 
             {/* Separator */}
             <div className="w-px h-4 bg-gray-700 mx-2" />
+
+            {/* Local export: pixel-verify the frames variable frame rate skips (slow) */}
+            <Toggle value={vfrVerify} onChange={setVfrVerify} label="Verify VFR" />
 
 
             {/* Separator */}

@@ -60,6 +60,8 @@ export function startImpersonation(minted: AdminImpersonateResponse, redirectTo 
  * button sends them straight to the copy in their own workspace).
  */
 export function stopImpersonation(redirectTo = '/admin'): void {
+    // TEMP debug: exit-only-closes-popup
+    console.log('[impersonation] stopImpersonation', { redirectTo, from: window.location.href });
     sessionStorage.removeItem(STORAGE_KEY);
     window.location.href = redirectTo;
 }

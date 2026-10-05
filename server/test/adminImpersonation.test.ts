@@ -170,6 +170,8 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
                     overlaySegments: [
                         { id: 'o1', item: { type: 'text' } },
                         { id: 'o2', item: { type: 'blur' } },
+                        { id: 'o3', item: { type: 'arrow' } },
+                        { id: 'o4', item: { type: 'border' } },
                     ],
                 },
             },
@@ -182,6 +184,14 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             updatedAt: new Date(now - 60_000).toISOString(),
             projectData: {},
         });
+        // A single overlay type — each overlay flag must match only its own type
+        const outlined = await seedProject(pool, {
+            ownerId: owner.id,
+            uploadStatus: 'ready',
+            name: 'Outlined project',
+            updatedAt: new Date(now - 30_000).toISOString(),
+            projectData: { timeline: { overlaySegments: [{ id: 'o', item: { type: 'border' } }] } },
+        });
         // Not openable: trashed, and upload never finished
         const trashed = await seedProject(pool, {
             ownerId: owner.id,
@@ -193,7 +203,7 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             ownerId: owner.id,
             updatedAt: new Date(now).toISOString(),
         });
-        createdProjects.push(rich.id, bare.id, trashed.id, pending.id);
+        createdProjects.push(rich.id, bare.id, outlined.id, trashed.id, pending.id);
 
         const res = await post(testApp(), '/admin-project-list', await userToken({ email: ADMIN_EMAIL }));
         expect(res.statusCode).toBe(200);
@@ -212,13 +222,18 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
                 has_zooms: boolean;
                 has_spotlights: boolean;
                 has_blurs: boolean;
+                has_text: boolean;
+                has_arrows: boolean;
+                has_outlines: boolean;
             }>;
         };
 
         const richRow = projects.find(p => p.id === rich.id);
         const bareRow = projects.find(p => p.id === bare.id);
+        const outlinedRow = projects.find(p => p.id === outlined.id);
         expect(richRow).toBeDefined();
         expect(bareRow).toBeDefined();
+        expect(outlinedRow).toBeDefined();
         expect(projects.find(p => p.id === trashed.id)).toBeUndefined();
         expect(projects.find(p => p.id === pending.id)).toBeUndefined();
 
@@ -235,6 +250,9 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             has_zooms: true,
             has_spotlights: true,
             has_blurs: true,
+            has_text: true,
+            has_arrows: true,
+            has_outlines: true,
         });
         expect(bareRow).toMatchObject({
             duration_ms: null,
@@ -244,6 +262,15 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             has_zooms: false,
             has_spotlights: false,
             has_blurs: false,
+            has_text: false,
+            has_arrows: false,
+            has_outlines: false,
+        });
+        expect(outlinedRow).toMatchObject({
+            has_blurs: false,
+            has_text: false,
+            has_arrows: false,
+            has_outlines: true,
         });
         // Newest-updated first
         expect(projects.findIndex(p => p.id === rich.id))

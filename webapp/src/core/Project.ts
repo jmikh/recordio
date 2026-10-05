@@ -56,6 +56,8 @@ export const createDefaultSettings = (): ProjectSettings => ({
         autoGenerate: true,
         dimOpacity: 0.5,
         enlargeScale: 1.25,
+        featherPx: 60,
+        featherTransition: 'closeIn',
         transitionDurationMs: 750,
         minHoldDurationMs: 200,
         defaultHoldDurationMs: 1000,

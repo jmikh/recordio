@@ -499,6 +499,8 @@ export interface SeedRenderJobOptions {
     userId?: string;
     renderStoragePath?: string | null;
     quality?: string;
+    /** Table default 30; the Mux render is MUX_RENDER_FPS (60) */
+    fps?: number;
     /** 0–1 worker heartbeat; NULL (the default) means queued, not started */
     progress?: number | null;
     /** Failure reason, e.g. 'Worker unresponsive' from the stale-job cron */
@@ -513,8 +515,8 @@ export interface SeedRenderJobOptions {
 export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise<string> {
     const id = randomUUID();
     await db.query(
-        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path, quality, progress, attempt_count, updated_at, error)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 1), COALESCE($10::timestamptz, now()), $11)`,
+        `INSERT INTO render_jobs (id, project_id, user_id, cloud_version, status, render_storage_path, quality, progress, attempt_count, updated_at, error, fps)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 1), COALESCE($10::timestamptz, now()), $11, $12)`,
         [
             id,
             opts.projectId,
@@ -529,6 +531,7 @@ export async function seedRenderJob(db: Db, opts: SeedRenderJobOptions): Promise
             opts.attemptCount ?? null,
             opts.updatedAt ?? null,
             opts.error ?? null,
+            opts.fps ?? 30,
         ],
     );
     return id;

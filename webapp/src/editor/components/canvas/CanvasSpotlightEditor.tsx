@@ -6,7 +6,6 @@ import { useUIStore } from '../../stores/useUIStore';
 import { BoundingBox, type CornerRadii } from './bounding-box';
 import { DimmedOverlay } from './DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
@@ -76,9 +75,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
 
     // History Batcher
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
-    // Display Mapper for output -> CSS coordinate conversion
-    const displayMapper = useDisplayMapper();
 
     // ViewMapper for source <-> output coordinate conversion
     const viewMapper = useMemo(() => {
@@ -230,23 +226,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]);
 
-    // Compute the enlarged preview rect (centered on the current spotlight rect)
-    const scale = spotlight?.scale ?? 1;
-    const showEnlargedPreview = scale > 1;
-    const scaledOutputRect = useMemo(() => {
-        if (!showEnlargedPreview) return null;
-        const cx = currentOutputRect.x + currentOutputRect.width / 2;
-        const cy = currentOutputRect.y + currentOutputRect.height / 2;
-        const sw = currentOutputRect.width * scale;
-        const sh = currentOutputRect.height * scale;
-        return {
-            x: cx - sw / 2,
-            y: cy - sh / 2,
-            width: sw,
-            height: sh,
-        };
-    }, [currentOutputRect, scale, showEnlargedPreview]);
-
     // ── Zoom Bounds ────────────────────────────────────────────────
     // Compute intersection of all zoom viewports during this spotlight.
     // All rects here are in OUTPUT coordinates.
@@ -269,29 +248,17 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         project.settings.zoom,
     ]);
 
-    // Check if the spotlight (or its enlarged version) exceeds the zoom bounds
+    // Check if the spotlight exceeds the zoom bounds
     const isOutOfBounds = useMemo(() => {
         if (!zoomBoundsRect) return false;
-        const check = scaledOutputRect ?? currentOutputRect;
+        const check = currentOutputRect;
         return (
             check.x < zoomBoundsRect.x - 1 ||
             check.y < zoomBoundsRect.y - 1 ||
             check.x + check.width > zoomBoundsRect.x + zoomBoundsRect.width + 1 ||
             check.y + check.height > zoomBoundsRect.y + zoomBoundsRect.height + 1
         );
-    }, [zoomBoundsRect, scaledOutputRect, currentOutputRect]);
-
-    // Check if the enlarged spotlight exceeds the full output area
-    // (relevant when there's no zoom, so no zoom bounds rect is shown)
-    const exceedsOutputArea = useMemo(() => {
-        if (!scaledOutputRect) return false;
-        return (
-            scaledOutputRect.x < -1 ||
-            scaledOutputRect.y < -1 ||
-            scaledOutputRect.x + scaledOutputRect.width > outputSize.width + 1 ||
-            scaledOutputRect.y + scaledOutputRect.height > outputSize.height + 1
-        );
-    }, [scaledOutputRect, outputSize]);
+    }, [zoomBoundsRect, currentOutputRect]);
 
     // If zoom bounds are smaller than 1.2× the minimum spotlight size,
     // they're too tight to be useful — show a warning banner instead.
@@ -313,52 +280,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                 cornerRadii={currentCornerRadii}
                 opacity={spotlight?.dimOpacity}
             />
-
-            {/* Enlarged preview outline — non-editable, white dashed */}
-            {showEnlargedPreview && scaledOutputRect && (() => {
-                const displayRect = displayMapper.outputToDisplay(scaledOutputRect);
-                const scaledRadii: [number, number, number, number] = [
-                    currentCornerRadii[0] * scale,
-                    currentCornerRadii[1] * scale,
-                    currentCornerRadii[2] * scale,
-                    currentCornerRadii[3] * scale,
-                ];
-                const displayRadii = displayMapper.outputToDisplayRadii(scaledRadii);
-                return (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            left: displayRect.x,
-                            top: displayRect.y,
-                            width: displayRect.width,
-                            height: displayRect.height,
-                            border: '1px solid white',
-                            borderRadius: `${displayRadii[0]}px ${displayRadii[1]}px ${displayRadii[2]}px ${displayRadii[3]}px`,
-                            pointerEvents: 'none',
-                            boxSizing: 'border-box',
-                        }}
-                    >
-                        <span
-                            style={{
-                                position: 'absolute',
-                                top: -22,
-                                left: 0,
-                                fontSize: 11,
-                                lineHeight: '18px',
-                                padding: '0 4px',
-                                borderRadius: 3,
-                                background: 'var(--surface-raised)',
-                                color: 'var(--color-text-main)',
-                                whiteSpace: 'nowrap',
-                                fontWeight: 500,
-                                userSelect: 'none',
-                            }}
-                        >
-                            When Enlarged
-                        </span>
-                    </div>
-                );
-            })()}
 
             {/* Zoom Bounds: too-small warning banner */}
             {zoomBoundsTooSmall && (
@@ -407,71 +328,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                     ⚠ Spotlight exceeds zoom area
                 </div>
             )}
-
-            {/* Output-area overflow warning (when no zoom bounds) */}
-            {!zoomBoundsRect && exceedsOutputArea && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 8,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        background: 'var(--surface-raised)',
-                        border: '1px solid var(--destructive)',
-                        color: 'var(--destructive)',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                    }}
-                >
-                    ⚠ Spotlight will exceed video boundaries when enlarged
-                </div>
-            )}
-
-            {/* Zoom Bounds indicator — dashed rect in output coords → CSS */}
-            {zoomBoundsRect && !zoomBoundsTooSmall && (() => {
-                const displayRect = displayMapper.outputToDisplay(zoomBoundsRect);
-                const boundsColor = isOutOfBounds ? 'var(--color-destructive)' : 'white';
-                return (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            left: displayRect.x,
-                            top: displayRect.y,
-                            width: displayRect.width,
-                            height: displayRect.height,
-                            border: `1px dashed ${boundsColor}`,
-                            pointerEvents: 'none',
-                            boxSizing: 'border-box',
-                        }}
-                    >
-                        {/* Label */}
-                        <span
-                            style={{
-                                position: 'absolute',
-                                top: -22,
-                                left: 0,
-                                fontSize: 11,
-                                lineHeight: '18px',
-                                padding: '0 4px',
-                                borderRadius: 3,
-                                background: 'var(--surface-raised)',
-                                color: 'var(--color-text-main)',
-                                whiteSpace: 'nowrap',
-                                fontWeight: 500,
-                                userSelect: 'none',
-                            }}
-                            title="Spotlights will be clipped or video zoomed here"
-                        >
-                            Zoom Area
-                        </span>
-                    </div>
-                );
-            })()}
 
             <BoundingBox
                 rect={currentOutputRect}

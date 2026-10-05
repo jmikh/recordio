@@ -7,6 +7,7 @@ import { AuthModal } from '../../../auth/AuthModal';
 import { SupportModal } from '../../../components/SupportModal';
 import { ProUpgradeModal } from '../../../billing/ProUpgradeModal';
 import { UserMenu } from '../../../components/UserMenu';
+import { ImpersonationHeaderButton } from '../../../components/ImpersonationHeaderButton';
 import { useUserStore } from '../../../auth/useUserStore';
 
 import { trackDownloadClicked } from '../../../analytics';
@@ -110,6 +111,8 @@ export const Header = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <ImpersonationHeaderButton />
+
                     <Tooltip text={isSyncingMedia ? "Syncing to cloud..." : ""}>
                         <div className="relative">
                             <Button

@@ -7,9 +7,8 @@
  *   Audio: AAC → Opus
  */
 
-export type { ExportQuality } from '../utils/exportQuality';
-import type { ExportQuality } from '../utils/exportQuality';
-export type ExportFps = 30;
+export type { ExportQuality, ExportFps } from '../utils/exportQuality';
+import type { ExportQuality, ExportFps } from '../utils/exportQuality';
 
 export interface VideoCodecResult {
     config: VideoEncoderConfig;
@@ -37,23 +36,24 @@ export async function resolveVideoCodec(
     quality: ExportQuality,
     width: number,
     height: number,
+    fps: ExportFps = 30,
 ): Promise<VideoCodecResult> {
     const bitrate = getBitrate(quality);
     const tried: string[] = [];
 
     // H.264 candidates ordered by preference (best quality first)
-    const h264Candidates = getH264Candidates(quality);
+    const h264Candidates = getH264Candidates(quality, fps);
     for (const codec of h264Candidates) {
         tried.push(codec);
         try {
-            const config: VideoEncoderConfig = { codec, width, height, bitrate, bitrateMode: 'constant', framerate: 30, hardwareAcceleration: 'prefer-hardware' };
+            const config: VideoEncoderConfig = { codec, width, height, bitrate, bitrateMode: 'constant', framerate: fps, hardwareAcceleration: 'prefer-hardware' };
             const result = await VideoEncoder.isConfigSupported(config);
             console.log(`[Export] Encoder HW accel for ${codec}: ${result.supported}`);
             if (result.supported) {
                 return { config, muxerCodec: 'avc', fallback: false, tried };
             }
             // If prefer-hardware not supported, try without (Chrome may still use VA-API via default)
-            const swConfig: VideoEncoderConfig = { codec, width, height, bitrate, bitrateMode: 'constant', framerate: 30 };
+            const swConfig: VideoEncoderConfig = { codec, width, height, bitrate, bitrateMode: 'constant', framerate: fps };
             const swResult = await VideoEncoder.isConfigSupported(swConfig);
             if (swResult.supported) {
                 console.log(`[Export] Encoder HW accel probe returned false for ${codec}, using default (may still use VA-API)`);
@@ -68,7 +68,7 @@ export async function resolveVideoCodec(
     const vp9Codec = 'vp09.00.10.08'; // Profile 0, Level 1.0, 8-bit
     tried.push(vp9Codec);
     try {
-        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, bitrateMode: 'constant', framerate: 30 };
+        const config: VideoEncoderConfig = { codec: vp9Codec, width, height, bitrate, bitrateMode: 'constant', framerate: fps };
         const result = await VideoEncoder.isConfigSupported(config);
         if (result.supported) {
             console.warn('[Export] H.264 not supported — falling back to VP9');
@@ -98,14 +98,17 @@ export async function resolveVideoCodec(
  * Return H.264 codec strings to try, ordered by preference.
  * Higher quality exports try High Profile first; lower quality uses Baseline.
  */
-function getH264Candidates(q: ExportQuality): string[] {
+function getH264Candidates(q: ExportQuality, fps: ExportFps): string[] {
     switch (q) {
         case '4K':
+            // High Profile Level 5.1 covers 4K up to ~30 fps; 60 fps needs Level 5.2.
+            // Baseline as last resort.
+            return fps > 30 ? ['avc1.640034', 'avc1.42001f'] : ['avc1.640033', 'avc1.42001f'];
         case '2K':
-            // High Profile Level 5.1, then Baseline as last resort
+            // High Profile Level 5.1 (1440p up to 60 fps), then Baseline as last resort
             return ['avc1.640033', 'avc1.42001f'];
         case '1080p':
-            // High Profile Level 4.2, then Baseline
+            // High Profile Level 4.2 (1080p up to 60 fps), then Baseline
             return ['avc1.64002a', 'avc1.42001f'];
         case '720p':
         case '480p':

@@ -80,10 +80,40 @@ const EFFECT_RENDERERS: Record<
     circle: paintCircle,
 };
 
+export interface ActiveClick {
+    /** Index into the events array */
+    index: number;
+    click: BaseEvent;
+    /** 0–1 progress through the click animation */
+    progress: number;
+}
+
 /**
- * Draws click effects on the canvas.
+ * Returns the clicks whose effect is animating at the given output time.
  * Event timestamps are source time; they are mapped to output time via timeMapper.
  * Events in cut/hidden segments (mapped to -1) are skipped.
+ */
+export function getActiveClicks(
+    events: BaseEvent[],
+    currentOutputTime: number,
+    timeMapper: TimeMapper
+): ActiveClick[] {
+    const active: ActiveClick[] = [];
+    for (let index = 0; index < events.length; index++) {
+        const click = events[index];
+        const mappedTime = timeMapper.mapSourceToOutputTime(click.timestamp);
+        if (mappedTime < 0) continue; // Event is in a cut/hidden segment
+
+        if (currentOutputTime >= mappedTime && currentOutputTime <= mappedTime + CLICK_DURATION) {
+            const elapsed = currentOutputTime - mappedTime;
+            active.push({ index, click, progress: elapsed / CLICK_DURATION });
+        }
+    }
+    return active;
+}
+
+/**
+ * Draws click effects on the canvas.
  */
 export function paintMouseClicks(
     ctx: CanvasRenderingContext2D,
@@ -99,17 +129,9 @@ export function paintMouseClicks(
     const zoomScale = outputSize.width / viewport.width;
     const scale = (outputSize.height / REF_OUTPUT_HEIGHT) * zoomScale;
 
-    for (const click of events) {
-        const mappedTime = timeMapper.mapSourceToOutputTime(click.timestamp);
-        if (mappedTime < 0) continue; // Event is in a cut/hidden segment
-
-        if (currentOutputTime >= mappedTime && currentOutputTime <= mappedTime + CLICK_DURATION) {
-            const elapsed = currentOutputTime - mappedTime;
-            const progress = elapsed / CLICK_DURATION;
-
-            const center = viewMapper.projectEventPointToOutput(click.mousePos, viewport);
-            renderer(ctx, center.x, center.y, progress, settings, scale);
-        }
+    for (const { click, progress } of getActiveClicks(events, currentOutputTime, timeMapper)) {
+        const center = viewMapper.projectEventPointToOutput(click.mousePos, viewport);
+        renderer(ctx, center.x, center.y, progress, settings, scale);
     }
 }
 

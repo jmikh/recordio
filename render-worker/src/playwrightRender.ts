@@ -26,6 +26,8 @@ export interface PlaywrightRenderConfig {
     project: unknown;
     projectName?: string;
     quality: string;
+    /** Output frame rate (max — renders are VFR) */
+    fps: number;
     /** storagePath → local filename */
     mediaFileNames: MediaFileNames;
     /** Base URL for media files served by Fastify (e.g. http://localhost:8080/media/jobId/) */
@@ -133,7 +135,7 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { project, projectName, quality, mediaFileNames, mediaBaseUrl, renderPageUrl, resultUrl, uploadUrl, resultReady, onProgress, onRenderDone } = config;
+    const { project, projectName, quality, fps, mediaFileNames, mediaBaseUrl, renderPageUrl, resultUrl, uploadUrl, resultReady, onProgress, onRenderDone } = config;
     const reportProgress = onProgress ?? (() => {});
     const startTime = Date.now();
 
@@ -194,7 +196,7 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
         });
 
         // --- Inject job config before page loads ---
-        const renderJob = { project, projectName, quality, mediaBaseUrl, mediaFileNames, resultUrl };
+        const renderJob = { project, projectName, quality, fps, mediaBaseUrl, mediaFileNames, resultUrl };
 
         await page.addInitScript((job: any) => {
             (window as any).__RENDER_JOB__ = job;

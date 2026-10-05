@@ -276,7 +276,10 @@ describe('v6 → v7: drag effect off, autoGenerate flags', () => {
         const result = migrateProject(proj);
         expect(result.settings.mouse).toEqual({ mouseClickEnabled: true, mouseDragEnabled: false });
         expect(result.settings.zoom).toEqual({ enabled: false, maxZoom: 2, autoGenerate: true });
-        expect(result.settings.spotlight).toEqual({ enabled: true, dimOpacity: 0.5, autoGenerate: true });
+        expect(result.settings.spotlight).toEqual({
+            enabled: true, dimOpacity: 0.5, autoGenerate: true,
+            featherPx: 60, featherTransition: 'closeIn',
+        });
     });
 
     it('keeps an explicit autoGenerate and tolerates missing groups', () => {
@@ -285,6 +288,33 @@ describe('v6 → v7: drag effect off, autoGenerate flags', () => {
         expect(result.settings.zoom.autoGenerate).toBe(false);
         expect(result.settings.mouse).toBeUndefined();
         expect(result.settings.spotlight).toBeUndefined();
+    });
+});
+
+// ==========================================
+// Spotlight feather backfill (version-independent)
+// ==========================================
+
+describe('spotlight feather backfill', () => {
+    it('fills featherPx / featherTransition defaults and drops the retired edgeMode', () => {
+        const proj = makeV1Project({
+            schemaVersion: CURRENT_SCHEMA_VERSION,
+            settings: { spotlight: { enabled: true, dimOpacity: 0.5, autoGenerate: true, edgeMode: 'enlarge' } },
+        });
+        const result = migrateProject(proj);
+        expect(result.settings.spotlight.featherPx).toBe(60);
+        expect(result.settings.spotlight.featherTransition).toBe('closeIn');
+        expect(result.settings.spotlight.edgeMode).toBeUndefined();
+    });
+
+    it('keeps explicit feather values', () => {
+        const proj = makeV1Project({
+            schemaVersion: CURRENT_SCHEMA_VERSION,
+            settings: { spotlight: { enabled: true, dimOpacity: 0.5, autoGenerate: true, featherPx: 0, featherTransition: 'fade' } },
+        });
+        const result = migrateProject(proj);
+        expect(result.settings.spotlight.featherPx).toBe(0);
+        expect(result.settings.spotlight.featherTransition).toBe('fade');
     });
 });
 

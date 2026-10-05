@@ -6,7 +6,8 @@
  * (ready, not trashed, not purged), each with its owner and a set of
  * `has_*` flags read straight out of project_data: camera/mic sources
  * present, non-empty caption/zoom/spotlight segment arrays, and any
- * blur overlay. The /admin page shows the flags as icons and a click
+ * overlay of each type (blur, text, arrow, border — the editor's
+ * "outline"). The /admin page shows the flags as icons and a click
  * impersonates the owner straight into that project's editor.
  *
  * The LIMIT runs in a subquery over the bare rows first, so the jsonb
@@ -18,9 +19,11 @@
  * Request:  {}
  * Response: { projects: [{ id, name, slug, owner_id, owner_email, owner_name,
  *             created_at, updated_at, duration_ms, has_camera, has_mic,
- *             has_captions, has_zooms, has_spotlights, has_blurs }] }
+ *             has_captions, has_zooms, has_spotlights, has_blurs, has_text,
+ *             has_arrows, has_outlines }] }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import type { OverlayItemType } from '@shared/types/overlay';
 import { requireAdmin, type AdminRoutesOptions } from './requireAdmin.js';
 
 const RECENT_PROJECTS_LIMIT = 100;
@@ -33,6 +36,19 @@ function nonEmptyArray(expr: string): string {
 /** SQL: true when the jsonb expression is an object (a present source). */
 function isObject(expr: string): string {
     return `COALESCE(jsonb_typeof(${expr}) = 'object', false)`;
+}
+
+/** SQL: true when the timeline has at least one overlay segment of this item type. */
+function hasOverlay(timeline: string, type: OverlayItemType): string {
+    return `EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(
+            CASE WHEN jsonb_typeof(${timeline}->'overlaySegments') = 'array'
+                 THEN ${timeline}->'overlaySegments'
+                 ELSE '[]'::jsonb END
+        ) seg
+        WHERE seg->'item'->>'type' = '${type}'
+    )`;
 }
 
 export const adminProjectListRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> = async (
@@ -69,15 +85,10 @@ export const adminProjectListRoutes: FastifyPluginAsyncTypebox<AdminRoutesOption
                         'has_captions',   ${nonEmptyArray(`${timeline}->'captionSegments'`)},
                         'has_zooms',      ${nonEmptyArray(`${timeline}->'zoomSegments'`)},
                         'has_spotlights', ${nonEmptyArray(`${timeline}->'spotlightSegments'`)},
-                        'has_blurs',      EXISTS (
-                            SELECT 1
-                            FROM jsonb_array_elements(
-                                CASE WHEN jsonb_typeof(${timeline}->'overlaySegments') = 'array'
-                                     THEN ${timeline}->'overlaySegments'
-                                     ELSE '[]'::jsonb END
-                            ) seg
-                            WHERE seg->'item'->>'type' = 'blur'
-                        )
+                        'has_blurs',      ${hasOverlay(timeline, 'blur')},
+                        'has_text',       ${hasOverlay(timeline, 'text')},
+                        'has_arrows',     ${hasOverlay(timeline, 'arrow')},
+                        'has_outlines',   ${hasOverlay(timeline, 'border')}
                     ) AS obj
                     FROM (
                         SELECT *

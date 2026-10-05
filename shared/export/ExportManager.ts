@@ -6,12 +6,17 @@ import { drawBackground } from '../painters/backgroundPainter';
 import { getDeviceFrame } from '../utils/deviceFrames';
 import { TimeMapper } from '../mappers/timeMapper';
 import { FrameExtractor, type DecodePreferences } from './FrameExtractor';
-import { resolveVideoCodec, resolveAudioCodec, getHeightForQuality } from './codecResolver';
+import { resolveVideoCodec, resolveAudioCodec, getHeightForQuality, type ExportFps } from './codecResolver';
 import { renderAudioBuffer, encodeAudioBuffer, type SoundEffectBuffers } from './audioProcessor';
+import { computeFrameSignature } from './frameSignature';
+import { preloadToolbarIcons } from '../painters/toolbarPainter';
+import { getCaptionFont } from '../painters/captionPainter';
+import { getKeyboardFont } from '../painters/keyboardPainter';
+import { getOverlayTextFont } from '../painters/overlayPainter';
 import type { Project, SourceMetadata } from '../types';
 import type { RenderContext } from '../utils/renderContext';
 
-export type { ExportQuality } from './codecResolver';
+export type { ExportQuality, ExportFps } from './codecResolver';
 
 export interface ExportProgress {
     progress: number;
@@ -60,6 +65,32 @@ export interface ExportEnvironment {
     onMuxedData?: (data: Uint8Array, position: number) => void;
 }
 
+export interface ExportOptions {
+    skipDownload?: boolean;
+    /** Output frame rate (default 30). With VFR this is the maximum: static stretches encode fewer frames. */
+    fps?: ExportFps;
+    /**
+     * Default 'variable': output frames that would look identical to the last
+     * encoded one are skipped, so the previous frame lasts longer (VFR output).
+     * 'constant': every 1/fps slot is drawn and encoded.
+     */
+    frameRateMode?: 'constant' | 'variable';
+    /**
+     * VFR debug: still draw frames that would be skipped and compare their
+     * pixels with the last encoded frame, logging mismatches. Slow.
+     */
+    verifySkippedFrames?: boolean;
+}
+
+/** VFR: longest a single encoded frame may be held before it's re-encoded. */
+const MAX_FRAME_HOLD_MS = 1000;
+
+/** Keyframe spacing in output time (VFR; CFR forces one every fps * 2 frames). */
+const KEYFRAME_INTERVAL_MS = 2000;
+
+/** VFR verify mode: stop logging individual mismatches after this many. */
+const MAX_LOGGED_MISMATCHES = 20;
+
 /** Maximum number of full export retries on codec reclaim errors. */
 const MAX_EXPORT_RETRIES = 2;
 
@@ -73,7 +104,7 @@ export class ExportManager {
         project: Project,
         quality: import('./codecResolver').ExportQuality,
         onProgress: (state: ExportProgress) => void,
-        options?: { skipDownload?: boolean },
+        options?: ExportOptions,
         env?: ExportEnvironment,
         projectName?: string,
     ): Promise<ExportResult> {
@@ -120,7 +151,7 @@ export class ExportManager {
         quality: import('./codecResolver').ExportQuality,
         onProgress: (state: ExportProgress) => void,
         signal: AbortSignal,
-        options?: { skipDownload?: boolean },
+        options?: ExportOptions,
         env?: ExportEnvironment,
         projectName?: string,
     ): Promise<ExportResult> {
@@ -129,7 +160,7 @@ export class ExportManager {
             throw new Error('[ExportManager] renderContext is required in ExportEnvironment');
         }
 
-        const fps = 30;
+        const fps = options?.fps ?? 30;
         const targetHeight = getHeightForQuality(quality);
         const aspectRatio = project.settings.outputSize.width / project.settings.outputSize.height;
         const targetWidth = Math.round(targetHeight * aspectRatio);
@@ -141,13 +172,13 @@ export class ExportManager {
         const renderProject = scaleProject(project, { width, height });
 
         // Probe codec support
-        const videoCodec = await resolveVideoCodec(quality, width, height);
+        const videoCodec = await resolveVideoCodec(quality, width, height, fps);
         const audioCodec = await resolveAudioCodec();
 
         console.log(`[Export] Video codec: ${videoCodec.muxerCodec} (${videoCodec.config.codec}), ` +
             `fallback=${videoCodec.fallback}, tried=[${videoCodec.tried.join(', ')}], ` +
             `hwAccel=${videoCodec.config.hardwareAcceleration ?? 'default'}, ` +
-            `${width}x${height} @ ${videoCodec.config.bitrate! / 1_000_000}Mbps`);
+            `${width}x${height} @ ${fps}fps, ${videoCodec.config.bitrate! / 1_000_000}Mbps`);
 
         // Stream muxer output — either to an external sink or to an in-memory buffer
         const streaming = !!env?.onMuxedData;
@@ -217,51 +248,82 @@ export class ExportManager {
         let framesProcessed = 0;
 
         try {
-            const bgSettings = renderProject.settings.background;
-            if (bgSettings.type === 'preset' || bgSettings.type === 'custom') {
-                const bgUrl = (bgSettings.storagePath && env?.mediaUrls?.[bgSettings.storagePath])
-                    || bgSettings.imageUrl;
-                if (bgUrl) {
-                    console.log(`[Export] Loading background image: ${bgUrl}`);
-                    const bgStart = performance.now();
-                    imageElements.bg = await renderCtx.loadImage(bgUrl);
-                    console.log(`[Export] Background image loaded in ${(performance.now() - bgStart).toFixed(0)}ms`);
-                }
-            }
-
-            const deviceFrameSettings = renderProject.settings.screen;
-            if (deviceFrameSettings.mode === 'device' && deviceFrameSettings.deviceFrameId) {
-                const frameDef = getDeviceFrame(deviceFrameSettings.deviceFrameId);
-                if (frameDef) {
-                    console.log(`[Export] Loading device frame: ${frameDef.imageUrl}`);
-                    const dfStart = performance.now();
-                    imageElements.device = await renderCtx.loadImage(frameDef.imageUrl);
-                    console.log(`[Export] Device frame loaded in ${(performance.now() - dfStart).toFixed(0)}ms`);
-                }
-            }
-
-            // Signal preparing phase
-            console.log(`[Export] Image loading complete, initializing frame extractors...`);
             onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'preparing' });
 
-            // Initialize frame extractors
+            const timeMapper = new TimeMapper(renderProject.timeline.outputWindows);
+            totalDurationMs = timeMapper.outputDuration;
+            const totalDurationSec = totalDurationMs / 1000;
             const mediaUrls = env?.mediaUrls ?? {};
-            const sourceCount = sources.filter(s => mediaUrls[s.storagePath]).length;
-            let sourceIndex = 0;
-            for (const source of sources) {
-                const sourceUrl = mediaUrls[source.storagePath];
-                if (sourceUrl) {
+
+            const loadImages = async () => {
+                const bgSettings = renderProject.settings.background;
+                const bgUrl = (bgSettings.type === 'preset' || bgSettings.type === 'custom')
+                    ? (bgSettings.storagePath && mediaUrls[bgSettings.storagePath]) || bgSettings.imageUrl
+                    : undefined;
+                const deviceFrameSettings = renderProject.settings.screen;
+                const frameDef = deviceFrameSettings.mode === 'device' && deviceFrameSettings.deviceFrameId
+                    ? getDeviceFrame(deviceFrameSettings.deviceFrameId)
+                    : undefined;
+
+                await Promise.all([
+                    renderProject.settings.screen.toolbar.enabled && preloadToolbarIcons(renderCtx),
+                    bgUrl && (async () => {
+                        console.log(`[Export] Loading background image: ${bgUrl}`);
+                        const bgStart = performance.now();
+                        imageElements.bg = await renderCtx.loadImage(bgUrl);
+                        console.log(`[Export] Background image loaded in ${(performance.now() - bgStart).toFixed(0)}ms`);
+                    })(),
+                    frameDef && (async () => {
+                        console.log(`[Export] Loading device frame: ${frameDef.imageUrl}`);
+                        const dfStart = performance.now();
+                        imageElements.device = await renderCtx.loadImage(frameDef.imageUrl);
+                        console.log(`[Export] Device frame loaded in ${(performance.now() - dfStart).toFixed(0)}ms`);
+                    })(),
+                ]);
+            };
+
+            const initExtractors = async () => {
+                const toInit = sources.filter(s => mediaUrls[s.storagePath]);
+                const progressBySource = toInit.map(() => 0);
+                await Promise.all(toInit.map(async (source, si) => {
+                    const sourceUrl = mediaUrls[source.storagePath];
                     console.log(`[Export] Initializing extractor for: ${sourceUrl}`);
                     const extractor = new FrameExtractor(sourceUrl, env?.decodePreferences);
-                    const si = sourceIndex;
+                    // Register before init so `finally` disposes it even if a sibling init fails
+                    frameExtractors[source.storagePath] = extractor;
                     await extractor.initialize((chunkProgress) => {
-                        const overallProgress = (si + chunkProgress) / sourceCount;
+                        progressBySource[si] = chunkProgress;
+                        const overallProgress = progressBySource.reduce((sum, p) => sum + p, 0) / toInit.length;
                         onProgress({ progress: overallProgress, timeRemainingSeconds: null, phase: 'preparing' });
                     });
-                    frameExtractors[source.storagePath] = extractor;
-                    sourceIndex++;
-                }
-            }
+                }));
+            };
+
+            // Images, frame extractors and audio are independent — prepare them concurrently
+            const setupStart = performance.now();
+            const setupMs: Record<string, number> = {};
+            const timed = async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
+                const t0 = performance.now();
+                const result = await fn();
+                setupMs[label] = performance.now() - t0;
+                return result;
+            };
+            const [, , , renderedAudioBuffer] = await Promise.all([
+                timed('images', loadImages),
+                timed('fonts', () => preloadFonts(renderProject)),
+                timed('extractors', initExtractors),
+                timed('audio', () => renderAudioBuffer({
+                    project: renderProject,
+                    totalDurationSec,
+                    userEvents: renderProject.userEvents,
+                    timeMapper,
+                    soundEffects: env?.soundEffects,
+                    mediaUrls,
+                })),
+            ]);
+            console.log(`[Export] Setup done in ${(performance.now() - setupStart).toFixed(0)}ms ` +
+                `(images=${setupMs.images.toFixed(0)}ms fonts=${setupMs.fonts.toFixed(0)}ms ` +
+                `extractors=${setupMs.extractors.toFixed(0)}ms audio=${setupMs.audio.toFixed(0)}ms, run concurrently)`);
 
             // Check decode fallback
             let decodeFallbackTriggered = false;
@@ -275,26 +337,16 @@ export class ExportManager {
                 }
             }
 
-            const timeMapper = new TimeMapper(renderProject.timeline.outputWindows);
-            totalDurationMs = timeMapper.outputDuration;
-            const totalDurationSec = totalDurationMs / 1000;
-
-            // --- Audio Rendering ---
-            const renderedAudioBuffer = await renderAudioBuffer({
-                project: renderProject,
-                totalDurationSec,
-                userEvents: renderProject.userEvents,
-                timeMapper,
-                soundEffects: env?.soundEffects,
-                mediaUrls,
-            });
             encodeAudioBuffer(renderedAudioBuffer, audioEncoder);
 
             // --- Frame Loop ---
             onProgress({ progress: 0, timeRemainingSeconds: null, phase: 'exporting' });
             const frameInterval = 1000 / fps;
             totalFrames = Math.ceil(totalDurationMs / frameInterval);
-            console.log(`[Export] Starting frame loop: ${totalFrames} frames, ${totalDurationMs.toFixed(0)}ms duration, ${Object.keys(frameExtractors).length} sources`);
+            const variableFrameRate = (options?.frameRateMode ?? 'variable') === 'variable';
+            const verifySkips = variableFrameRate && !!options?.verifySkippedFrames;
+            console.log(`[Export] Starting frame loop: ${totalFrames} frames, ${totalDurationMs.toFixed(0)}ms duration, ` +
+                `${Object.keys(frameExtractors).length} sources, ${fps}fps ${variableFrameRate ? 'variable' : 'constant'}${verifySkips ? ' (verify)' : ''}`);
 
             const startTime = performance.now();
             framesProcessed = 0;
@@ -304,6 +356,16 @@ export class ExportManager {
             let accDecode = 0, accBackground = 0, accRender = 0, accEncode = 0, accBackpressure = 0, accTotal = 0;
             let accChunksFed = 0, maxQueueSize = 0;
             let accUnchangedFrames = 0;
+            let accRenderedFrames = 0, accEncodedFrames = 0;
+
+            // VFR state: the signature of the image currently on the canvas, and when it was last encoded
+            let lastSignature: string | null = null;
+            let lastEncodedTimeMs = -Infinity;
+            let lastKeyframeTimeMs = -Infinity;
+            let encodedFrames = 0;
+            let longestHoldMs = 0;
+            let verifyMismatches = 0;
+            let lastDrawnPixels: Uint8ClampedArray | null = null;
 
             // Track frames with unchanged decoded timestamps
             const prevTimestamps: Record<string, number> = {};
@@ -363,50 +425,109 @@ export class ExportManager {
                     unchangedStreakCount = 0;
                 }
 
+                // VFR: a frame whose signature matches the image on the canvas is identical to it —
+                // don't redraw it, and only encode it when a hold expires or it's the first/last frame
+                let shouldDraw = true;
+                let shouldEncode = true;
+                let signature: string | null = null;
+                if (variableFrameRate) {
+                    signature = computeFrameSignature({
+                        project: renderProject,
+                        projectName,
+                        userEvents: renderProject.userEvents,
+                        timeMapper,
+                        currentTimeMs,
+                        frameRefs: currentFrameRefs,
+                    });
+                    const unchanged = signature === lastSignature;
+                    shouldDraw = !unchanged;
+                    shouldEncode = !unchanged
+                        || i === 0
+                        || i === totalFrames - 1 // its own duration ends the track
+                        || currentTimeMs - lastEncodedTimeMs >= MAX_FRAME_HOLD_MS;
+                }
+                const verifyThisFrame = verifySkips && !shouldDraw;
+
                 // Render Frame
-                ctx.clearRect(0, 0, width, height);
+                if (shouldDraw || verifyThisFrame) {
+                    ctx.clearRect(0, 0, width, height);
 
-                const tBg0 = performance.now();
-                drawBackground(
-                    ctx,
-                    renderProject.settings.background,
-                    renderProject.settings.background.backgroundBlurPx,
-                    { width, height },
-                    imageElements.bg
-                );
-                accBackground += performance.now() - tBg0;
+                    const tBg0 = performance.now();
+                    drawBackground(
+                        ctx,
+                        renderProject.settings.background,
+                        renderProject.settings.background.backgroundBlurPx,
+                        { width, height },
+                        imageElements.bg
+                    );
+                    accBackground += performance.now() - tBg0;
 
-                PlaybackRenderer.render({
-                    ctx,
-                    renderCtx,
-                    bgRef: imageElements.bg,
-                    videoRefs: currentFrameRefs,
-                    deviceFrameImg: imageElements.device,
-                    sourceCanvas: offscreenCanvas
-                }, {
-                    project: renderProject,
-                    projectName,
-                    userEvents: renderProject.userEvents,
-                    currentTimeMs: currentTimeMs,
-                    timeMapper: timeMapper
-                });
+                    PlaybackRenderer.render({
+                        ctx,
+                        renderCtx,
+                        bgRef: imageElements.bg,
+                        videoRefs: currentFrameRefs,
+                        deviceFrameImg: imageElements.device,
+                        sourceCanvas: offscreenCanvas
+                    }, {
+                        project: renderProject,
+                        projectName,
+                        userEvents: renderProject.userEvents,
+                        currentTimeMs: currentTimeMs,
+                        timeMapper: timeMapper
+                    });
+                    accRenderedFrames++;
+                }
+
+                if (shouldDraw) {
+                    lastSignature = signature;
+                    if (verifySkips) lastDrawnPixels = ctx.getImageData(0, 0, width, height).data;
+                } else if (verifyThisFrame && lastDrawnPixels) {
+                    const pixels = ctx.getImageData(0, 0, width, height).data;
+                    let diffPixels = 0;
+                    for (let p = 0; p < pixels.length; p += 4) {
+                        if (pixels[p] !== lastDrawnPixels[p] || pixels[p + 1] !== lastDrawnPixels[p + 1]
+                            || pixels[p + 2] !== lastDrawnPixels[p + 2] || pixels[p + 3] !== lastDrawnPixels[p + 3]) {
+                            diffPixels++;
+                        }
+                    }
+                    if (diffPixels > 0) {
+                        verifyMismatches++;
+                        if (verifyMismatches <= MAX_LOGGED_MISMATCHES) {
+                            console.warn(`[Export:VFR] MISMATCH t=${currentTimeMs.toFixed(0)}ms diffPixels=${diffPixels} signature=${signature}`);
+                        }
+                        // Keep comparing against what's actually on the canvas now
+                        lastDrawnPixels = pixels;
+                    }
+                }
                 const t2 = performance.now();
 
-                const durationMicros = 1000000 / fps;
-                const encoderFrame = new VideoFrame(offscreenCanvas, {
-                    timestamp: timestampMicros,
-                    duration: durationMicros
-                });
+                if (shouldEncode) {
+                    const durationMicros = 1000000 / fps;
+                    const encoderFrame = new VideoFrame(offscreenCanvas, {
+                        timestamp: timestampMicros,
+                        duration: durationMicros
+                    });
 
-                if ((videoEncoder.state as string) === 'closed') {
+                    if ((videoEncoder.state as string) === 'closed') {
+                        encoderFrame.close();
+                        Object.values(currentFrameRefs).forEach(f => f.close());
+                        const err = videoEncoderError
+                            ?? new Error(`VideoEncoder closed unexpectedly after ${framesProcessed}/${totalFrames} frames`);
+                        throw err;
+                    }
+                    const keyFrame = variableFrameRate
+                        ? currentTimeMs - lastKeyframeTimeMs >= KEYFRAME_INTERVAL_MS
+                        : i % (fps * 2) === 0;
+                    if (keyFrame) lastKeyframeTimeMs = currentTimeMs;
+                    if (i > 0) longestHoldMs = Math.max(longestHoldMs, currentTimeMs - lastEncodedTimeMs);
+                    lastEncodedTimeMs = currentTimeMs;
+                    encodedFrames++;
+                    accEncodedFrames++;
+
+                    videoEncoder.encode(encoderFrame, { keyFrame });
                     encoderFrame.close();
-                    Object.values(currentFrameRefs).forEach(f => f.close());
-                    const err = videoEncoderError
-                        ?? new Error(`VideoEncoder closed unexpectedly after ${framesProcessed}/${totalFrames} frames`);
-                    throw err;
                 }
-                videoEncoder.encode(encoderFrame, { keyFrame: i % (fps * 2) === 0 });
-                encoderFrame.close();
                 const t3 = performance.now();
 
                 Object.values(currentFrameRefs).forEach(f => f.close());
@@ -441,17 +562,26 @@ export class ExportManager {
                         `decode=${accDecode.toFixed(0)}ms render=${accRender.toFixed(0)}ms ` +
                         `encode=${accEncode.toFixed(0)}ms backpressure=${accBackpressure.toFixed(0)}ms ` +
                         `total=${accTotal.toFixed(0)}ms (${(accTotal / logInterval).toFixed(0)}ms/frame) ` +
-                        `decoded=${newFrames}/${logInterval} chunksFed=${accChunksFed} maxQueue=${maxQueueSize}${memStr}`);
-                    const profile = PlaybackRenderer.flushProfile(logInterval);
+                        `decoded=${newFrames}/${logInterval} encoded=${accEncodedFrames}/${logInterval} ` +
+                        `chunksFed=${accChunksFed} maxQueue=${maxQueueSize}${memStr}`);
+                    const profile = PlaybackRenderer.flushProfile(accRenderedFrames);
                     if (profile) console.log(`${profile} background=${accBackground.toFixed(0)}ms`);
                     accDecode = 0; accBackground = 0; accRender = 0; accEncode = 0; accBackpressure = 0; accTotal = 0;
                     accChunksFed = 0; maxQueueSize = 0; accUnchangedFrames = 0;
+                    accRenderedFrames = 0; accEncodedFrames = 0;
                 }
 
                 // Periodic yield for UI responsiveness
                 if (framesProcessed % logInterval === 0) {
                     await new Promise(r => setTimeout(r, 0));
                 }
+            }
+
+            console.log(`[Export] Frame loop done in ${((performance.now() - startTime) / 1000).toFixed(1)}s (${totalFrames} frames)`);
+            if (variableFrameRate) {
+                const skippedPct = totalFrames > 0 ? (1 - encodedFrames / totalFrames) * 100 : 0;
+                console.log(`[Export] VFR: encoded ${encodedFrames}/${totalFrames} frames (${skippedPct.toFixed(0)}% skipped), ` +
+                    `longest hold ${longestHoldMs.toFixed(0)}ms${verifySkips ? `, verify mismatches ${verifyMismatches}` : ''}`);
             }
 
 
@@ -517,6 +647,38 @@ export class ExportManager {
             this.abortController.abort();
         }
     }
+}
+
+/** Give up waiting on font loads after this long — the export proceeds with fallback fonts. */
+const FONT_LOAD_TIMEOUT_MS = 5000;
+
+/**
+ * Loads the web fonts the painters draw text with. Without this, a font that's
+ * still loading when the export starts is drawn as a fallback for the first
+ * frames (and, with VFR, such a frame can be held).
+ */
+async function preloadFonts(project: Project): Promise<void> {
+    const fonts = (globalThis as { document?: Document }).document?.fonts;
+    if (!fonts) return;
+
+    // Size doesn't matter for loading — family + weight select the font face
+    const specs = new Set<string>([getCaptionFont(16), getKeyboardFont(16)]);
+    for (const segment of project.timeline.overlaySegments || []) {
+        if (segment.item.type === 'text') specs.add(getOverlayTextFont({ ...segment.item, fontSizePx: 16 }));
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>(resolve => {
+        timer = setTimeout(() => {
+            console.warn(`[Export] Font loading still pending after ${FONT_LOAD_TIMEOUT_MS}ms — continuing`);
+            resolve();
+        }, FONT_LOAD_TIMEOUT_MS);
+    });
+    const loads = Promise.all([...specs].map(spec =>
+        fonts.load(spec).catch(e => console.warn(`[Export] Failed to load font "${spec}":`, e))
+    ));
+    await Promise.race([loads, timeout]);
+    clearTimeout(timer);
 }
 
 /**

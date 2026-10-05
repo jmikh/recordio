@@ -12,7 +12,7 @@ interface MediaTooltipProps {
 /** Spotlight tooltip with demo video */
 export const SpotlightTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip
-        description={"Shine the spotlight on what matters by enlarging it and dimming the rest.\nLooks best on cards, popovers and clearly defined areas."}
+        description={"Shine the spotlight on what matters by dimming everything around it.\nLooks best on cards, popovers and clearly defined areas."}
         videoSrc={`${CDN_ORIGIN}/demos/spotlight.webm`}
         placement={placement}
         trigger={trigger}

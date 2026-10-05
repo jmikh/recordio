@@ -79,6 +79,19 @@ function getPuzzleImage(renderCtx: RenderContext): CanvasImageSource | null {
     return null;
 }
 
+/**
+ * Loads the toolbar icons up front. Without this they load lazily on first
+ * draw, so the first frames of an export are drawn without them.
+ */
+export async function preloadToolbarIcons(renderCtx: RenderContext): Promise<void> {
+    logoLoading = true;
+    puzzleLoading = true;
+    await Promise.all([
+        logoImg || renderCtx.loadImage(logoUrl).then(img => { logoImg = img; }).catch(e => { console.warn('[toolbar] Failed to load logo:', e); }),
+        puzzleImg || renderCtx.loadImage(puzzleUrl).then(img => { puzzleImg = img; }).catch(e => { console.warn('[toolbar] Failed to load puzzle:', e); }),
+    ]);
+}
+
 // ══════════════════════════════════════════
 // Color Schemes
 // ══════════════════════════════════════════

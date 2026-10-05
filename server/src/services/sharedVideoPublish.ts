@@ -34,7 +34,7 @@
  */
 import type { Deps } from '../deps.js';
 import { getOrCreateRenderJob, type RenderJobResolution } from './renderJobs.js';
-import { markMuxVideoFailed, uploadToMux, MUX_RENDER_QUALITY } from './muxUpload.js';
+import { markMuxVideoFailed, uploadToMux, MUX_RENDER_QUALITY, MUX_RENDER_FPS } from './muxUpload.js';
 
 /** Dispatches allowed before the cooldown; the 6th waits it out. */
 export const MAX_PUBLISH_ATTEMPTS = 5;
@@ -67,7 +67,7 @@ export interface PublishAttemptState {
     muxAttempt: number | null;
     /** mux_videos.updated_at is inside the cooldown window */
     muxRecent: boolean | null;
-    /** render_jobs.attempt_count for the target (project, cloudVersion, MUX_RENDER_QUALITY); null when no row */
+    /** render_jobs.attempt_count for the target (project, cloudVersion, MUX_RENDER_QUALITY, MUX_RENDER_FPS); null when no row */
     renderAttemptCount: number | null;
     /** render_jobs.updated_at is inside the cooldown window */
     renderRecent: boolean | null;
@@ -156,10 +156,11 @@ export async function publishProjectToMux(
             projectId,
             userId: ownerId,
             cloudVersion,
-            // Mux streams a single quality (1080p) regardless of what the
-            // user picks for downloads — cached per (project, version,
-            // quality), so this is its own render job.
+            // Mux streams a single render (1080p, up to 60 fps) regardless
+            // of what the user picks for downloads — cached per (project,
+            // version, quality, fps), so this is its own render job.
             quality: MUX_RENDER_QUALITY,
+            fps: MUX_RENDER_FPS,
             statusCallbackUrl,
             log,
         });

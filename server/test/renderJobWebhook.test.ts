@@ -234,7 +234,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
             projectId: project.id,
             cloudVersion: 2,
             renderStoragePath: renderPath,
-            quality: '1080p', // only the Mux quality feeds Mux
+            quality: '1080p', fps: 60, // only the Mux render (1080p, 60 fps) feeds Mux
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -285,7 +285,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
             projectId: project.id,
             cloudVersion: 1,
             renderStoragePath: `u/${project.id}/renders/v1.mp4`,
-            quality: '1080p', // only the Mux quality feeds Mux
+            quality: '1080p', fps: 60, // only the Mux render (1080p, 60 fps) feeds Mux
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -308,7 +308,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         const jobId = await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 1,
-            quality: '1080p', // only the Mux quality cascades to the mux_video
+            quality: '1080p', fps: 60, // only the Mux render (1080p, 60 fps) cascades to the mux_video
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,
@@ -335,7 +335,7 @@ describe.runIf(hasTestDb())('POST /render-job-webhook (e2e, real Postgres)', () 
         const jobId = await seedRenderJob(pool, {
             projectId: project.id,
             cloudVersion: 1,
-            quality: '1080p', // only the Mux quality cascades to the mux_video
+            quality: '1080p', fps: 60, // only the Mux render (1080p, 60 fps) cascades to the mux_video
         });
         const muxVideoId = await seedMuxVideo(pool, {
             projectId: project.id,

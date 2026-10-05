@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 import { CloudRenderService } from '../../../activity/cloudRenderService';
 import { useActivityStore, selectRenderTask, type CloudRenderPhase } from '../../../activity/useActivityStore';
 
@@ -17,7 +17,7 @@ export function useCloudRender(projectId: string, projectName: string) {
     const isActive = task?.status === 'active';
 
     const startCloudRender = useCallback(
-        (quality: ExportQuality = '1080p') => CloudRenderService.start(projectId, projectName, quality),
+        (quality: ExportQuality = '1080p', fps: ExportFps = 30) => CloudRenderService.start(projectId, projectName, quality, fps),
         [projectId, projectName],
     );
 

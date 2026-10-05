@@ -8,6 +8,7 @@ import { LuRedo2, LuUndo2 } from 'react-icons/lu';
 import { Button, LogoLink, StatusBadge } from '@shared/components';
 import { ProjectNameField } from '../../editor/components/header/ProjectNameField';
 import { UserMenu } from '../../components/UserMenu';
+import { ImpersonationHeaderButton } from '../../components/ImpersonationHeaderButton';
 import { SupportModal } from '../../components/SupportModal';
 import { useToast } from '../../components/Toast';
 import { useSyncStatusStore } from '../../storage/syncStatusStore';
@@ -79,6 +80,7 @@ export function ScreenshotHeader({ children }: { children?: ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+                <ImpersonationHeaderButton />
                 {children}
                 <div className="ml-1">
                     <UserMenu onOpenSupportModal={() => setIsSupportModalOpen(true)} />

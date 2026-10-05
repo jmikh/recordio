@@ -82,7 +82,7 @@ describe('CloudRenderService.start', () => {
         await CloudRenderService.start('p1', 'My video', '1080p');
 
         expect(CloudProjectService.saveProject).toHaveBeenCalledOnce();
-        expect(mockInvoke).toHaveBeenCalledWith('render-job-create', { projectId: 'p1', cloudVersion: 3, quality: '1080p' });
+        expect(mockInvoke).toHaveBeenCalledWith('render-job-create', { projectId: 'p1', cloudVersion: 3, quality: '1080p', fps: 30 });
         expect(task()).toMatchObject({ kind: 'render', status: 'active', phase: 'queued', projectSlug: 'slug-1', quality: '1080p' });
 
         await vi.advanceTimersByTimeAsync(3000);
@@ -154,14 +154,14 @@ describe('CloudRenderService.start', () => {
 describe('CloudRenderService.retry', () => {
     it('re-renders when the failure happened before a file existed', async () => {
         mockInvoke.mockResolvedValueOnce({ data: null, error: new Error('offline') });
-        await CloudRenderService.start('p1', 'My video', '4K');
+        await CloudRenderService.start('p1', 'My video', '4K', 60);
         expect(task().status).toBe('failed');
 
         respond({ jobId: 'j2', status: 'pending', renderStoragePath: null });
         CloudRenderService.retry('p1');
         await vi.advanceTimersByTimeAsync(0);
 
-        expect(mockInvoke).toHaveBeenLastCalledWith('render-job-create', expect.objectContaining({ quality: '4K' }));
+        expect(mockInvoke).toHaveBeenLastCalledWith('render-job-create', expect.objectContaining({ quality: '4K', fps: 60 }));
         expect(task()).toMatchObject({ status: 'active', phase: 'queued' });
     });
 

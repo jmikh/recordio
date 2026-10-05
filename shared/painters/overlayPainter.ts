@@ -57,6 +57,24 @@ export interface OverlayPaintContext {
 }
 
 /**
+ * Returns the overlay segments shown at the given output time, in paint order:
+ * sorted by duration descending so shorter overlays paint on top.
+ */
+export function getActiveOverlaySegments(overlaySegments: OverlaySegment[], currentTimeMs: number): OverlaySegment[] {
+    return overlaySegments
+        .filter(segment => {
+            if (!segment.visible) return false;
+            if (currentTimeMs < segment.outputStartTimeMs || currentTimeMs > segment.outputEndTimeMs) return false;
+            return true;
+        })
+        .sort((a, b) => {
+            const durA = a.outputEndTimeMs - a.outputStartTimeMs;
+            const durB = b.outputEndTimeMs - b.outputStartTimeMs;
+            return durB - durA; // longest first (painted first = behind)
+        });
+}
+
+/**
  * Draws all overlay items for the given time.
  * @param ctx - Canvas 2D context
  * @param overlaySegments - All overlay segments in the project
@@ -86,21 +104,7 @@ export function drawOverlays(
     ctx.scale(scaleX, scaleY);
     ctx.translate(-viewport.x, -viewport.y);
 
-    // Find active segments at this time, sorted by duration descending
-    // so shorter overlays paint on top
-    const activeSegments = overlaySegments
-        .filter(segment => {
-            if (!segment.visible) return false;
-            if (currentTimeMs < segment.outputStartTimeMs || currentTimeMs > segment.outputEndTimeMs) return false;
-            return true;
-        })
-        .sort((a, b) => {
-            const durA = a.outputEndTimeMs - a.outputStartTimeMs;
-            const durB = b.outputEndTimeMs - b.outputStartTimeMs;
-            return durB - durA; // longest first (painted first = behind)
-        });
-
-    for (const segment of activeSegments) {
+    for (const segment of getActiveOverlaySegments(overlaySegments, currentTimeMs)) {
         const item = segment.item;
         // Only skip text when being edited (rendered via HTML for inline editing).
         if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
@@ -237,6 +241,11 @@ function drawPixelate(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, pain
 // TEXT
 // ============================================================================
 
+/** Canvas font for a text overlay item. */
+export function getOverlayTextFont(item: Pick<TextOverlayItem, 'fontSizePx' | 'fontFamily' | 'fontWeight'>): string {
+    return `${item.fontWeight} ${item.fontSizePx}px ${item.fontFamily}, sans-serif`;
+}
+
 function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, textScale: number): void {
     const { topLeft, widthPx, text, fontSizePx, fontFamily, fontWeight, color } = item;
 
@@ -247,7 +256,7 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, textScal
     const bgRadius = Math.round(TEXT_REF_RADIUS * textScale);
 
     // Font
-    const fontString = `${fontWeight} ${fontSizePx}px ${fontFamily}, sans-serif`;
+    const fontString = getOverlayTextFont({ fontSizePx, fontFamily, fontWeight });
     ctx.font = fontString;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';

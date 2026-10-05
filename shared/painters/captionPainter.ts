@@ -1,4 +1,4 @@
-import type { Size, CaptionSettings, CaptionSegment } from '../types';
+import type { Size, CaptionSettings, CaptionSegment, Word } from '../types';
 import { roundRectPath } from './utils/roundRect';
 
 // ══════════════════════════════════════════
@@ -32,9 +32,65 @@ function hexToRgba(hex: string, opacity: number): string {
     return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+/** Canvas font for caption text at the given pixel size. */
+export function getCaptionFont(fontSizePx: number): string {
+    return `600 ${fontSizePx}px Satoshi, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+}
+
+export interface ActiveCaption {
+    segment: CaptionSegment;
+    /** Words that are drawn (not explicitly hidden) */
+    words: Word[];
+    /** Index into `words` of the last highlighted word (-1 = none highlighted) */
+    highlightUpToIndex: number;
+}
+
+/**
+ * Returns the captions shown at the given output time, with their word highlight progress.
+ * Highlighting is driven by each word's output timestamps, not a proportional algorithm.
+ */
+export function getActiveCaptions(
+    captionSegments: CaptionSegment[],
+    settings: CaptionSettings,
+    currentTimeMs: number
+): ActiveCaption[] {
+    // Don't render if captions are disabled or missing
+    if (!(settings.enabled ?? true) || !captionSegments || captionSegments.length === 0) {
+        return [];
+    }
+
+    const highlightEnabled = settings.wordHighlight !== false;
+    const active: ActiveCaption[] = [];
+
+    // Get captions active at current time using cached output times
+    for (const segment of captionSegments) {
+        if (!segment.visible || currentTimeMs < segment.outputStartTimeMs || currentTimeMs >= segment.outputEndTimeMs) {
+            continue;
+        }
+
+        // Only render words that are not explicitly hidden
+        const words = segment.words.filter(w => !w.hidden);
+        if (words.length === 0) continue;
+
+        // Find the last word with a valid output time that's been reached.
+        // All words up to (and including) this index are highlighted.
+        let highlightUpToIndex = -1;
+        if (highlightEnabled) {
+            for (let i = words.length - 1; i >= 0; i--) {
+                if (words[i].outputStartTimeMs >= 0 && currentTimeMs >= words[i].outputStartTimeMs) {
+                    highlightUpToIndex = i;
+                    break;
+                }
+            }
+        }
+
+        active.push({ segment, words, highlightUpToIndex });
+    }
+    return active;
+}
+
 /**
  * Draws captions at the bottom of the canvas with progressive word highlighting.
- * Highlighting is driven by each word's output timestamps, not a proportional algorithm.
  *
  * @param ctx 2D Canvas Context
  * @param captionSegments Caption segments from transcription (words carry timestamps)
@@ -49,18 +105,7 @@ export function drawCaptions(
     currentTimeMs: number,
     outputSize: Size
 ) {
-    // Don't render if captions are disabled or missing
-    if (!(settings.enabled ?? true) || !captionSegments || captionSegments.length === 0) {
-        return;
-    }
-
-    // Get captions active at current time using cached output times
-    const visibleCaptions = captionSegments.filter(segment =>
-        segment.visible &&
-        currentTimeMs >= segment.outputStartTimeMs &&
-        currentTimeMs < segment.outputEndTimeMs
-    );
-
+    const visibleCaptions = getActiveCaptions(captionSegments, settings, currentTimeMs);
     if (visibleCaptions.length === 0) {
         return;
     }
@@ -77,7 +122,7 @@ export function drawCaptions(
     ctx.save();
 
     // Font Setup
-    ctx.font = `600 ${fontSize}px Satoshi, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.font = getCaptionFont(fontSize);
     ctx.textBaseline = 'middle';
 
     // Stack multiple captions vertically (though typically there's only one)
@@ -86,23 +131,7 @@ export function drawCaptions(
 
     const highlightEnabled = settings.wordHighlight !== false;
 
-    for (const caption of visibleCaptions) {
-        // Only render words that are not explicitly hidden
-        const words = caption.words.filter(w => !w.hidden);
-        if (words.length === 0) continue;
-
-        // Find the last word with a valid output time that's been reached.
-        // All words up to (and including) this index are highlighted.
-        let highlightUpToIndex = -1;
-        if (highlightEnabled) {
-            for (let i = words.length - 1; i >= 0; i--) {
-                if (words[i].outputStartTimeMs >= 0 && currentTimeMs >= words[i].outputStartTimeMs) {
-                    highlightUpToIndex = i;
-                    break;
-                }
-            }
-        }
-
+    for (const { words, highlightUpToIndex } of visibleCaptions) {
         const wordStrings = words.map(w => w.word);
 
         // Word wrap the text if it exceeds maxWidth - returns lines with word indices

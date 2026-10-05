@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { ExportManager, type ExportProgress, type ExportEnvironment } from '@shared/export/ExportManager';
+import { ExportManager, type ExportProgress, type ExportEnvironment, type ExportFps } from '@shared/export/ExportManager';
 import { browserRenderContext } from '../../utils/renderContext';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { getClickSoundBuffer, getDragSoundBuffers } from '../../audio/clickSoundPlayer';
@@ -15,9 +15,11 @@ interface UseLocalRenderOptions {
     quality: ExportQuality;
     videoDecodePreference: 'gpu' | 'cpu';
     onDecodeFallback: () => void;
+    fps: ExportFps;
+    verifySkippedFrames?: boolean;
 }
 
-export function useLocalRender({ project, projectName, quality, videoDecodePreference, onDecodeFallback }: UseLocalRenderOptions) {
+export function useLocalRender({ project, projectName, quality, videoDecodePreference, onDecodeFallback, fps, verifySkippedFrames }: UseLocalRenderOptions) {
     const [isLocalRendering, setIsLocalRendering] = useState(false);
     const [localRenderProgress, setLocalRenderProgress] = useState<ExportProgress | null>(null);
     const exportRef = useRef<ExportManager | null>(null);
@@ -40,6 +42,8 @@ export function useLocalRender({ project, projectName, quality, videoDecodePrefe
 
         setIsLocalRendering(true);
         setLocalRenderProgress(null);
+        // Pauses the editor preview's render loop (CanvasContainer) for the duration of the export
+        useProjectStore.getState().setExportState({ isExporting: true });
         const exportManager = new ExportManager();
         exportRef.current = exportManager;
 
@@ -77,7 +81,7 @@ export function useLocalRender({ project, projectName, quality, videoDecodePrefe
                 fullProject,
                 quality,
                 (progress) => setLocalRenderProgress(progress),
-                { skipDownload: false },
+                { skipDownload: false, fps, verifySkippedFrames },
                 env,
                 projectName,
             );
@@ -112,11 +116,12 @@ export function useLocalRender({ project, projectName, quality, videoDecodePrefe
                 phase,
             };
         } finally {
+            useProjectStore.getState().setExportState({ isExporting: false });
             setIsLocalRendering(false);
             setLocalRenderProgress(null);
             exportRef.current = null;
         }
-    }, [isLocalRendering, project, projectName, quality, videoDecodePreference, onDecodeFallback]);
+    }, [isLocalRendering, project, projectName, quality, videoDecodePreference, onDecodeFallback, fps, verifySkippedFrames]);
 
     return { isLocalRendering, localRenderProgress, startOrCancel };
 }

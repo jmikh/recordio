@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ExportQuality } from '@shared/utils/exportQuality';
+import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 
 /**
  * Background tasks that outlive the page that started them — cloud renders
@@ -41,6 +41,7 @@ export interface RenderTask extends ActivityTaskBase {
     kind: 'render';
     phase: Exclude<CloudRenderPhase, 'idle'>;
     quality: ExportQuality;
+    fps: ExportFps;
     /** Known once the job completes — lets the toast's Download re-fetch the file */
     renderStoragePath: string | null;
 }

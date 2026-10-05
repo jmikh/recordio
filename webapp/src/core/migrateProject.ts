@@ -1,6 +1,7 @@
 import { CURRENT_SCHEMA_VERSION } from './Project';
 import { textToWords } from '@shared/utils/captionUtils';
 import { CDN_ORIGIN } from '@shared/types/bridge';
+import { DEFAULT_SPOTLIGHT_FEATHER_PX, DEFAULT_SPOTLIGHT_FEATHER_TRANSITION } from '@shared/animators/spotlightAnimator';
 
 /** Weight per word: letter count + base value. Matches textToWords(). */
 const WORD_BASE_VALUE = 3;
@@ -109,6 +110,17 @@ export function migrateProject(raw: any): any {
         if (raw.settings?.mouse) raw.settings.mouse.mouseDragEnabled = false;
         if (raw.settings?.zoom && raw.settings.zoom.autoGenerate === undefined) raw.settings.zoom.autoGenerate = true;
         if (raw.settings?.spotlight && raw.settings.spotlight.autoGenerate === undefined) raw.settings.spotlight.autoGenerate = true;
+    }
+
+    // Backfill spotlight feather settings if missing (projects saved before feathering).
+    // Version-independent so the defaults land on every load until the project is re-saved.
+    if (raw.settings?.spotlight) {
+        const sp = raw.settings.spotlight;
+        if (sp.featherPx === undefined) sp.featherPx = DEFAULT_SPOTLIGHT_FEATHER_PX;
+        if (sp.featherTransition !== 'fade' && sp.featherTransition !== 'closeIn') {
+            sp.featherTransition = DEFAULT_SPOTLIGHT_FEATHER_TRANSITION;
+        }
+        delete sp.edgeMode;
     }
 
     // Backfill displaySettings if missing (pre-displaySettings projects)

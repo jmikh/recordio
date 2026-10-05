@@ -1,4 +1,4 @@
-import type { Project, Rect } from '../types';
+import type { Project, Rect, Size } from '../types';
 import type { UrlChangeEvent } from '../types';
 import { ViewMapper } from '../mappers/viewMapper';
 import type { TimeMapper } from '../mappers/timeMapper';
@@ -23,6 +23,64 @@ function defineScreenPath(
     radius: number
 ) {
     roundRectPath(ctx, rect.x, rect.y, rect.width, rect.height, radius);
+}
+
+/**
+ * Resolves the drawable size of the screen source.
+ * Supports HTMLVideoElement (videoWidth), VideoFrame (displayWidth), and generic CanvasImageSource (width).
+ */
+export function getScreenInputSize(video: CanvasImageSource, project: Project): Size {
+    const v = video as any;
+    const inputSize = v.displayWidth
+        ? { width: v.displayWidth, height: v.displayHeight }
+        : v.videoWidth
+            ? { width: v.videoWidth, height: v.videoHeight }
+            : v.width
+                ? { width: v.width, height: v.height }
+                : project.screenSource.size;
+
+    if (!inputSize || inputSize.width === 0) {
+        throw new Error(`[drawScreen] Invalid inputSize for screen.`);
+    }
+    return inputSize;
+}
+
+/**
+ * Builds the ViewMapper used to place the screen recording on the output canvas.
+ */
+export function createScreenViewMapper(project: Project, inputSize: Size): ViewMapper {
+    const screen = project.settings.screen;
+
+    // Resolve device frame (if in device mode) so ViewMapper can apply frame-first padding
+    const deviceFrame = screen.mode === 'device' ? getDeviceFrame(screen.deviceFrameId) : undefined;
+
+    // Pass the crop settings and device frame to the ViewMapper
+    return new ViewMapper(
+        inputSize, project.settings.outputSize, screen.padding,
+        screen.crop,
+        project.screenSource.trackableContentRect,
+        screen.toolbar.enabled,
+        deviceFrame
+    );
+}
+
+/**
+ * Address-bar text for the custom toolbar at the given output time:
+ * the URL active at the mapped source time, or the project name as fallback.
+ */
+export function getToolbarAddressText(
+    project: Project,
+    currentOutputTimeMs: number | undefined,
+    timeMapper: TimeMapper | undefined,
+    urlChanges: UrlChangeEvent[] | undefined,
+    projectName: string | undefined
+): string {
+    const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
+        ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
+        : undefined;
+    return urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
+        ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', project.settings.screen.toolbar.urlMode)
+        : projectName ?? '';
 }
 
 /**
@@ -53,36 +111,15 @@ export function drawScreen(
     };
 
     // 1. Resolve video dimensions from the source
-    // Supports HTMLVideoElement (videoWidth), VideoFrame (displayWidth), and generic CanvasImageSource (width)
-    const v = video as any;
-    const inputSize = v.displayWidth
-        ? { width: v.displayWidth, height: v.displayHeight }
-        : v.videoWidth
-            ? { width: v.videoWidth, height: v.videoHeight }
-            : v.width
-                ? { width: v.width, height: v.height }
-                : project.screenSource.size;
-
-    if (!inputSize || inputSize.width === 0) {
-        throw new Error(`[drawScreen] Invalid inputSize for screen.`);
-    }
+    const inputSize = getScreenInputSize(video, project);
 
     // 3. Resolve View Mapping
     const outputSize = project.settings.outputSize;
-    const padding = project.settings.screen.padding;
 
-    // Resolve device frame (if in device mode) so ViewMapper can apply frame-first padding
     const isDeviceMode = screenConfig.mode === 'device';
     const deviceFrame = isDeviceMode ? getDeviceFrame(screenConfig.deviceFrameId) : undefined;
 
-    // Pass the crop settings and device frame to the ViewMapper
-    const viewMapper = new ViewMapper(
-        inputSize, outputSize, padding,
-        project.settings.screen.crop,
-        project.screenSource.trackableContentRect,
-        project.settings.screen.toolbar.enabled,
-        deviceFrame
-    );
+    const viewMapper = createScreenViewMapper(project, inputSize);
 
     // 4. Calculate Rects
     const renderRects = viewMapper.resolveRenderRects(effectiveViewport);
@@ -124,15 +161,8 @@ export function drawScreen(
 
             // Draw custom toolbar (if active), then video
             if (hasCustomToolbar) {
-                const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
-                    ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
-                    : undefined;
-                const toolbarSettings = project.settings.screen.toolbar;
-                const addressText = urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
-                    ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', toolbarSettings.urlMode)
-                    : projectName ?? '';
-
-                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings, renderCtx);
+                const addressText = getToolbarAddressText(project, currentOutputTimeMs, timeMapper, urlChanges, projectName);
+                drawToolbar(ctx, toolbarRect, addressText, project.settings.screen.toolbar, renderCtx);
             }
 
             // Draw video content (positioned by ViewMapper's contentRect)
@@ -220,15 +250,8 @@ export function drawScreen(
 
             // Draw custom toolbar in the top portion
             if (hasCustomToolbar) {
-                const sourceTimeMs = currentOutputTimeMs !== undefined && timeMapper
-                    ? timeMapper.mapOutputToSourceTime(currentOutputTimeMs)
-                    : undefined;
-                const toolbarSettings = project.settings.screen.toolbar;
-                const addressText = urlChanges && sourceTimeMs !== undefined && sourceTimeMs !== -1
-                    ? getUrlAtTime(urlChanges, sourceTimeMs, projectName ?? '', toolbarSettings.urlMode)
-                    : projectName ?? '';
-
-                drawToolbar(ctx, toolbarRect, addressText, toolbarSettings, renderCtx);
+                const addressText = getToolbarAddressText(project, currentOutputTimeMs, timeMapper, urlChanges, projectName);
+                drawToolbar(ctx, toolbarRect, addressText, project.settings.screen.toolbar, renderCtx);
             }
 
             // Draw video content (destRect is already positioned below toolbar by ViewMapper)

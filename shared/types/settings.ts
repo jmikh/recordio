@@ -141,8 +141,20 @@ export interface SpotlightSettings {
     autoGenerate?: boolean;
     /** Dim opacity for background (0 = no dim, 1 = fully black). Default: 0.5 */
     dimOpacity: number;
-    /** Scale factor when spotlight is active (1.0 = no scale, 1.1 = 10% larger). Default: 1.1 */
+    /**
+     * @deprecated Spotlights no longer enlarge their content (they feather instead).
+     * Kept so existing project data still type-checks; not read by the renderer.
+     */
     enlargeScale: number;
+    /** Feathered edge width in OUTPUT px (0 = hard edge). Default: 60 */
+    featherPx?: number;
+    /**
+     * How the spotlight transitions in and out.
+     * 'fade' = the dim fades in/out uniformly in place.
+     * 'closeIn' = the darkness closes in from the frame edges on entry and pulls back
+     * out to them on exit. Default: 'closeIn'
+     */
+    featherTransition?: 'fade' | 'closeIn';
     /** Transition duration in milliseconds for fade in/out. Default: 300 */
     transitionDurationMs: number;
     /** Minimum hold duration in milliseconds (the shortest a spotlight can be). Default: 200 */

@@ -5,9 +5,9 @@
  * Impersonation is read-only, so the 2s auto-save is dropped before it
  * reaches the API (CloudProjectService.saveProject). That silence is the
  * point — a 403 toast every two seconds would be worse — but silence
- * alone lets you edit for ten minutes believing it stuck. The bottom
- * banner says "read-only"; this says it at the moment it starts to
- * matter, which is the first edit.
+ * alone lets you edit for ten minutes believing it stuck. The header
+ * icon (ImpersonationHeaderButton) says "read-only"; this says it at the
+ * moment it starts to matter, which is the first edit.
  *
  * Null-rendering subscriber, like ActivityToasts: the auto-save signal
  * lives in a store, the toast needs React context.
@@ -33,7 +33,7 @@ export function ImpersonationReadOnlyNotice() {
                 addToast({
                     type: 'info',
                     title: 'Read-only — this edit is not saved',
-                    message: 'You are viewing another user\'s account. Use Clone to get an editable copy in your own workspace.',
+                    message: 'You are viewing another user\'s account. Use Clone (mask icon in the header) to get an editable copy in your own workspace.',
                     duration: 0,
                 });
             },

@@ -1,5 +1,6 @@
 import { LuLightbulb, LuZoomIn } from 'react-icons/lu';
-import { Button, CollapsibleCard, Dropdown, InfoTooltip, Slider, Toggle, Tooltip } from '@shared/components';
+import { Button, CollapsibleCard, Dropdown, InfoTooltip, MultiToggle, Slider, Toggle, Tooltip } from '@shared/components';
+import { DEFAULT_SPOTLIGHT_FEATHER_TRANSITION, DEFAULT_SPOTLIGHT_FEATHER_PX } from '@shared/animators/spotlightAnimator';
 import { useToast } from '../../../components/Toast';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -85,6 +86,8 @@ export const MotionSettings = () => {
 
     const autoZoom = zoom.autoGenerate ?? true;
     const autoSpotlight = spotlight.autoGenerate ?? true;
+    const spotlightFeatherPx = spotlight.featherPx ?? DEFAULT_SPOTLIGHT_FEATHER_PX;
+    const spotlightFeatherTransition = spotlight.featherTransition ?? DEFAULT_SPOTLIGHT_FEATHER_TRANSITION;
 
     return (
         <div className="flex flex-col gap-3 text-sm text-text-main">
@@ -204,21 +207,26 @@ export const MotionSettings = () => {
                             <PreviewEffectButton kind="spotlight" label="Preview spotlight" />
                         </Toggle>
                     )}
-                    {/* Enlarge is only offered as a default, like Max zoom. */}
-                    {templateMode && (
-                        <Slider
-                            label="Enlarge"
-                            min={1.1}
-                            max={2}
-                            value={spotlight.enlargeScale}
-                            onPointerDown={startInteraction}
-                            onPointerUp={endInteraction}
-                            onChange={(enlargeScale) => batchAction(() => applySpotlightSettingsToAll({ enlargeScale }))}
-                            showTooltip
-                            units="×"
-                            decimals={2}
+                    <Slider
+                        label="Feather"
+                        min={0}
+                        max={200}
+                        value={spotlightFeatherPx}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={(v) => batchAction(() => updateSettings({ spotlight: { ...spotlight, featherPx: Math.round(v) } }))}
+                        showTooltip
+                        units="px"
+                        decimals={0}
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-label">Transition</span>
+                        <MultiToggle<'fade' | 'closeIn'>
+                            options={[{ value: 'fade', label: 'Fade In' }, { value: 'closeIn', label: 'Close In' }]}
+                            value={spotlightFeatherTransition}
+                            onChange={(featherTransition) => updateSettings({ spotlight: { ...spotlight, featherTransition } })}
                         />
-                    )}
+                    </div>
                     <Slider
                         label="Dim"
                         min={0.1}

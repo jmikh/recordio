@@ -108,6 +108,7 @@ describe('POST /render-job-create (auth + validation, no db)', () => {
         ['non-integer cloudVersion', { projectId: 'p-1', cloudVersion: 1.5 }],
         ['unknown quality', { projectId: 'p-1', cloudVersion: 1, quality: '8K' }],
         ['lowercase quality', { projectId: 'p-1', cloudVersion: 1, quality: '4k' }],
+        ['unsupported fps', { projectId: 'p-1', cloudVersion: 1, fps: 24 }],
     ])('schema 400: %s', async (_name, payload) => {
         const { app, deps } = validationApp();
         const res = await post(app, payload, await ownerToken());
@@ -175,6 +176,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         render_storage_path: string | null;
         attempt_count: number;
         quality: string;
+        fps: number;
     }
 
     async function jobRows(projectId: string): Promise<JobRow[]> {
@@ -239,7 +241,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         const res = await post(app, { projectId: project.id, cloudVersion: 3 }, await ownerToken());
         expect(res.statusCode).toBe(200);
 
-        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v3.mp4`;
+        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v3_1080p_30fps.mp4`;
         const body = res.json() as { jobId: string; status: string; renderStoragePath: string };
         expect(body.status).toBe('pending');
         expect(body.renderStoragePath).toBe(expectedPath);
@@ -253,6 +255,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
             status: 'pending',
             render_storage_path: expectedPath,
             quality: '1080p',
+            fps: 30,
         });
 
         // All five media kinds presigned for download (1h), output for upload
@@ -270,6 +273,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
             jobId: body.jobId,
             projectName: 'Render me',
             quality: '1080p',
+            fps: 30,
             uploadUrl: `https://fake-s3/put/${expectedPath}`,
             statusCallbackUrl: EXPECTED_CALLBACK,
         });
@@ -321,7 +325,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         );
         expect(res.statusCode).toBe(200);
 
-        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v3_4K.mp4`;
+        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v3_4K_30fps.mp4`;
         expect((res.json() as { renderStoragePath: string }).renderStoragePath).toBe(expectedPath);
         expect((await jobRows(project.id))[0]).toMatchObject({
             quality: '4K',
@@ -332,6 +336,24 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
             quality: '4K',
             uploadUrl: `https://fake-s3/put/${expectedPath}`,
         });
+    });
+
+    it('fps 60: its own row next to a completed 30 fps render, fps in the path, worker dispatched at 60', async () => {
+        const { app, deps } = testApp();
+        const project = await seed();
+        await seedRenderJob(pool, { projectId: project.id, cloudVersion: 3, status: 'completed', fps: 30 });
+
+        const res = await post(app, { projectId: project.id, cloudVersion: 3, fps: 60 }, await ownerToken());
+        expect(res.statusCode).toBe(200);
+
+        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v3_1080p_60fps.mp4`;
+        const body = res.json() as { jobId: string; status: string; renderStoragePath: string };
+        expect(body).toMatchObject({ status: 'pending', renderStoragePath: expectedPath });
+        const rows = await jobRows(project.id);
+        expect(rows).toHaveLength(2);
+        expect(rows[1]).toMatchObject({ id: body.jobId, fps: 60, render_storage_path: expectedPath });
+        expect(deps.renderWorker.submissions).toHaveLength(1);
+        expect(deps.renderWorker.submissions[0]).toMatchObject({ fps: 60 });
     });
 
     it('a completed 1080p render is NOT a cache hit for a 4K request at the same version', async () => {
@@ -434,7 +456,7 @@ describe.runIf(hasTestDb())('POST /render-job-create (e2e, real Postgres)', () =
         expect(res.statusCode).toBe(200);
         // Same subtlety as project-update-thumbnail: the RPC gets the
         // CALLER's id, so the output path is namespaced by the editor
-        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v1.mp4`;
+        const expectedPath = `${SEEDED_USER_ID}/${project.id}/renders/v1_1080p_30fps.mp4`;
         expect((res.json() as { renderStoragePath: string }).renderStoragePath).toBe(expectedPath);
         expect((await jobRows(project.id))[0].user_id).toBe(SEEDED_USER_ID);
         expect(deps.renderWorker.submissions).toHaveLength(1);
