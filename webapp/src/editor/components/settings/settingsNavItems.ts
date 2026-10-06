@@ -11,7 +11,8 @@ export interface SettingsNavItem<T extends string = SettingsPanelTab> {
 /**
  * The editor's settings tabs in display order — shared with the Personal
  * Settings page (plans/user-default-project-settings) so labels and icons
- * stay in sync. The editor adds its own disabled state for Camera.
+ * stay in sync. The editor drops Motion (zoom/spotlight settings show when a
+ * block is selected) and adds its own disabled state for Camera.
  */
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     { id: 'background', label: 'Background', icon: LuWallpaper },

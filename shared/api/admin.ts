@@ -65,8 +65,7 @@ export interface AdminUserListResponse {
  * with its owner and the features its project_data carries, so an
  * admin can pick an interesting one and jump into its editor as the
  * owner. The `has_*` flags are computed server-side from the jsonb
- * (sources present, non-empty segment arrays, any overlay of each
- * type — `has_outlines` is the 'border' overlay the editor calls Outline).
+ * (sources present, non-empty segment arrays).
  */
 export interface AdminProjectSummary {
     id: string;
@@ -85,17 +84,31 @@ export interface AdminProjectSummary {
     has_zooms: boolean;
     has_spotlights: boolean;
     has_blurs: boolean;
-    has_text: boolean;
-    has_arrows: boolean;
-    has_outlines: boolean;
 }
 
 /**
- * Empty body. Most-recently-updated first, capped server-side (~100).
- * Only ready, non-trashed projects — the ones an editor can open.
+ * Keyset-paginated, newest-updated first (ties broken by id). Omit
+ * `before` for the first page; for the next, pass the last row of the
+ * previous page — its `updated_at` verbatim (microsecond precision,
+ * so the cursor is exact) and its `id`.
+ */
+export const AdminProjectListRequestSchema = Type.Object({
+    before: Type.Optional(
+        Type.Object({
+            updatedAt: Type.String({ minLength: 1 }),
+            id: Type.String({ minLength: 1 }),
+        }),
+    ),
+});
+export type AdminProjectListRequest = Static<typeof AdminProjectListRequestSchema>;
+
+/**
+ * One page (~100 rows) of ready, non-trashed projects — the ones an
+ * editor can open. `hasMore` is true when older rows remain.
  */
 export interface AdminProjectListResponse {
     projects: AdminProjectSummary[];
+    hasMore: boolean;
 }
 
 // ── POST /admin-subscriber-list ──────────────────────────────────

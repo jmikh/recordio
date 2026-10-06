@@ -12,8 +12,8 @@ import { computeFrameSignature } from './frameSignature';
 import { preloadToolbarIcons } from '../painters/toolbarPainter';
 import { getCaptionFont } from '../painters/captionPainter';
 import { getKeyboardFont } from '../painters/keyboardPainter';
-import { getOverlayTextFont } from '../painters/overlayPainter';
-import type { Project, SourceMetadata } from '../types';
+import type { Project } from '../types';
+import { getActiveCameraMatte } from '../utils/cameraMatte';
 import type { RenderContext } from '../utils/renderContext';
 
 export type { ExportQuality, ExportFps } from './codecResolver';
@@ -237,10 +237,16 @@ export class ExportManager {
         const frameExtractors: Record<string, FrameExtractor> = {};
         const imageElements: { bg: CanvasImageSource | null, device: CanvasImageSource | null } = { bg: null, device: null };
 
-        // Build sources map from project
-        const sources: SourceMetadata[] = [renderProject.screenSource];
+        // Storage paths of the videos to decode. The camera's person mask
+        // (background removal) is decoded alongside it at the same source
+        // time, so each camera frame gets the mask with its timestamp.
+        const sources: string[] = [renderProject.screenSource.storagePath];
         if (renderProject.cameraSource) {
-            sources.push(renderProject.cameraSource);
+            sources.push(renderProject.cameraSource.storagePath);
+        }
+        const cameraMatte = getActiveCameraMatte(renderProject);
+        if (cameraMatte) {
+            sources.push(cameraMatte.storagePath);
         }
 
         let totalDurationMs = 0;
@@ -283,14 +289,14 @@ export class ExportManager {
             };
 
             const initExtractors = async () => {
-                const toInit = sources.filter(s => mediaUrls[s.storagePath]);
+                const toInit = sources.filter(path => mediaUrls[path]);
                 const progressBySource = toInit.map(() => 0);
-                await Promise.all(toInit.map(async (source, si) => {
-                    const sourceUrl = mediaUrls[source.storagePath];
+                await Promise.all(toInit.map(async (storagePath, si) => {
+                    const sourceUrl = mediaUrls[storagePath];
                     console.log(`[Export] Initializing extractor for: ${sourceUrl}`);
                     const extractor = new FrameExtractor(sourceUrl, env?.decodePreferences);
                     // Register before init so `finally` disposes it even if a sibling init fails
-                    frameExtractors[source.storagePath] = extractor;
+                    frameExtractors[storagePath] = extractor;
                     await extractor.initialize((chunkProgress) => {
                         progressBySource[si] = chunkProgress;
                         const overallProgress = progressBySource.reduce((sum, p) => sum + p, 0) / toInit.length;
@@ -663,9 +669,6 @@ async function preloadFonts(project: Project): Promise<void> {
 
     // Size doesn't matter for loading — family + weight select the font face
     const specs = new Set<string>([getCaptionFont(16), getKeyboardFont(16)]);
-    for (const segment of project.timeline.overlaySegments || []) {
-        if (segment.item.type === 'text') specs.add(getOverlayTextFont({ ...segment.item, fontSizePx: 16 }));
-    }
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<void>(resolve => {

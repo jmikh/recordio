@@ -45,7 +45,7 @@ import { resolveDefaultWorkspaceId } from '../../services/defaultWorkspace.js';
 interface ProjectStruct {
     id?: string;
     screenSource?: { storagePath?: string };
-    cameraSource?: { storagePath?: string };
+    cameraSource?: { storagePath?: string; matte?: { storagePath?: string } };
     microphoneSource?: { storagePath?: string };
     settings?: {
         background?: { storagePath?: string };
@@ -53,7 +53,7 @@ interface ProjectStruct {
     };
 }
 
-type MediaSlot = 'screen' | 'camera' | 'mic' | 'background' | 'music';
+type MediaSlot = 'screen' | 'camera' | 'cameraMatte' | 'mic' | 'background' | 'music';
 
 interface ProjectRow {
     id: string;
@@ -146,6 +146,7 @@ export const projectCloneRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> =
                 const slots: { slot: MediaSlot; path?: string; set: (p: string) => void }[] = [
                     { slot: 'screen', path: data.screenSource?.storagePath, set: p => { data.screenSource!.storagePath = p; } },
                     { slot: 'camera', path: data.cameraSource?.storagePath, set: p => { data.cameraSource!.storagePath = p; } },
+                    { slot: 'cameraMatte', path: data.cameraSource?.matte?.storagePath, set: p => { data.cameraSource!.matte!.storagePath = p; } },
                     { slot: 'mic', path: data.microphoneSource?.storagePath, set: p => { data.microphoneSource!.storagePath = p; } },
                     { slot: 'background', path: data.settings?.background?.storagePath, set: p => { data.settings!.background!.storagePath = p; } },
                     { slot: 'music', path: data.settings?.audio?.music?.storagePath, set: p => { data.settings!.audio!.music!.storagePath = p; } },

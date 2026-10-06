@@ -52,7 +52,7 @@ export const MultiToggle = <T extends string>({
             ref={containerRef}
             className={`
                 relative flex items-center justify-center select-none
-                border border-border rounded-full p-1 h-9
+                bg-surface-inset border border-border rounded-full p-1 h-9
                 ${className}
             `}
         >

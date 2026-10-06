@@ -12,7 +12,6 @@ import {
     ghostZoom,
     ghostIconClass,
     MIN_ICON_WIDTH_PX,
-    SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
 import type { ZoomSegment } from '@shared/types';
@@ -25,9 +24,8 @@ interface ZoomTrackProps {
 /**
  * ZoomTrack renders zoom segments as time-range blocks on the timeline.
  *
- * Each block has:
- * - A transition-in zone (left, transitionDurationMs wide, striped)
- * - A hold zone (rest of block, solid)
+ * Each block is a single solid segment (the zoom-in ramp is part of the block,
+ * labelled with its zoom factor), followed by a zoom-out indicator in the gap.
  *
  * Interactions mirror the Spotlight track: move, resize-start, resize-end,
  * ghost on hover, click to add (deleting overlapping blocks).
@@ -43,6 +41,7 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
 
     const project = useProjectStore(s => s.project);
     const { transitionDurationMs: globalTransitionDurationMs } = project.settings.zoom;
+    const outputWidth = project.settings.outputSize.width;
     const zoomEnabled = project.settings.zoom.enabled ?? true;
 
     const timeMapper = useTimeMapper();
@@ -146,14 +145,13 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
 
                     const isSelected = editingZoomId === s.id;
                     const isDragging = dragState?.segmentId === s.id;
-                    const segTransitionInWidthPx = coords.msToX(s.transitionDurationMs ?? globalTransitionDurationMs);
 
                     return (
                         <ZoomBlock
                             key={s.id}
                             left={startX}
                             width={blockWidth}
-                            transitionInWidth={segTransitionInWidthPx}
+                            zoomFactor={outputWidth / s.rectPx.width}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
@@ -185,60 +183,34 @@ export const ZoomTrack: React.FC<ZoomTrackProps> = ({ height, isCollapsed }) => 
                 })}
 
                 {/* Ghost block — shown when hovering to add a new zoom */}
-                {zoomEnabled && hoverInfo && !editingZoomId && !dragState && (() => {
-                    const ghostTransitionWidthPx = coords.msToX(globalTransitionDurationMs);
-                    const clampedTransitionWidth = Math.min(ghostTransitionWidthPx, hoverInfo.width);
-                    const holdWidth = Math.max(0, hoverInfo.width - clampedTransitionWidth);
+                {zoomEnabled && hoverInfo && !editingZoomId && !dragState && (
+                    <div
+                        className={ghostZoom.container}
+                        style={{
+                            left: `${hoverInfo.x}px`,
+                            width: `${hoverInfo.width}px`,
+                            height,
+                        }}
+                    >
+                        <span className={ghostZoom.label}>+ Zoom</span>
 
-                    return (
                         <div
-                            className={ghostZoom.container}
+                            className={`${ghostZoom.block.className} flex items-center justify-center overflow-hidden`}
                             style={{
-                                left: `${hoverInfo.x}px`,
-                                width: `${hoverInfo.width}px`,
-                                height,
+                                position: 'absolute',
+                                left: 0,
+                                top: ghostY,
+                                width: hoverInfo.width,
+                                ...ghostZoom.block.getStyle(),
+                                height: height - 2,
                             }}
                         >
-                            <span className={ghostZoom.label}>+ Zoom</span>
-
-                            {/* Ghost transition-in */}
-                            {clampedTransitionWidth > 0 && (
-                                <div
-                                    className={ghostZoom.transitionIn.className}
-                                    style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: ghostY,
-                                        width: clampedTransitionWidth,
-                                        ...ghostZoom.transitionIn.getStyle(),
-                                        height: height - 2,
-                                        ...(holdWidth <= 0 ? { borderRight: '', borderRadius: SEGMENT_RADIUS } : {}),
-                                    }}
-                                />
-                            )}
-
-                            {/* Ghost hold */}
-                            {holdWidth > 0 && (
-                                <div
-                                    className={`${ghostZoom.hold.className} flex items-center justify-center overflow-hidden`}
-                                    style={{
-                                        position: 'absolute',
-                                        left: clampedTransitionWidth,
-                                        top: ghostY,
-                                        width: holdWidth,
-                                        ...ghostZoom.hold.getStyle(),
-                                        height: height - 2,
-                                        borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-                                    }}
-                                >
-                                    {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <LuZoomIn className={`${ghostIconClass} icon-md`} />
-                                    )}
-                                </div>
+                            {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
+                                <LuZoomIn className={`${ghostIconClass} icon-md`} />
                             )}
                         </div>
-                    );
-                })()}
+                    </div>
+                )}
             </div>
         </div>
     );

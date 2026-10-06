@@ -9,16 +9,6 @@ interface MediaTooltipProps {
     trigger?: React.ReactNode;
 }
 
-/** Spotlight tooltip with demo video */
-export const SpotlightTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
-    <InfoTooltip
-        description={"Shine the spotlight on what matters by dimming everything around it.\nLooks best on cards, popovers and clearly defined areas."}
-        videoSrc={`${CDN_ORIGIN}/demos/spotlight.webm`}
-        placement={placement}
-        trigger={trigger}
-    />
-);
-
 /** Auto-shrink tooltip with demo video */
 export const AutoShrinkTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip

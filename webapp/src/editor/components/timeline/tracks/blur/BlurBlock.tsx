@@ -1,10 +1,9 @@
 import React from 'react';
-import { LuArrowUpRight, LuType } from 'react-icons/lu';
-import { TbBlur, TbBorderOuter } from 'react-icons/tb';
-import type { OverlayItemType } from '@shared/types/overlay';
+import { TbBlur } from 'react-icons/tb';
 import {
     holdSegment,
     blockContainer,
+    trackBlockColor,
     resizeHandle,
     dragHandleIndicator,
     blockIconClass,
@@ -12,25 +11,14 @@ import {
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 
-const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
-    blur: <TbBlur className="icon-md" />,
-    text: <LuType className="icon-md" />,
-    arrow: <LuArrowUpRight className="icon-md" />,
-    border: <TbBorderOuter className="icon-md" />,
-};
-
-interface OverlayBlockProps {
+interface BlurBlockProps {
     left: number;
     width: number;
     isSelected: boolean;
     isDragging: boolean;
     trackHeight: number;
-    /** Type of the single overlay item */
-    itemType: OverlayItemType;
-    /** Number of other segments overlapping with this one */
-    overlapCount: number;
-    /** Z-index for stacking (shorter blocks get higher z) */
-    zIndex: number;
+    /** Number of regions blurred by this block */
+    regionCount: number;
     onMouseDown: (e: React.MouseEvent) => void;
     onClick: (e: React.MouseEvent) => void;
     onResizeStartMouseDown: (e: React.MouseEvent) => void;
@@ -40,18 +28,16 @@ interface OverlayBlockProps {
 }
 
 /**
- * A single overlay block on the timeline — contains exactly one overlay item.
- * Shows type-specific icon and overlap indicator when overlapping with other blocks.
+ * A single blur block on the timeline — one hold segment with the blur icon
+ * and, when it blurs more than one region, the region count.
  */
-export const OverlayBlock: React.FC<OverlayBlockProps> = ({
+export const BlurBlock: React.FC<BlurBlockProps> = ({
     left,
     width,
     isSelected,
     isDragging,
     trackHeight,
-    itemType,
-    overlapCount,
-    zIndex,
+    regionCount,
     onMouseDown,
     onClick,
     onResizeStartMouseDown,
@@ -65,12 +51,12 @@ export const OverlayBlock: React.FC<OverlayBlockProps> = ({
 
     return (
         <div
-            className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} ${trackBlockColor.blur.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? trackBlockColor.blur.hover : ''} ${disabled ? 'pointer-events-none' : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
                 height: trackHeight,
-                zIndex,
+                zIndex: isSelected ? 20 : 10,
                 opacity: disabled ? 0.7 : 1,
                 cursor: disabled ? 'default' : undefined,
             }}
@@ -91,13 +77,10 @@ export const OverlayBlock: React.FC<OverlayBlockProps> = ({
             >
                 {!isCollapsed && width >= MIN_ICON_WIDTH_PX && (
                     <div className="flex items-center gap-0.5">
-                        <span className={blockIconClass}>
-                            {OVERLAY_TYPE_ICONS[itemType]}
-                        </span>
-                        {/* Overlap indicator */}
-                        {overlapCount > 0 && width >= MIN_ICON_WIDTH_PX + 16 && (
-                            <span className={`${blockIconClass} text-badge opacity-60`}>
-                                +{overlapCount}
+                        <TbBlur className={`${blockIconClass} icon-md`} />
+                        {regionCount > 1 && width >= MIN_ICON_WIDTH_PX + 16 && (
+                            <span className={`${blockIconClass} text-badge`}>
+                                {regionCount}
                             </span>
                         )}
                     </div>

@@ -1,7 +1,7 @@
 /**
  * Per-item interactive editor: bounding box for blur/border, endpoint
  * handles for arrows, inline editor for text. Store-free — the host
- * (video `OverlayEditor`, screenshot `AnnotationLayer`) supplies the item,
+ * (screenshot `AnnotationLayer`) supplies the item,
  * the update function, the history batcher and the edit-mode state, and
  * a DisplayMapper via useDisplayMapper (store-derived or provided).
  */

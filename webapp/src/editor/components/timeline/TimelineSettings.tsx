@@ -36,10 +36,10 @@ function buildTrackConfigs(): TrackConfig[] {
             toggle: () => useProjectStore.getState().toggleCameraMoveEnabled(),
         },
         {
-            showKey: 'showOverlay',
-            label: 'Overlay',
-            getEnabled: (s) => s.project.settings.overlay?.enabled ?? true,
-            toggle: () => useProjectStore.getState().toggleOverlayEnabled(),
+            showKey: 'showBlur',
+            label: 'Blur',
+            getEnabled: (s) => s.project.settings.blur?.enabled ?? true,
+            toggle: () => useProjectStore.getState().toggleBlurEnabled(),
         },
     ];
 }
@@ -62,7 +62,7 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
     const zoomEnabled = useProjectStore(s => s.project.settings.zoom.enabled ?? true);
     const spotlightEnabled = useProjectStore(s => s.project.settings.spotlight.enabled ?? true);
     const cameraMoveEnabled = useProjectStore(s => s.project.settings.cameraMove?.enabled ?? true);
-    const overlayEnabled = useProjectStore(s => s.project.settings.overlay?.enabled ?? true);
+    const blurEnabled = useProjectStore(s => s.project.settings.blur?.enabled ?? true);
 
     const trackConfigs = useMemo(() => buildTrackConfigs(), []);
 
@@ -75,11 +75,8 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         showZoom: zoomEnabled,
         showSpotlight: spotlightEnabled,
         showCameraMove: cameraMoveEnabled,
-        showOverlay: overlayEnabled,
+        showBlur: blurEnabled,
     };
-
-    const visibleCount = tracks.filter(t => displaySettings[t.showKey] as boolean).length;
-    const totalCount = tracks.length;
 
     // Calculate menu position when opening
     useEffect(() => {
@@ -164,35 +161,12 @@ export function TimelineSettings({ height }: TimelineSettingsProps) {
         <div ref={triggerRef} className="relative w-full" style={{ height }}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-between w-full h-full px-3 text-text-muted hover:text-text-highlighted hover:bg-white/5 transition-all cursor-pointer select-none group"
+                className="flex items-center justify-center w-full h-full text-text-muted hover:text-text-highlighted hover:bg-white/5 transition-all cursor-pointer select-none"
                 title="Track settings"
             >
-                {/* Track dots — filled = visible, empty = hidden */}
-                <div className="flex items-center gap-[3px]">
-                    {tracks.map(t => {
-                        const isVisible = displaySettings[t.showKey] as boolean;
-                        return (
-                            <div
-                                key={t.showKey}
-                                className={`w-[5px] h-[5px] rounded-full transition-colors ${
-                                    isVisible
-                                        ? 'bg-text-muted group-hover:bg-text-highlighted'
-                                        : 'bg-border'
-                                }`}
-                            />
-                        );
-                    })}
-                </div>
-
-                {/* Count + animated chevron */}
-                <div className="flex items-center gap-0.5">
-                    <span className="text-2xs tabular-nums leading-none">
-                        {visibleCount}/{totalCount}
-                    </span>
-                    <LuChevronUp
-                        className={`icon-sm transition-transform duration-150 ${isOpen ? 'rotate-0' : 'rotate-180'}`}
-                    />
-                </div>
+                <LuChevronUp
+                    className={`icon-sm transition-transform duration-150 ${isOpen ? 'rotate-0' : 'rotate-180'}`}
+                />
             </button>
 
             {/* Portal-rendered popover */}

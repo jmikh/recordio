@@ -46,8 +46,8 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
     // Captions: recompute output times on segments AND their nested words
     const nextCaptionSegments = recomputeCaptionOutputTimes(project.timeline.captionSegments || [], timeMapper);
 
-    // Overlays: recompute output times for overlay segments
-    const nextOverlaySegments = recomputeOutputTimes(project.timeline.overlaySegments || [], timeMapper);
+    // Blur: recompute output times for blur segments
+    const nextBlurSegments = recomputeOutputTimes(project.timeline.blurSegments || [], timeMapper);
 
     return {
         ...project,
@@ -57,7 +57,7 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
             zoomSegments: nextZoomSegments,
             spotlightSegments: nextSpotlightSegments,
             captionSegments: nextCaptionSegments,
-            overlaySegments: nextOverlaySegments,
+            blurSegments: nextBlurSegments,
         },
     };
 };

@@ -2,13 +2,17 @@
  * POST /admin-project-list — the admin page's recent-projects list
  * (plans/admin-user-impersonation-oneshot.md). Admin-only.
  *
- * The 100 most-recently-updated projects that an editor can open
- * (ready, not trashed, not purged), each with its owner and a set of
- * `has_*` flags read straight out of project_data: camera/mic sources
- * present, non-empty caption/zoom/spotlight segment arrays, and any
- * overlay of each type (blur, text, arrow, border — the editor's
- * "outline"). The /admin page shows the flags as icons and a click
+ * The projects an editor can open (ready, not trashed, not purged),
+ * most-recently-updated first, 100 per page, each with its owner and
+ * a set of `has_*` flags read straight out of project_data: camera/mic
+ * sources present and non-empty caption/zoom/spotlight/blur segment
+ * arrays. The /admin page shows the flags as icons and a click
  * impersonates the owner straight into that project's editor.
+ *
+ * Keyset pagination on (updated_at, id) — the "Load more" button
+ * passes the last row back as `before`, so pages stay stable while
+ * projects keep updating (an offset would shift and repeat rows).
+ * One extra row is fetched to tell whether another page exists.
  *
  * The LIMIT runs in a subquery over the bare rows first, so the jsonb
  * is only detoasted and inspected for the rows that make the cut.
@@ -16,17 +20,16 @@
  * schema versions, test rows with `{}`), and jsonb_array_length on a
  * non-array would error the whole request.
  *
- * Request:  {}
+ * Request:  { before?: { updatedAt, id } }
  * Response: { projects: [{ id, name, slug, owner_id, owner_email, owner_name,
  *             created_at, updated_at, duration_ms, has_camera, has_mic,
- *             has_captions, has_zooms, has_spotlights, has_blurs, has_text,
- *             has_arrows, has_outlines }] }
+ *             has_captions, has_zooms, has_spotlights, has_blurs }], hasMore }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import type { OverlayItemType } from '@shared/types/overlay';
+import { AdminProjectListRequestSchema } from '@shared/api/admin';
 import { requireAdmin, type AdminRoutesOptions } from './requireAdmin.js';
 
-const RECENT_PROJECTS_LIMIT = 100;
+const PAGE_SIZE = 100;
 
 /** SQL: true when the jsonb expression is a non-empty array. */
 function nonEmptyArray(expr: string): string {
@@ -38,19 +41,6 @@ function isObject(expr: string): string {
     return `COALESCE(jsonb_typeof(${expr}) = 'object', false)`;
 }
 
-/** SQL: true when the timeline has at least one overlay segment of this item type. */
-function hasOverlay(timeline: string, type: OverlayItemType): string {
-    return `EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements(
-            CASE WHEN jsonb_typeof(${timeline}->'overlaySegments') = 'array'
-                 THEN ${timeline}->'overlaySegments'
-                 ELSE '[]'::jsonb END
-        ) seg
-        WHERE seg->'item'->>'type' = '${type}'
-    )`;
-}
-
 export const adminProjectListRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> = async (
     app,
     opts,
@@ -59,13 +49,15 @@ export const adminProjectListRoutes: FastifyPluginAsyncTypebox<AdminRoutesOption
         '/admin-project-list',
         {
             preHandler: [app.requireUser, requireAdmin(opts.adminEmails)],
+            schema: { body: AdminProjectListRequestSchema },
         },
-        async (_req, reply) => {
+        async (req, reply) => {
+            const before = req.body.before;
             const timeline = `p.project_data->'timeline'`;
             const { rows } = await app.deps.db.query(
-                `SELECT COALESCE(jsonb_agg(obj ORDER BY updated_at DESC), '[]'::jsonb) AS projects
+                `SELECT COALESCE(jsonb_agg(obj ORDER BY updated_at DESC, id DESC), '[]'::jsonb) AS projects
                  FROM (
-                    SELECT p.updated_at,
+                    SELECT p.updated_at, p.id,
                            jsonb_build_object(
                         'id',           p.id,
                         'name',         p.name,
@@ -85,10 +77,7 @@ export const adminProjectListRoutes: FastifyPluginAsyncTypebox<AdminRoutesOption
                         'has_captions',   ${nonEmptyArray(`${timeline}->'captionSegments'`)},
                         'has_zooms',      ${nonEmptyArray(`${timeline}->'zoomSegments'`)},
                         'has_spotlights', ${nonEmptyArray(`${timeline}->'spotlightSegments'`)},
-                        'has_blurs',      ${hasOverlay(timeline, 'blur')},
-                        'has_text',       ${hasOverlay(timeline, 'text')},
-                        'has_arrows',     ${hasOverlay(timeline, 'arrow')},
-                        'has_outlines',   ${hasOverlay(timeline, 'border')}
+                        'has_blurs',      ${nonEmptyArray(`${timeline}->'blurSegments'`)}
                     ) AS obj
                     FROM (
                         SELECT *
@@ -96,15 +85,18 @@ export const adminProjectListRoutes: FastifyPluginAsyncTypebox<AdminRoutesOption
                         WHERE permanently_deleted = false
                           AND deleted_at IS NULL
                           AND upload_status = 'ready'
-                        ORDER BY updated_at DESC
+                          AND ($2::timestamptz IS NULL OR (updated_at, id) < ($2::timestamptz, $3::uuid))
+                        ORDER BY updated_at DESC, id DESC
                         LIMIT $1
                     ) p
                     LEFT JOIN auth.users u ON u.id = p.owner_id
                     LEFT JOIN user_profiles up ON up.user_id = p.owner_id
                  ) r`,
-                [RECENT_PROJECTS_LIMIT],
+                [PAGE_SIZE + 1, before?.updatedAt ?? null, before?.id ?? null],
             );
-            return reply.send({ projects: (rows[0] as { projects: unknown }).projects });
+            const projects = (rows[0] as { projects: unknown[] }).projects;
+            const hasMore = projects.length > PAGE_SIZE;
+            return reply.send({ projects: projects.slice(0, PAGE_SIZE), hasMore });
         },
     );
 };

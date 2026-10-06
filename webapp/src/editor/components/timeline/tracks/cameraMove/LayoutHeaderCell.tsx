@@ -2,7 +2,6 @@ import React from 'react';
 import { LuCamera } from 'react-icons/lu';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
-import { CameraMoveTooltip } from '../../../shared/MediaTooltips';
 
 interface LayoutHeaderCellProps {
     height: number;
@@ -16,24 +15,11 @@ export const LayoutHeaderCell: React.FC<LayoutHeaderCellProps> = ({ height, isCo
     return (
         <TimelineHeaderCell
             title="Layout"
-            icon={<LuCamera className="icon-sm" />}
+            icon={LuCamera}
             height={height}
             isCollapsed={isCollapsed}
             applyEnabled={cameraMoveEnabled}
             onToggleApply={toggleCameraMoveEnabled}
-            titleElement={
-                <CameraMoveTooltip
-                    placement="top-right"
-                    trigger={
-                        <span
-                            className="truncate select-none text-label"
-                            style={{ fontSize: isCollapsed ? 9 : 13, transition: 'font-size 150ms ease' }}
-                        >
-                            Layout
-                        </span>
-                    }
-                />
-            }
         />
     );
 };

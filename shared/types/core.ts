@@ -73,6 +73,18 @@ export interface CameraMetadata extends BaseSourceMetadata {
     size: Size;
     /** Actual negotiated frame rate from MediaRecorder (fps) */
     frameRate?: number;
+    /** Background-removal matte, computed once in the editor the first time it's switched on */
+    matte?: CameraMatteMetadata;
+}
+
+/**
+ * The person mask for background removal: a small grayscale video (white =
+ * person) with exactly the camera's frame timestamps, so every camera frame
+ * finds its mask by timestamp. Built by webapp/src/editor/cameraMatte,
+ * applied by shared/painters/cameraCutout.ts.
+ */
+export interface CameraMatteMetadata {
+    storagePath: string;
 }
 
 /**

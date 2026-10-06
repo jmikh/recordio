@@ -2,7 +2,6 @@ import React from 'react';
 import { LuLightbulb } from 'react-icons/lu';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { TimelineHeaderCell } from '../shared/TimelineHeaderCell';
-import { SpotlightTooltip } from '../../../shared/MediaTooltips';
 
 interface SpotlightHeaderCellProps {
     height: number;
@@ -16,24 +15,11 @@ export const SpotlightHeaderCell: React.FC<SpotlightHeaderCellProps> = ({ height
     return (
         <TimelineHeaderCell
             title="Spotlight"
-            icon={<LuLightbulb className="icon-sm" />}
+            icon={LuLightbulb}
             height={height}
             isCollapsed={isCollapsed}
             applyEnabled={spotlightEnabled}
             onToggleApply={toggleSpotlightEnabled}
-            titleElement={
-                <SpotlightTooltip
-                    placement="top-right"
-                    trigger={
-                        <span
-                            className="truncate select-none text-label"
-                            style={{ fontSize: isCollapsed ? 9 : 13, transition: 'font-size 150ms ease' }}
-                        >
-                            Spotlight
-                        </span>
-                    }
-                />
-            }
         />
     );
 };

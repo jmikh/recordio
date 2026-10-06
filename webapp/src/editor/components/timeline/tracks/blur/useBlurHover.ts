@@ -2,29 +2,31 @@ import { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../../../stores/useProjectStore';
 import { useUIStore } from '../../../../stores/useUIStore';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
-import type { OverlaySegment } from '@shared/types/overlay';
+import type { BlurSegment } from '@shared/types';
 import type { TimelineSegmentDragState as DragState } from '../shared/useTimelineSegmentDrag';
 import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from '../shared/useTimelineSegmentDrag';
+import { getValidBlockRange } from '../shared/timelineTrackUtils';
 import type { TimeMapper } from '@shared/mappers/timeMapper';
+import { createBlurSegment } from '../../../../blur/blurDefaults';
 
-export interface OverlayHoverInfo {
+export interface BlurHoverInfo {
     x: number;
     outputStartTimeMs: number;
     outputEndTimeMs: number;
     width: number;
 }
 
-export function useOverlayHover(
+export function useBlurHover(
     coords: TimePixelMapper,
     dragState: DragState | null,
     selectedId: string | null,
     setSelected: (id: string | null) => void,
     outputDuration: number,
-    segments: OverlaySegment[],
+    segments: BlurSegment[],
     timeMapper: TimeMapper
 ) {
-    const addOverlaySegment = useProjectStore(s => s.addOverlaySegment);
-    const [hoverInfo, setHoverInfo] = useState<OverlayHoverInfo | null>(null);
+    const addBlurSegment = useProjectStore(s => s.addBlurSegment);
+    const [hoverInfo, setHoverInfo] = useState<BlurHoverInfo | null>(null);
     const hoverInfoSetAtRef = useRef<number>(0);
 
     useEffect(() => {
@@ -46,42 +48,35 @@ export function useOverlayHover(
             return;
         }
 
-        // Only show ghost over empty areas — hide when hovering over an existing segment
-        const isOverSegment = segments.some(s =>
+        // Only show ghost over empty areas — blur blocks never overlap
+        const isInside = segments.some(s =>
             mouseTimeMs >= s.outputStartTimeMs && mouseTimeMs <= s.outputEndTimeMs
         );
-        if (isOverSegment) {
+        if (isInside) {
             setHoverInfo(null);
             return;
         }
 
-        // Start slightly before the cursor and extend right to match Spotlight/Zoom
-        const CURSOR_OVERLAP_MS = 100;
-        let start = Math.max(0, mouseTimeMs - CURSOR_OVERLAP_MS);
-        let end = start + K_DEFAULT_TIMELINE_BLOCK_MS;
-
-        if (end > outputDuration) {
-            end = outputDuration;
-            start = Math.max(0, end - K_DEFAULT_TIMELINE_BLOCK_MS);
-        }
-
-        // Enforce minimum duration
-        if (end - start < K_MIN_TIMELINE_BLOCK_MS) {
+        const range = getValidBlockRange(
+            mouseTimeMs,
+            segments,
+            outputDuration,
+            K_MIN_TIMELINE_BLOCK_MS,
+            K_DEFAULT_TIMELINE_BLOCK_MS
+        );
+        if (!range) {
             setHoverInfo(null);
             return;
         }
-
-        const width = coords.msToX(end - start);
-        const leftX = coords.msToX(start);
 
         if (!hoverInfo) {
             hoverInfoSetAtRef.current = Date.now();
         }
         setHoverInfo({
-            x: leftX,
-            outputStartTimeMs: start,
-            outputEndTimeMs: end,
-            width,
+            x: coords.msToX(range.start),
+            outputStartTimeMs: range.start,
+            outputEndTimeMs: range.end,
+            width: coords.msToX(range.end - range.start),
         });
     };
 
@@ -93,8 +88,7 @@ export function useOverlayHover(
         e.stopPropagation();
         if (dragState) return;
 
-        const currentSelectedId = useUIStore.getState().selectedOverlaySegmentId;
-        if (currentSelectedId) {
+        if (useUIStore.getState().selectedBlurSegmentId) {
             setSelected(null);
             setHoverInfo(null);
             return;
@@ -102,28 +96,10 @@ export function useOverlayHover(
 
         if (!hoverInfo || Date.now() - hoverInfoSetAtRef.current < 200) return;
 
-        const sourceStart = timeMapper.mapOutputToSourceTime(hoverInfo.outputStartTimeMs);
-        const sourceEnd = timeMapper.mapOutputToSourceTime(hoverInfo.outputEndTimeMs);
+        const outputSize = useProjectStore.getState().project.settings.outputSize;
+        const newSegment = createBlurSegment(hoverInfo.outputStartTimeMs, hoverInfo.outputEndTimeMs, timeMapper, outputSize);
 
-        // Create a new segment with a default blur item
-        const newSegment: OverlaySegment = {
-            id: crypto.randomUUID(),
-            sourceStartTimeMs: sourceStart,
-            sourceEndTimeMs: sourceEnd,
-            outputStartTimeMs: hoverInfo.outputStartTimeMs,
-            outputEndTimeMs: hoverInfo.outputEndTimeMs,
-            visible: true,
-            item: {
-                id: crypto.randomUUID(),
-                type: 'blur',
-                rectPx: { x: 0, y: 0, width: 100, height: 100 },
-                blurRadiusPx: 20,
-                borderRadiusPx: [0, 0, 0, 0],
-            },
-        };
-
-        // No overlap deletion — overlaps are fine
-        addOverlaySegment(newSegment);
+        addBlurSegment(newSegment);
         setSelected(newSegment.id);
         setHoverInfo(null);
     };

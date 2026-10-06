@@ -1,9 +1,9 @@
 import React from 'react';
 import { LuCamera, LuCameraOff } from 'react-icons/lu';
 import {
-    transitionSegment,
     holdSegment,
     blockContainer,
+    trackBlockColor,
     resizeHandle,
     dragHandleIndicator,
     blockIconClass,
@@ -14,8 +14,6 @@ import {
 interface CameraMoveBlockProps {
     left: number;
     width: number;
-    transitionInWidth: number;
-    transitionOutWidth: number;
     isSelected: boolean;
     isDragging: boolean;
     trackHeight: number;
@@ -31,11 +29,13 @@ interface CameraMoveBlockProps {
     isCollapsed?: boolean;
 }
 
+/**
+ * A single camera layout block on the timeline — one solid hold segment with
+ * the camera (or camera-off) icon.
+ */
 export const CameraMoveBlock: React.FC<CameraMoveBlockProps> = ({
     left,
     width,
-    transitionInWidth,
-    transitionOutWidth,
     isSelected,
     isDragging,
     trackHeight,
@@ -47,27 +47,13 @@ export const CameraMoveBlock: React.FC<CameraMoveBlockProps> = ({
     disabled = false,
     isCollapsed = false,
 }) => {
-    const clampedTransitionIn = Math.min(transitionInWidth, width / 2);
-    const clampedTransitionOut = Math.min(transitionOutWidth, width / 2);
-    const holdWidth = Math.max(0, width - clampedTransitionIn - clampedTransitionOut);
     const segmentHeight = trackHeight - 2;
     const segmentY = 1;
-
-    const transitionInColor = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
-    const transitionOutColor = (isSelected && !disabled) ? transitionSegment.selectedClass : transitionSegment.defaultClass;
     const holdColorClass = (isSelected && !disabled) ? holdSegment.selectedClass : holdSegment.defaultClass;
-
-    // When no hold, round both transition ends
-    const inStyle = holdWidth === 0 && clampedTransitionOut === 0
-        ? { ...transitionSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
-        : { ...transitionSegment.getStyle(), borderRight: 'none' as const };
-    const outStyle = holdWidth === 0 && clampedTransitionIn === 0
-        ? { ...transitionSegment.getStyle(), borderRadius: SEGMENT_RADIUS }
-        : { ...transitionSegment.getStyle(), borderLeft: 'none' as const };
 
     return (
         <div
-            className={`${blockContainer.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} ${trackBlockColor.camera.base} group ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? trackBlockColor.camera.hover : ''} ${disabled ? 'pointer-events-none' : ''}`}
             style={{
                 left: `${left}px`,
                 width: `${width}px`,
@@ -79,66 +65,24 @@ export const CameraMoveBlock: React.FC<CameraMoveBlockProps> = ({
             onMouseDown={disabled ? undefined : onMouseDown}
             onClick={disabled ? undefined : onClick}
         >
-            {/* Transition-in segment (left) */}
-            {clampedTransitionIn > 0 && (
-                <div
-                    className={`${transitionSegment.base} ${transitionInColor}`}
-                    style={{
-                        left: 0,
-                        top: segmentY,
-                        width: clampedTransitionIn,
-                        ...inStyle,
-                        height: segmentHeight,
-                        borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-                        ...(holdWidth === 0 && clampedTransitionOut === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
-                        ...(holdWidth === 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
-                    }}
-                />
-            )}
-
-            {/* Hold segment (middle) */}
-            {holdWidth > 0 && (
-                <div
-                    className={`${holdSegment.base} ${holdColorClass} flex items-center justify-center overflow-hidden`}
-                    style={{
-                        left: clampedTransitionIn,
-                        top: segmentY,
-                        width: holdWidth,
-                        ...holdSegment.getStyle(),
-                        height: segmentHeight,
-                        borderRadius: clampedTransitionIn === 0 && clampedTransitionOut === 0
-                            ? SEGMENT_RADIUS
-                            : clampedTransitionIn === 0
-                                ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
-                                : clampedTransitionOut === 0
-                                    ? `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`
-                                    : 0,
-                    }}
-                >
-                    {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
-                        isHidden
-                            ? <LuCameraOff className={`${blockIconClass} icon-md`} />
-                            : <LuCamera className={`${blockIconClass} icon-md`} />
-                    )}
-                </div>
-            )}
-
-            {/* Transition-out segment (right) */}
-            {clampedTransitionOut > 0 && (
-                <div
-                    className={`${transitionSegment.base} ${transitionOutColor}`}
-                    style={{
-                        left: clampedTransitionIn + holdWidth,
-                        top: segmentY,
-                        width: clampedTransitionOut,
-                        ...outStyle,
-                        height: segmentHeight,
-                        borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-                        ...(holdWidth === 0 && clampedTransitionIn === 0 ? { borderRadius: SEGMENT_RADIUS } : {}),
-                        ...(holdWidth === 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
-                    }}
-                />
-            )}
+            {/* Single hold segment */}
+            <div
+                className={`${holdSegment.base} ${holdColorClass} flex items-center justify-center overflow-hidden`}
+                style={{
+                    left: 0,
+                    top: segmentY,
+                    width: '100%',
+                    ...holdSegment.getStyle(),
+                    height: segmentHeight,
+                    borderRadius: SEGMENT_RADIUS,
+                }}
+            >
+                {!isCollapsed && width >= MIN_ICON_WIDTH_PX && (
+                    isHidden
+                        ? <LuCameraOff className={`${blockIconClass} icon-md`} />
+                        : <LuCamera className={`${blockIconClass} icon-md`} />
+                )}
+            </div>
 
             {/* Left resize handle */}
             <div

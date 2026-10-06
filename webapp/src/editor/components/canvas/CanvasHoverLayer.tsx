@@ -1,11 +1,12 @@
 /**
  * CanvasHoverLayer
  *
- * Unified always-mounted layer that provides hover highlight + click-to-select
- * for interactive canvas elements while paused:
+ * Unified always-mounted layer that provides hover highlight + press-to-select
+ * for interactive canvas elements while paused. The press is handed to the
+ * item's BoundingBox (dragHandoff), so select + drag is one gesture:
  *
- *   1. Camera  — higher priority; hover suppresses overlay targets
- *   2. Overlays — only active when camera is not hovered
+ *   1. Camera — higher priority; hover suppresses blur targets
+ *   2. Blur regions — only active when camera is not hovered
  *
  * Accounts for the current zoom viewport when positioning targets.
  */
@@ -15,8 +16,9 @@ import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useDisplayMapper } from '../../hooks/useDisplayMapper';
 import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
 import { getResolvedCameraStateAtTime } from '@shared/animators/cameraAnimator';
-import type { OverlaySegment, BlurOverlayItem, BorderOverlayItem, ArrowOverlayItem, TextOverlayItem } from '@shared/types/overlay';
-import type { Rect } from '@shared/types';
+import { getActiveBlurSegment } from '@shared/painters/blurPainter';
+import type { BlurRegion, Rect } from '@shared/types';
+import { beginDragHandoff } from './bounding-box/dragHandoff';
 
 // ─────────────────────────────────────────────────────────────
 // Root component
@@ -32,13 +34,12 @@ export const CanvasHoverLayer: React.FC = () => {
     const displayMapper = useDisplayMapper();
 
     const [hoveredCameraId, setHoveredCameraId] = useState<boolean>(false);
-    const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
+    const [hoveredRegionId, setHoveredRegionId] = useState<string | null>(null);
 
     // ── Store actions ────────────────────────────────────────
     const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const setCanvasMode    = useUIStore(s => s.setCanvasMode);
-    const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
-    const selectedOverlayId = useUIStore(s => s.selectedOverlaySegmentId);
+    const selectBlurSegment = useUIStore(s => s.selectBlurSegment);
     const setSettingsPanelActiveTab = useUIStore(s => s.setSettingsPanelActiveTab);
 
     // Clear lingering hover state if camera or segment disappears while hovered
@@ -50,8 +51,8 @@ export const CanvasHoverLayer: React.FC = () => {
     // ── Shared: zoom viewport ────────────────────────────────
     const zoomEnabled = project.settings.zoom?.enabled ?? true;
     const viewport = useMemo(() => {
-        // If an overlay is selected, the entire canvas renders without zoom
-        if (canvasMode === CanvasMode.OverlayEdit) {
+        // While a blur segment is being edited, the entire canvas renders without zoom
+        if (canvasMode === CanvasMode.BlurEdit) {
             return { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
         }
         
@@ -75,18 +76,6 @@ export const CanvasHoverLayer: React.FC = () => {
         return displayMapper.outputToDisplay(projected);
     }, [outputSize, viewport, displayMapper]);
 
-    const pointToViewportDisplay = useCallback((pt: { x: number; y: number }) => {
-        const scaleX = outputSize.width / viewport.width;
-        const scaleY = outputSize.height / viewport.height;
-        const r = displayMapper.outputToDisplay({
-            x: (pt.x - viewport.x) * scaleX,
-            y: (pt.y - viewport.y) * scaleY,
-            width: 0,
-            height: 0,
-        });
-        return { x: r.x, y: r.y };
-    }, [outputSize, viewport, displayMapper]);
-
     // ── Camera hover target ──────────────────────────────────
     const cameraSource   = project.cameraSource;
     const cameraSettings = project.settings.camera;
@@ -96,7 +85,7 @@ export const CanvasHoverLayer: React.FC = () => {
         !isPlaying &&
         canvasMode !== CanvasMode.CameraEdit &&
         canvasMode !== CanvasMode.CameraMoveEdit &&
-        canvasMode !== CanvasMode.OverlayEdit &&
+        canvasMode !== CanvasMode.BlurEdit &&
         !!cameraSource &&
         !!cameraSettings;
 
@@ -126,8 +115,11 @@ export const CanvasHoverLayer: React.FC = () => {
         });
     }, [resolvedCamera, displayMapper]);
 
-    const handleCameraClick = useCallback((e: React.MouseEvent) => {
+    const handleCameraPointerDown = useCallback((e: React.PointerEvent) => {
+        if (e.button !== 0) return;
         e.stopPropagation();
+        e.preventDefault();
+        beginDragHandoff(e);
         // Find a cameraMoveSegment covering currentTimeMs
         const segments = cameraMoveEnabled ? (project.timeline.cameraMoveSegments || []) : [];
         const active = segments.find(
@@ -143,34 +135,34 @@ export const CanvasHoverLayer: React.FC = () => {
         }
     }, [cameraMoveEnabled, project.timeline.cameraMoveSegments, currentTimeMs, selectCameraMove, setCanvasMode, setSettingsPanelActiveTab]);
 
-    // ── Overlay hover targets ────────────────────────────────
-    const overlayEnabled = project.settings.overlay?.enabled ?? true;
+    // ── Blur region hover targets ────────────────────────────
+    const blurEnabled = project.settings.blur?.enabled ?? true;
 
-    const overlaysActive =
+    const blurActive =
         !isPlaying &&
         canvasMode !== CanvasMode.ZoomEdit &&
         canvasMode !== CanvasMode.SpotlightEdit &&
-        overlayEnabled;
+        canvasMode !== CanvasMode.BlurEdit &&
+        blurEnabled;
 
-    const visibleSegments = useMemo(() => {
-        if (!overlaysActive) return [];
-        return (project.timeline.overlaySegments || []).filter((s: OverlaySegment) =>
-            s.visible &&
-            s.id !== selectedOverlayId &&
-            currentTimeMs >= s.outputStartTimeMs &&
-            currentTimeMs <= s.outputEndTimeMs
-        );
-    }, [overlaysActive, project.timeline.overlaySegments, currentTimeMs, selectedOverlayId]);
+    const activeBlurSegment = useMemo(() => {
+        if (!blurActive) return undefined;
+        return getActiveBlurSegment(project.timeline.blurSegments || [], currentTimeMs);
+    }, [blurActive, project.timeline.blurSegments, currentTimeMs]);
+    const visibleRegions = useMemo(() => activeBlurSegment?.regions ?? [], [activeBlurSegment]);
 
-    const handleOverlayClick = useCallback((e: React.MouseEvent, segmentId: string) => {
+    const handleRegionPointerDown = useCallback((e: React.PointerEvent, regionId: string) => {
+        if (e.button !== 0 || !activeBlurSegment) return;
         e.stopPropagation();
-        selectOverlaySegment(segmentId);
-    }, [selectOverlaySegment]);
+        e.preventDefault();
+        beginDragHandoff(e);
+        selectBlurSegment(activeBlurSegment.id, regionId);
+    }, [activeBlurSegment, selectBlurSegment]);
 
     if (!displayMapper) return null;
 
     const showCamera  = cameraActive && !!cameraDisplayRect;
-    const showOverlays = overlaysActive && visibleSegments.length > 0;
+    const showBlurs = visibleRegions.length > 0;
 
     // --- Cleanup lingering state ---
     // If the camera goes out of view or is paused out, clear its hover state.
@@ -180,29 +172,28 @@ export const CanvasHoverLayer: React.FC = () => {
         }
     }, [showCamera, hoveredCameraId]);
 
-    // If the hovered segment goes out of view, clear its hover state.
+    // If the hovered region goes out of view, clear its hover state.
     useEffect(() => {
-        if (hoveredSegmentId && !visibleSegments.find(s => s.id === hoveredSegmentId)) {
-            setHoveredSegmentId(null);
+        if (hoveredRegionId && !visibleRegions.find(r => r.id === hoveredRegionId)) {
+            setHoveredRegionId(null);
         }
-    }, [visibleSegments, hoveredSegmentId]);
+    }, [visibleRegions, hoveredRegionId]);
 
-    if (!showCamera && !showOverlays) return null;
+    if (!showCamera && !showBlurs) return null;
 
     return (
         <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden">
 
-            {/* ── Overlay targets (suppressed while camera is hovered) ── */}
-            {showOverlays && visibleSegments.map((segment: OverlaySegment) => (
-                <OverlayHoverTarget
-                    key={segment.id}
-                    segment={segment}
-                    isHovered={hoveredSegmentId === segment.id}
+            {/* ── Blur region targets (suppressed while camera is hovered) ── */}
+            {showBlurs && visibleRegions.map((region: BlurRegion) => (
+                <BlurRegionHoverTarget
+                    key={region.id}
+                    region={region}
+                    isHovered={hoveredRegionId === region.id}
                     suppressPointerEvents={hoveredCameraId}
-                    onHover={(hovered) => setHoveredSegmentId(hovered ? segment.id : null)}
-                    onClick={(e) => handleOverlayClick(e, segment.id)}
+                    onHover={(hovered) => setHoveredRegionId(hovered ? region.id : null)}
+                    onPointerDown={(e) => handleRegionPointerDown(e, region.id)}
                     outputToViewportDisplay={outputToViewportDisplay}
-                    pointToViewportDisplay={pointToViewportDisplay}
                 />
             ))}
 
@@ -227,7 +218,7 @@ export const CanvasHoverLayer: React.FC = () => {
                     }}
                     onMouseEnter={() => setHoveredCameraId(true)}
                     onMouseLeave={() => setHoveredCameraId(false)}
-                    onClick={handleCameraClick}
+                    onPointerDown={handleCameraPointerDown}
                 />
             )}
         </div>
@@ -235,124 +226,38 @@ export const CanvasHoverLayer: React.FC = () => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Overlay hover target (per-segment)
+// Blur region hover target
 // ─────────────────────────────────────────────────────────────
 
-interface OverlayHoverTargetProps {
-    segment: OverlaySegment;
+interface BlurRegionHoverTargetProps {
+    region: BlurRegion;
     isHovered: boolean;
     suppressPointerEvents: boolean;
     onHover: (hovered: boolean) => void;
-    onClick: (e: React.MouseEvent) => void;
+    onPointerDown: (e: React.PointerEvent) => void;
     outputToViewportDisplay: (rect: Rect) => Rect;
-    pointToViewportDisplay: (pt: { x: number; y: number }) => { x: number; y: number };
 }
 
-const OverlayHoverTarget: React.FC<OverlayHoverTargetProps> = ({
-    segment, isHovered, suppressPointerEvents, onHover, onClick,
-    outputToViewportDisplay, pointToViewportDisplay,
+const BlurRegionHoverTarget: React.FC<BlurRegionHoverTargetProps> = ({
+    region, isHovered, suppressPointerEvents, onHover, onPointerDown, outputToViewportDisplay,
 }) => {
-    const hoverBorder = isHovered ? '2px solid var(--color-secondary)' : '2px solid transparent';
-    const pointerEvents = suppressPointerEvents ? 'none' : 'auto';
-    const item = segment.item;
-
-    switch (item.type) {
-        case 'blur':
-        case 'border': {
-            const rectItem = item as BlurOverlayItem | BorderOverlayItem;
-            const display = outputToViewportDisplay(rectItem.rectPx);
-            return (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: display.x,
-                        top: display.y,
-                        width: display.width,
-                        height: display.height,
-                        pointerEvents,
-                        cursor: 'pointer',
-                        border: hoverBorder,
-                        borderRadius: 2,
-                    }}
-                    onMouseEnter={() => onHover(true)}
-                    onMouseLeave={() => onHover(false)}
-                    onClick={onClick}
-                />
-            );
-        }
-        case 'text': {
-            const textItem = item as TextOverlayItem;
-            const scale = 1; // ref height ratio 1:1 for padding calc
-            const pad = Math.round(8 * scale);
-            const lineHeightPx = textItem.fontSizePx * 1.2;
-            const estLines = Math.max(1, Math.ceil((textItem.text || '').length * textItem.fontSizePx * 0.6 / Math.max(textItem.widthPx, 1)));
-            const totalOutputHeight = Math.max(lineHeightPx, estLines * lineHeightPx) + pad * 2;
-
-            const display = outputToViewportDisplay({
-                x: textItem.topLeft.x - pad,
-                y: textItem.topLeft.y - pad,
-                width: textItem.widthPx + pad * 2,
-                height: totalOutputHeight,
-            });
-            return (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: display.x,
-                        top: display.y,
-                        width: display.width,
-                        height: display.height,
-                        pointerEvents,
-                        cursor: 'pointer',
-                        border: hoverBorder,
-                        borderRadius: 2,
-                    }}
-                    onMouseEnter={() => onHover(true)}
-                    onMouseLeave={() => onHover(false)}
-                    onClick={onClick}
-                />
-            );
-        }
-        case 'arrow': {
-            const arrowItem = item as ArrowOverlayItem;
-            const tail = pointToViewportDisplay(arrowItem.tail);
-            const head = pointToViewportDisplay(arrowItem.head);
-            return (
-                <svg
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        pointerEvents: 'none',
-                        zIndex: 10,
-                    }}
-                >
-                    {/* Thick transparent hit area */}
-                    <line
-                        x1={tail.x} y1={tail.y}
-                        x2={head.x} y2={head.y}
-                        stroke="transparent"
-                        strokeWidth={12}
-                        style={{ pointerEvents: suppressPointerEvents ? 'none' : 'stroke', cursor: 'pointer' }}
-                        onMouseEnter={() => onHover(true)}
-                        onMouseLeave={() => onHover(false)}
-                        onClick={onClick}
-                    />
-                    {/* Visible hover line */}
-                    {isHovered && !suppressPointerEvents && (
-                        <line
-                            x1={tail.x} y1={tail.y}
-                            x2={head.x} y2={head.y}
-                            stroke="var(--color-secondary)"
-                            strokeWidth={2}
-                            style={{ pointerEvents: 'none' }}
-                        />
-                    )}
-                </svg>
-            );
-        }
-        default:
-            return null;
-    }
+    const display = outputToViewportDisplay(region.rectPx);
+    return (
+        <div
+            style={{
+                position: 'absolute',
+                left: display.x,
+                top: display.y,
+                width: display.width,
+                height: display.height,
+                pointerEvents: suppressPointerEvents ? 'none' : 'auto',
+                cursor: 'pointer',
+                border: isHovered ? '2px solid var(--color-secondary)' : '2px solid transparent',
+                borderRadius: 2,
+            }}
+            onMouseEnter={() => onHover(true)}
+            onMouseLeave={() => onHover(false)}
+            onPointerDown={onPointerDown}
+        />
+    );
 };

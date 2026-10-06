@@ -7,6 +7,7 @@ import { useInteractionLock } from './useInteractionLock';
 import { Handle, EdgeHandle } from './Handles';
 import { CornerRadiusHandle } from './CornerRadiusHandle';
 import { LinkToggle } from './LinkToggle';
+import { takeDragHandoff } from './dragHandoff';
 import {
     BOX_BORDER_WIDTH,
     OVERLAY_BORDER_WIDTH,
@@ -170,7 +171,11 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
 
     // Use refs for window event handlers to avoid stale closures
     const handleWindowPointerMove = useCallback((e: PointerEvent) => {
-        if (!dragRef.current || !boxRef.current) return;
+        if (!dragRef.current || !boxRef.current) {
+            console.log('[DragHandoff] move ignored', { hasDrag: !!dragRef.current, hasBox: !!boxRef.current });
+            return;
+        }
+        console.log('[DragHandoff] move', { dx: e.clientX - dragRef.current.startX, dy: e.clientY - dragRef.current.startY });
 
         const { type, initialRect, startX, startY } = dragRef.current;
 
@@ -211,6 +216,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const [isDragging, setIsDragging] = useState(false);
 
     React.useEffect(() => {
+        console.log('[DragHandoff] drag listeners effect', { isDragging, hasDrag: !!dragRef.current });
         if (isDragging) {
             window.addEventListener('pointermove', handleWindowPointerMove);
             window.addEventListener('pointerup', handleWindowPointerUp);
@@ -241,6 +247,32 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         };
         setIsDragging(true);
     }, [lockInteraction, onDragStart]);
+
+    // A press on a canvas hover target selected this item and mounted us —
+    // continue that press as a move-drag (see dragHandoff.ts)
+    React.useEffect(() => {
+        const handoff = takeDragHandoff();
+        console.log('[DragHandoff] box mount', { handoff: !!handoff, hasBox: !!boxRef.current });
+        if (!handoff || !boxRef.current) return;
+
+        lockInteraction();
+        onDragStart?.();
+
+        const snapRect = { ...currentRectRef.current };
+        dragRef.current = {
+            type: 'move',
+            startX: handoff.clientX,
+            startY: handoff.clientY,
+            initialRect: snapRect,
+            capturedElement: boxRef.current,
+            pointerId: handoff.pointerId,
+            initialAspectRatio: snapRect.width / snapRect.height,
+            shiftHeld: handoff.shiftKey,
+        };
+        setIsDragging(true);
+        // Mount-only: the handoff belongs to the box that mounts for the press
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ------------------------------------------------------------------
     // CORNER RADIUS HANDLERS

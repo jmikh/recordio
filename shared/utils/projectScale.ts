@@ -5,8 +5,7 @@
  * resolutions. Pure computation with no DOM dependencies.
  */
 
-import type { Project, Size, ZoomSegment, SpotlightSegment, CameraMoveSegment } from '../types';
-import type { OverlaySegment } from '../types/overlay';
+import type { Project, Size, ZoomSegment, SpotlightSegment, CameraMoveSegment, BlurSegment } from '../types';
 
 /**
  * Recursively scales any number property ending in 'Px' by the given scale factor.
@@ -41,12 +40,6 @@ function scalePixelValues(obj: any, scale: number, parentKey: string = ''): any 
             };
         }
         return obj;
-    }
-
-    // Handle Point objects ({x, y} without width/height) — overlay output coordinates.
-    const POINT_FIELDS_TO_SCALE = ['tail', 'head', 'topLeft'];
-    if (obj.hasOwnProperty('x') && obj.hasOwnProperty('y') && !obj.hasOwnProperty('width') && POINT_FIELDS_TO_SCALE.includes(parentKey)) {
-        return { x: obj.x * scale, y: obj.y * scale };
     }
 
     if (typeof obj !== 'object') return obj;
@@ -102,8 +95,8 @@ export function scaleProject(project: Project, newSize: Size): Project {
             cameraMoveSegments: (project.timeline.cameraMoveSegments || []).map((cl: CameraMoveSegment) =>
                 scalePixelValues(cl, scale) as CameraMoveSegment
             ),
-            overlaySegments: (project.timeline.overlaySegments || []).map((ob: OverlaySegment) =>
-                scalePixelValues(ob, scale) as OverlaySegment
+            blurSegments: (project.timeline.blurSegments || []).map((bs: BlurSegment) =>
+                scalePixelValues(bs, scale) as BlurSegment
             ),
         }
     };

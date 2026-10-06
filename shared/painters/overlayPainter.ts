@@ -1,28 +1,21 @@
 /**
  * Overlay Painter
  *
- * Draws overlay items (blur, text, arrow, border) on the canvas.
- * Used during playback and export (not during editing — the selected item
- * is rendered via HTML/SVG overlay instead).
+ * Draws screenshot annotation items (blur, text, arrow, border) on the canvas
+ * via drawOverlayItem() — one item, no time dimension. The CALLER owns the
+ * canvas transform; the paint context only carries the sizes the painters need
+ * for blur projection and effect/text scaling.
  *
- * Two entry points:
- *   - drawOverlays()    — video: picks the segments active at a time, applies the
- *                         zoom-viewport transform, paints them back-to-front.
- *   - drawOverlayItem() — one item, no time dimension. Used by drawOverlays and by
- *                         the screenshot renderer (plans/screenshots). The CALLER
- *                         owns the canvas transform; the paint context only carries
- *                         the sizes the painters need for blur projection and
- *                         effect/text scaling.
- *
- * All coordinates are in OUTPUT pixels.
+ * (Video projects no longer have overlays; their blur track is painted by
+ * blurPainter, whose drawBlurRect primitive the blur items here share.)
  */
 
 import type { Size, Rect } from '../types';
-import type { OverlaySegment, OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../types/overlay';
+import type { OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../types/overlay';
 import { roundRectPath } from './utils/roundRect';
+import { drawBlurRect } from './blurPainter';
 
-// Reference constants — scaled proportionally to output height (matching camera painter pattern)
-const REF_OUTPUT_HEIGHT = 1080;
+// Reference constants — scaled by the caller's effectScale (matching camera painter pattern)
 const REF_SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
 const REF_SHADOW_OFFSET_Y = 10;
@@ -40,15 +33,13 @@ const MIN_PIXELATE_CELL = 2;
 /**
  * What the per-item painters need beyond the item itself.
  *
- * Video passes outputSize + the zoom viewport and derives both scales from
- * outputSize.height / 1080. Screenshots pass the crop rect as viewport and
- * width-based scales so a tall full-page capture doesn't inflate shadows
- * and text padding.
+ * Screenshots pass the crop rect as viewport and width-based scales so a tall
+ * full-page capture doesn't inflate shadows and text padding.
  */
 export interface OverlayPaintContext {
-    /** Logical canvas size (video: output size; screenshot: crop size) */
+    /** Logical canvas size (screenshot: crop size) */
     outputSize: Size;
-    /** Region of output space currently mapped onto the canvas (video: zoom viewport; screenshot: crop rect) */
+    /** Region of document space currently mapped onto the canvas (screenshot: crop rect) */
     viewport: Rect;
     /** Multiplier for shadow/glow parameters */
     effectScale: number;
@@ -57,67 +48,8 @@ export interface OverlayPaintContext {
 }
 
 /**
- * Returns the overlay segments shown at the given output time, in paint order:
- * sorted by duration descending so shorter overlays paint on top.
- */
-export function getActiveOverlaySegments(overlaySegments: OverlaySegment[], currentTimeMs: number): OverlaySegment[] {
-    return overlaySegments
-        .filter(segment => {
-            if (!segment.visible) return false;
-            if (currentTimeMs < segment.outputStartTimeMs || currentTimeMs > segment.outputEndTimeMs) return false;
-            return true;
-        })
-        .sort((a, b) => {
-            const durA = a.outputEndTimeMs - a.outputStartTimeMs;
-            const durB = b.outputEndTimeMs - b.outputStartTimeMs;
-            return durB - durA; // longest first (painted first = behind)
-        });
-}
-
-/**
- * Draws all overlay items for the given time.
- * @param ctx - Canvas 2D context
- * @param overlaySegments - All overlay segments in the project
- * @param currentTimeMs - Current output time in ms
- * @param outputSize - Output canvas size
- * @param viewport - Current zoom viewport in output coordinates
- * @param editingItemId - Item currently being edited (skip to avoid double-render)
- */
-export function drawOverlays(
-    ctx: CanvasRenderingContext2D,
-    overlaySegments: OverlaySegment[],
-    currentTimeMs: number,
-    outputSize: Size,
-    viewport: Rect,
-    editingItemId?: string | null
-): void {
-    const scale = outputSize.height / REF_OUTPUT_HEIGHT;
-    const paint: OverlayPaintContext = { outputSize, viewport, effectScale: scale, textScale: scale };
-
-    // Apply viewport transform: overlay coordinates are in output space,
-    // so we scale + translate to project them through the zoom viewport.
-    // When not zoomed, viewport === outputSize → scale=1, translate=0 (no-op).
-    const scaleX = outputSize.width / viewport.width;
-    const scaleY = outputSize.height / viewport.height;
-
-    ctx.save();
-    ctx.scale(scaleX, scaleY);
-    ctx.translate(-viewport.x, -viewport.y);
-
-    for (const segment of getActiveOverlaySegments(overlaySegments, currentTimeMs)) {
-        const item = segment.item;
-        // Only skip text when being edited (rendered via HTML for inline editing).
-        if (editingItemId && item.id === editingItemId && item.type === 'text') continue;
-
-        drawOverlayItem(ctx, item, paint);
-    }
-
-    ctx.restore();
-}
-
-/**
  * Draws a single overlay item. The caller must already have applied the
- * output→canvas transform (scale by outputSize/viewport, translate by
+ * document→canvas transform (scale by outputSize/viewport, translate by
  * -viewport). Blur/pixelate reset the transform internally and project
  * through `paint.viewport` themselves, because ctx.filter and drawImage
  * self-copies are ambiguous under a non-identity CTM.
@@ -153,42 +85,7 @@ function projectRect(rectPx: Rect, paint: OverlayPaintContext) {
 }
 
 function drawBlur(ctx: CanvasRenderingContext2D, item: BlurOverlayItem, paint: OverlayPaintContext): void {
-    const { blurRadiusPx, borderRadiusPx } = item;
-
-    // Work entirely in canvas pixel space to avoid CTM/filter ambiguity.
-    // The parent transform is scale(sx,sy) + translate(-vp.x,-vp.y).
-    // We reset the transform and manually project all coordinates.
-    const { scaleX, canvasX, canvasY, canvasW, canvasH } = projectRect(item.rectPx, paint);
-
-    // Scale blur radius by zoom so blur stays equally effective at all zoom levels.
-    // When zoomed in 2×, content pixels double, so blur kernel must double too.
-    const scaledBlur = blurRadiusPx * scaleX;
-
-    ctx.save();
-
-    // Reset transform — we'll work in raw canvas pixel coordinates
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    // Create clipping path in canvas pixel space
-    const scaledRadius = borderRadiusPx.map(r => r * scaleX) as [number, number, number, number];
-    roundRectPath(ctx, canvasX, canvasY, canvasW, canvasH, scaledRadius);
-    ctx.clip();
-
-    // Apply blur filter (now unambiguously in canvas pixel space)
-    ctx.filter = `blur(${scaledBlur}px)`;
-
-    // Expand source area by blur radius so the kernel has real pixel data at the edges.
-    const expand = scaledBlur * 2;
-    const srcX = Math.max(0, canvasX - expand);
-    const srcY = Math.max(0, canvasY - expand);
-    const srcW = canvasW + expand * 2;
-    const srcH = canvasH + expand * 2;
-
-    // 1:1 copy with blur — source and dest are the same canvas pixel coordinates
-    ctx.drawImage(ctx.canvas, srcX, srcY, srcW, srcH, srcX, srcY, srcW, srcH);
-
-    ctx.filter = 'none';
-    ctx.restore();
+    drawBlurRect(ctx, item.rectPx, item.blurRadiusPx, item.borderRadiusPx, paint.outputSize, paint.viewport);
 }
 
 /** Scratch canvas for pixelate downsampling — reused across calls (never displayed). */

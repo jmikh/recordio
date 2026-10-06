@@ -24,6 +24,8 @@
    --color-surface-body: var(--surface-body);
    --color-surface: var(--surface-default);
    --color-surface-raised: var(--surface-raised);
+   /* Recessed wells inside controls: toggle/slider tracks, multi-toggle bed */
+   --color-surface-inset: var(--surface-inset);
    /* Stand-in for video/media — identical in both themes, see below */
    --color-surface-media: var(--surface-media);
    --color-text-on-media: var(--text-on-media);
@@ -76,6 +78,20 @@
      ───────────────────────────────────────────────────────── */
    --color-destructive: var(--destructive);
    --color-success: var(--success);
+
+   /* ─────────────────────────────────────────────────────────
+     Timeline Track Blocks
+     ───────────────────────────────────────────────────────── */
+   --color-track-clip: var(--track-clip);
+   --color-track-clip-highlighted: var(--track-clip-highlighted);
+   --color-track-zoom: var(--track-zoom);
+   --color-track-zoom-highlighted: var(--track-zoom-highlighted);
+   --color-track-spotlight: var(--track-spotlight);
+   --color-track-spotlight-highlighted: var(--track-spotlight-highlighted);
+   --color-track-blur: var(--track-blur);
+   --color-track-blur-highlighted: var(--track-blur-highlighted);
+   --color-track-camera: var(--track-camera);
+   --color-track-camera-highlighted: var(--track-camera-highlighted);
 
    /* ─────────────────────────────────────────────────────────
      Text
@@ -143,6 +159,20 @@
    --destructive: oklch(0.65 0.25 25);
    --success: oklch(0.70 0.18 155);
 
+   /* Timeline track blocks — one hue per track type so blocks read apart at
+      a glance. Shared by both themes. Hover lifts lightness the same way
+      --primary-highlighted sits above --primary. */
+   --track-clip: var(--primary);
+   --track-clip-highlighted: var(--primary-highlighted);
+   --track-zoom: oklch(0.535 0.131 152.0);         /* #1A8245 green */
+   --track-zoom-highlighted: oklch(from var(--track-zoom) calc(l + 0.05) c h);
+   --track-spotlight: oklch(0.565 0.137 55.3);     /* #B15C08 amber */
+   --track-spotlight-highlighted: oklch(from var(--track-spotlight) calc(l + 0.05) c h);
+   --track-blur: oklch(0.546 0.215 262.9);         /* #2563EB blue */
+   --track-blur-highlighted: oklch(from var(--track-blur) calc(l + 0.05) c h);
+   --track-camera: oklch(0.579 0.197 4.7);         /* #D1336B rose */
+   --track-camera-highlighted: oklch(from var(--track-camera) calc(l + 0.05) c h);
+
    /* Z-Index Scale */
    --z-index-base: 1;
    --z-index-navbar: 20;
@@ -162,6 +192,7 @@
    --surface-body: oklch(96.5% 0.012 var(--hue-primary));
    --surface-default: oklch(99% 0.003 var(--hue-primary));
    --surface-raised: oklch(100% 0 0);
+   --surface-inset: oklch(94% 0.01 var(--hue-primary));
 
    /* Media surface — where a video sits or will sit. Deliberately NOT
       theme-flipped: a player slot reads as black in light mode too, so
@@ -198,6 +229,7 @@
    --surface-body: oklch(0.10 0.035 var(--hue-primary));
    --surface-default: oklch(0.18 0.016 var(--hue-primary));
    --surface-raised: oklch(0.26 0.012 var(--hue-primary));
+   --surface-inset: oklch(0.13 0.025 var(--hue-primary));
 
    /* Interactive State Overlays - Original values */
    --state-disabled: oklch(1 0 0 / 1%);

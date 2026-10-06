@@ -9,7 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';
-import { drawOverlays } from '@shared/painters/overlayPainter';
+import { drawBlurs } from '@shared/painters/blurPainter';
 import type { Project } from '@shared/types';
 
 // Maximum zoom bounding box size as a fraction of the output
@@ -50,10 +50,9 @@ export const renderZoomEditor = (
         }
     }
 
-    // Render Overlay annotations (if any are active at this time)
-    const overlaySegments = project.timeline.overlaySegments || [];
-    if (overlaySegments.length > 0) {
-        drawOverlays(ctx, overlaySegments, state.currentTimeMs, outputSize, effectiveViewport);
+    // Render blur regions (if a blur segment is active at this time)
+    if (project.settings.blur?.enabled ?? true) {
+        drawBlurs(ctx, project.timeline.blurSegments || [], state.currentTimeMs, outputSize, effectiveViewport);
     }
 };
 

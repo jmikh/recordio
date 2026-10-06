@@ -1,76 +1,35 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { getTimeMapper } from '../../hooks/useTimeMapper';
-import { LuArrowUpRight, LuChevronDown, LuEraser, LuMinus, LuPause, LuPlay, LuPlus, LuScissors, LuType } from 'react-icons/lu';
-import { TbBlur, TbBorderOuter } from 'react-icons/tb';
+import { LuEraser, LuMinus, LuPause, LuPlay, LuPlus, LuScissors } from 'react-icons/lu';
+import { TbBlur } from 'react-icons/tb';
 import { Slider, Button, Tooltip } from '@shared/components';
 import { useToast } from '../../../components/Toast';
 import { analyzeForAutoCut } from '../../autocut/autoCutAnalyzer';
 import { getCachedSpeechSegments } from '../../autocut/vadService';
-import { MIN_WINDOW_DURATION_MS } from './tracks/recording/constants';
-import { createDefaultItem } from '../settings/OverlayInspector';
-import type { OverlayItemType, OverlaySegment } from '@shared/types/overlay';
+import { MIN_WINDOW_DURATION_MS } from './tracks/clip/constants';
+import { getValidBlockRange } from './tracks/shared/timelineTrackUtils';
+import { K_DEFAULT_TIMELINE_BLOCK_MS, K_MIN_TIMELINE_BLOCK_MS } from './tracks/shared/useTimelineSegmentDrag';
+import { getActiveBlurSegment } from '@shared/painters/blurPainter';
+import { createBlurSegment, createDefaultBlurRegion } from '../../blur/blurDefaults';
 import { trackAutocutClicked, trackAutocutFailed } from '../../../analytics';
 import { captureError } from '../../../lib/sentry';
-
-export const MIN_PIXELS_PER_SEC = 10;
-export const MAX_PIXELS_PER_SEC = 200;
+import { MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC, fitTimelineToScreen } from './fitTimeline';
 
 
-
-const OVERLAY_OPTIONS: { type: OverlayItemType; label: string; icon: React.ReactNode }[] = [
-    { type: 'blur', label: 'Blur', icon: <TbBlur className="icon-md" /> },
-    { type: 'text', label: 'Text', icon: <LuType className="icon-md" /> },
-    { type: 'arrow', label: 'Arrow', icon: <LuArrowUpRight className="icon-md" /> },
-    { type: 'border', label: 'Outline', icon: <TbBorderOuter className="icon-md" /> },
-];
 
 export const TimelineToolbar: React.FC = () => {
     // Subscribe for perf
     const timeDisplayRef = React.useRef<HTMLDivElement>(null);
-    const [overlayMenuOpen, setOverlayMenuOpen] = useState(false);
-    const overlayBtnRef = useRef<HTMLButtonElement>(null);
-    const overlayMenuRef = useRef<HTMLDivElement>(null);
-    const [overlayMenuStyle, setOverlayMenuStyle] = useState<React.CSSProperties>({});
-
-    // Position overlay menu when opened
-    useEffect(() => {
-        if (!overlayMenuOpen || !overlayBtnRef.current) return;
-        const rect = overlayBtnRef.current.getBoundingClientRect();
-        setOverlayMenuStyle({
-            position: 'fixed',
-            bottom: window.innerHeight - rect.top + 4,
-            left: rect.left,
-            zIndex: 9999,
-        });
-    }, [overlayMenuOpen]);
-
-    // Close overlay menu on click outside
-    useEffect(() => {
-        if (!overlayMenuOpen) return;
-        const handleClickOutside = (e: MouseEvent) => {
-            const target = e.target as Node;
-            if (
-                overlayBtnRef.current && !overlayBtnRef.current.contains(target) &&
-                overlayMenuRef.current && !overlayMenuRef.current.contains(target)
-            ) {
-                setOverlayMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [overlayMenuOpen]);
 
     const isPlaying = useUIStore(s => s.isPlaying);
     const setIsPlaying = useUIStore(s => s.setIsPlaying);
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
     const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
-    const timelineContainerRef = useUIStore(s => s.timelineContainerRef);
     const canvasMode = useUIStore(s => s.canvasMode);
     const currentTimeMs = useUIStore(s => s.currentTimeMs);
     const setScissorsHovered = useUIStore(s => s.setScissorsHovered);
@@ -167,16 +126,7 @@ export const TimelineToolbar: React.FC = () => {
         setPixelsPerSec(newScale);
     };
 
-    const handleFit = () => {
-        const container = timelineContainerRef?.current;
-        if (!container) return;
-        const availableWidth = container.clientWidth - 50;
-        if (totalDurationMs > 0) {
-            const fitPps = (availableWidth * 1000) / totalDurationMs;
-            const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
-            setPixelsPerSec(clampedPps);
-        }
-    };
+    const handleFit = () => fitTimelineToScreen(totalDurationMs);
 
     // Check if current time is at least MIN_WINDOW_DURATION_MS from both window boundaries (in output time)
     const canSplit = useMemo(() => {
@@ -204,37 +154,33 @@ export const TimelineToolbar: React.FC = () => {
         splitWindow(win.id, win.startMs + sourceOffset);
     };
 
-    const handleAddOverlay = useCallback((type: OverlayItemType) => {
-        const outputSize = useProjectStore.getState().project.settings.outputSize;
-        const overlaySettings = useProjectStore.getState().project.settings.overlay as any;
-        const item = createDefaultItem(type, outputSize, overlaySettings);
+    // Add blur at the playhead: inside a blur block → another region in it;
+    // otherwise a new block in the free space around the playhead.
+    const blurSegments = timeline.blurSegments;
+    const blurTarget = useMemo(() => {
+        const segments = (blurSegments || []).filter(s => s.visible);
+        const existing = getActiveBlurSegment(segments, currentTimeMs);
+        if (existing) return { kind: 'region' as const, segment: existing };
+        const range = getValidBlockRange(currentTimeMs, segments, totalDurationMs, K_MIN_TIMELINE_BLOCK_MS, K_DEFAULT_TIMELINE_BLOCK_MS);
+        return range ? { kind: 'segment' as const, range } : null;
+    }, [blurSegments, currentTimeMs, totalDurationMs]);
 
-        const outputDuration = timeMapper.getOutputDuration();
-        const defaultDuration = 3000;
-        let outputStart = currentTimeMs;
-        let outputEnd = currentTimeMs + defaultDuration;
+    const handleAddBlur = useCallback(() => {
+        if (!blurTarget) return;
+        const { project, addBlurSegment, addBlurRegion } = useProjectStore.getState();
+        const outputSize = project.settings.outputSize;
 
-        if (outputEnd > outputDuration) { 
-            outputEnd = outputDuration; 
-            outputStart = Math.max(0, outputEnd - defaultDuration); 
+        if (blurTarget.kind === 'region') {
+            const region = createDefaultBlurRegion(outputSize, blurTarget.segment.regions.length);
+            addBlurRegion(blurTarget.segment.id, region);
+            useUIStore.getState().selectBlurSegment(blurTarget.segment.id, region.id);
+            return;
         }
 
-        const sourceStart = timeMapper.mapOutputToSourceTime(outputStart);
-        const sourceEnd = timeMapper.mapOutputToSourceTime(outputEnd);
-
-        const newSegment: OverlaySegment = {
-            id: crypto.randomUUID(),
-            sourceStartTimeMs: sourceStart,
-            sourceEndTimeMs: sourceEnd,
-            outputStartTimeMs: outputStart,
-            outputEndTimeMs: outputEnd,
-            visible: true,
-            item,
-        };
-
-        useProjectStore.getState().addOverlaySegment(newSegment);
-        useUIStore.getState().selectOverlaySegment(newSegment.id);
-    }, [currentTimeMs, timeMapper]);
+        const segment = createBlurSegment(blurTarget.range.start, blurTarget.range.end, timeMapper, outputSize);
+        addBlurSegment(segment);
+        useUIStore.getState().selectBlurSegment(segment.id);
+    }, [blurTarget, timeMapper]);
 
     const onTogglePlay = () => {
         if (!isPlaying && useUIStore.getState().currentTimeMs >= timeMapper.outputDuration) {
@@ -319,38 +265,20 @@ export const TimelineToolbar: React.FC = () => {
 
                 <div className="w-px h-5 bg-border mx-1" />
 
-                <div className="relative">
-                    <button
-                        ref={overlayBtnRef}
-                        onClick={() => setOverlayMenuOpen(!overlayMenuOpen)}
-                        className="interactive-ghost flex items-center gap-1.5 px-2 py-1 text-xs"
+                <Tooltip
+                    text={blurTarget ? 'Blur part of the screen at the playhead' : 'No room for a blur block here'}
+                    position="top-start"
+                >
+                    <Button
+                        variant="ghost"
+                        icon={TbBlur}
+                        disabled={!blurTarget}
+                        onClick={handleAddBlur}
+                        className={!blurTarget ? 'opacity-40 cursor-not-allowed' : ''}
                     >
-                        <span>Add Overlay</span>
-                        <LuChevronDown className={`icon-sm transition-transform ${overlayMenuOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {overlayMenuOpen && createPortal(
-                        <div
-                            ref={overlayMenuRef}
-                            className="bg-surface-raised border border-border rounded-lg shadow-float py-1 px-1"
-                            style={overlayMenuStyle}
-                        >
-                            {OVERLAY_OPTIONS.map(({ type, label, icon }) => (
-                                <button
-                                    key={type}
-                                    onClick={() => {
-                                        handleAddOverlay(type);
-                                        setOverlayMenuOpen(false);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 rounded-md text-text-main hover:bg-state-hover"
-                                >
-                                    <span className="shrink-0">{icon}</span>
-                                    <span>{label}</span>
-                                </button>
-                            ))}
-                        </div>,
-                        document.body
-                    )}
-                </div>
+                        Add blur
+                    </Button>
+                </Tooltip>
             </div>
 
             {/* Center: play button + time */}

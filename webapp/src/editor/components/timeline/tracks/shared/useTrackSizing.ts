@@ -8,10 +8,10 @@ import type { DisplaySettings } from '@shared/types/timeline';
 // Computes per-track heights for the hover-to-expand timeline system.
 //
 // Rules:
-// 1. Recording is ALWAYS full height — never collapses, not part of DisplaySettings
-// 2. When no track is hovered → the first visible non-recording track is full height
+// 1. Clip track is ALWAYS full height — never collapses, not part of DisplaySettings
+// 2. When no track is hovered → the first visible non-clip track is full height
 // 3. When a track is hovered → that track becomes full height
-// 4. All other non-recording tracks collapse to COLLAPSED_HEIGHT
+// 4. All other non-clip tracks collapse to COLLAPSED_HEIGHT
 // ============================================================================
 
 /** Full track height (same as existing TRACK_HEIGHT) */
@@ -20,14 +20,14 @@ export const TRACK_HEIGHT = 32;
 /** Collapsed track height (~40% of full) */
 export const COLLAPSED_HEIGHT = 13;
 
-type EffectTrack = 'zoom' | 'spotlight' | 'cameraMove' | 'overlay';
+type EffectTrack = 'zoom' | 'spotlight' | 'cameraMove' | 'blur';
 
-/** Track ordering for effect tracks (recording is handled separately) */
+/** Track ordering for effect tracks (clip track is handled separately) */
 const EFFECT_TRACK_ORDER: EffectTrack[] = [
     'zoom',
     'spotlight',
     'cameraMove',
-    'overlay',
+    'blur',
 ];
 
 /** Maps effect track keys to their DisplaySettings show_ field */
@@ -35,7 +35,7 @@ const SHOW_KEY: Record<EffectTrack, keyof DisplaySettings> = {
     zoom: 'showZoom',
     spotlight: 'showSpotlight',
     cameraMove: 'showCameraMove',
-    overlay: 'showOverlay',
+    blur: 'showBlur',
 };
 
 /** Gap between track rows */
@@ -51,15 +51,15 @@ export interface TrackSizeInfo {
 
 export interface TrackSizingResult {
     tracks: Record<EffectTrack, TrackSizeInfo>;
-    /** Recording track is always full height */
-    recordingHeight: number;
+    /** Clip track is always full height */
+    clipHeight: number;
     /** Deterministic total height for all visible tracks including gaps and padding */
     totalHeight: number;
 }
 
 export function useTrackSizing(): TrackSizingResult {
     const displaySettings = useProjectStore(s => s.project.timeline.displaySettings) ?? {
-        showZoom: true, showSpotlight: true, showCameraMove: true, showOverlay: true, collapsed: false,
+        showZoom: true, showSpotlight: true, showCameraMove: true, showBlur: true, collapsed: false,
     };
     const hoveredTrack = useUIStore(s => s.hoveredTrack);
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
@@ -79,14 +79,14 @@ export function useTrackSizing(): TrackSizingResult {
                 tracks[key] = { height: TRACK_HEIGHT, isCollapsed: false };
             }
 
-            // Recording + visible effect tracks
+            // Clip + visible effect tracks
             const visibleCount = 1 + visibleEffects.length;
             const totalHeight = RULER_HEIGHT
                 + visibleCount * TRACK_HEIGHT
                 + (visibleCount > 0 ? (visibleCount - 1) * TRACK_GAP : 0)
                 + TRACK_GAP * 2;
 
-            return { tracks, recordingHeight: TRACK_HEIGHT, totalHeight };
+            return { tracks, clipHeight: TRACK_HEIGHT, totalHeight };
         }
 
         // Hover-to-expand mode: one expanded + rest collapsed
@@ -103,17 +103,17 @@ export function useTrackSizing(): TrackSizingResult {
             }
         }
 
-        // Recording always full + effect tracks
+        // Clip always full + effect tracks
         const visibleCount = 1 + visibleEffects.length;
         const collapsedCount = Math.max(0, visibleEffects.length - 1);
         const expandedCount = visibleEffects.length > 0 ? 1 : 0;
         const totalHeight = RULER_HEIGHT
-            + TRACK_HEIGHT  // recording
+            + TRACK_HEIGHT  // clip
             + expandedCount * TRACK_HEIGHT
             + collapsedCount * COLLAPSED_HEIGHT
             + (visibleCount > 0 ? (visibleCount - 1) * TRACK_GAP : 0)
             + TRACK_GAP * 2;
 
-        return { tracks, recordingHeight: TRACK_HEIGHT, totalHeight };
+        return { tracks, clipHeight: TRACK_HEIGHT, totalHeight };
     }, [displaySettings, hoveredTrack, hasCameraSource]);
 }

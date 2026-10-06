@@ -3,17 +3,17 @@
  * account (plans/admin-user-impersonation-oneshot.md). Only mounts once
  * AdminPage's gate has confirmed the caller is an admin.
  *
- * One fetch (admin-project-list, ~100 rows, newest-updated first). Each
- * row shows the project, its owner, the recording length, and an icon
- * per feature the project carries (camera, mic, captions, zooms,
- * spotlights, and each overlay type: blurs, text, arrows, outlines) —
- * primary-coloured and bold when present, faded when absent. Clicking a row mints an
+ * Paged fetch (admin-project-list, 100 rows a page, newest-updated
+ * first); "Load more" appends the next page, keyed off the last row.
+ * Each row shows the project, its owner, the recording length, and an
+ * icon per feature the project carries (camera, mic, captions, zooms,
+ * spotlights, blurs) — primary-coloured and bold when present, faded when absent. Clicking a row mints an
  * impersonation token for the OWNER and reboots the app straight into
  * that project's editor, so the admin sees exactly what the owner sees.
  */
 import { useEffect, useState } from 'react';
-import { LuArrowUpRight, LuCamera, LuCaptions, LuLightbulb, LuLoader, LuMic, LuType, LuZoomIn } from 'react-icons/lu';
-import { TbBlur, TbBorderOuter } from 'react-icons/tb';
+import { LuCamera, LuCaptions, LuLightbulb, LuLoader, LuMic, LuZoomIn } from 'react-icons/lu';
+import { TbBlur } from 'react-icons/tb';
 import { Button, Tooltip } from '@shared/components';
 import type { AdminProjectSummary } from '@shared/api';
 import { invokeFunction } from '../../api/client';
@@ -25,8 +25,7 @@ import { timeAgo } from '../dashboard/timeAgo';
 type Status = 'loading' | 'ready' | 'error';
 
 type FeatureKey =
-    | 'has_camera' | 'has_mic' | 'has_captions' | 'has_zooms' | 'has_spotlights'
-    | 'has_blurs' | 'has_text' | 'has_arrows' | 'has_outlines';
+    | 'has_camera' | 'has_mic' | 'has_captions' | 'has_zooms' | 'has_spotlights' | 'has_blurs';
 
 /** Same glyphs the editor uses for each feature, so they read as the same thing. */
 const FEATURES: Array<{ key: FeatureKey; label: string; icon: typeof LuCamera }> = [
@@ -36,9 +35,6 @@ const FEATURES: Array<{ key: FeatureKey; label: string; icon: typeof LuCamera }>
     { key: 'has_zooms', label: 'Zooms', icon: LuZoomIn },
     { key: 'has_spotlights', label: 'Spotlights', icon: LuLightbulb },
     { key: 'has_blurs', label: 'Blurs', icon: TbBlur },
-    { key: 'has_text', label: 'Text', icon: LuType },
-    { key: 'has_arrows', label: 'Arrows', icon: LuArrowUpRight },
-    { key: 'has_outlines', label: 'Outlines', icon: TbBorderOuter },
 ];
 
 /** Icons draw at stroke 2; present features go heavier so they stand out from the faded ones. */
@@ -69,6 +65,9 @@ function FeatureIcons({ project }: { project: AdminProjectSummary }) {
 export function RecentProjectsPanel() {
     const [status, setStatus] = useState<Status>('loading');
     const [projects, setProjects] = useState<AdminProjectSummary[]>([]);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [loadMoreFailed, setLoadMoreFailed] = useState(false);
     const [openingId, setOpeningId] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -80,9 +79,27 @@ export function RecentProjectsPanel() {
                 return;
             }
             setProjects(data.projects);
+            setHasMore(data.hasMore);
             setStatus('ready');
         })();
     }, []);
+
+    const loadMore = async () => {
+        const last = projects[projects.length - 1];
+        if (loadingMore || !last) return;
+        setLoadingMore(true);
+        setLoadMoreFailed(false);
+        const { data, error } = await invokeFunction('admin-project-list', {
+            before: { updatedAt: last.updated_at, id: last.id },
+        });
+        setLoadingMore(false);
+        if (error || !data) {
+            setLoadMoreFailed(true);
+            return;
+        }
+        setProjects(prev => [...prev, ...data.projects]);
+        setHasMore(data.hasMore);
+    };
 
     const open = async (project: AdminProjectSummary) => {
         if (openingId) return;
@@ -165,6 +182,17 @@ export function RecentProjectsPanel() {
                                 );
                             })}
                         </ul>
+                    )}
+
+                    {hasMore && (
+                        <div className="flex flex-col items-center gap-2 mt-3">
+                            {loadMoreFailed && (
+                                <p className="text-sm text-destructive" role="alert">Failed to load more projects.</p>
+                            )}
+                            <Button variant="base" disabled={loadingMore} onClick={loadMore}>
+                                {loadingMore ? 'Loading...' : 'Load more'}
+                            </Button>
+                        </div>
                     )}
                 </>
             )}

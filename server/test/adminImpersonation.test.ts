@@ -167,12 +167,7 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
                     captionSegments: [{ id: 'c' }],
                     zoomSegments: [{ id: 'z' }],
                     spotlightSegments: [{ id: 's' }],
-                    overlaySegments: [
-                        { id: 'o1', item: { type: 'text' } },
-                        { id: 'o2', item: { type: 'blur' } },
-                        { id: 'o3', item: { type: 'arrow' } },
-                        { id: 'o4', item: { type: 'border' } },
-                    ],
+                    blurSegments: [{ id: 'b', regions: [{ id: 'r' }] }],
                 },
             },
         });
@@ -184,13 +179,13 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             updatedAt: new Date(now - 60_000).toISOString(),
             projectData: {},
         });
-        // A single overlay type — each overlay flag must match only its own type
-        const outlined = await seedProject(pool, {
+        // Pre-blur-track project: legacy overlays don't count as blurs
+        const legacy = await seedProject(pool, {
             ownerId: owner.id,
             uploadStatus: 'ready',
-            name: 'Outlined project',
+            name: 'Legacy overlay project',
             updatedAt: new Date(now - 30_000).toISOString(),
-            projectData: { timeline: { overlaySegments: [{ id: 'o', item: { type: 'border' } }] } },
+            projectData: { timeline: { overlaySegments: [{ id: 'o', item: { type: 'blur' } }] } },
         });
         // Not openable: trashed, and upload never finished
         const trashed = await seedProject(pool, {
@@ -203,7 +198,7 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             ownerId: owner.id,
             updatedAt: new Date(now).toISOString(),
         });
-        createdProjects.push(rich.id, bare.id, outlined.id, trashed.id, pending.id);
+        createdProjects.push(rich.id, bare.id, legacy.id, trashed.id, pending.id);
 
         const res = await post(testApp(), '/admin-project-list', await userToken({ email: ADMIN_EMAIL }));
         expect(res.statusCode).toBe(200);
@@ -222,18 +217,15 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
                 has_zooms: boolean;
                 has_spotlights: boolean;
                 has_blurs: boolean;
-                has_text: boolean;
-                has_arrows: boolean;
-                has_outlines: boolean;
             }>;
         };
 
         const richRow = projects.find(p => p.id === rich.id);
         const bareRow = projects.find(p => p.id === bare.id);
-        const outlinedRow = projects.find(p => p.id === outlined.id);
+        const legacyRow = projects.find(p => p.id === legacy.id);
         expect(richRow).toBeDefined();
         expect(bareRow).toBeDefined();
-        expect(outlinedRow).toBeDefined();
+        expect(legacyRow).toBeDefined();
         expect(projects.find(p => p.id === trashed.id)).toBeUndefined();
         expect(projects.find(p => p.id === pending.id)).toBeUndefined();
 
@@ -250,9 +242,6 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             has_zooms: true,
             has_spotlights: true,
             has_blurs: true,
-            has_text: true,
-            has_arrows: true,
-            has_outlines: true,
         });
         expect(bareRow).toMatchObject({
             duration_ms: null,
@@ -262,19 +251,38 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             has_zooms: false,
             has_spotlights: false,
             has_blurs: false,
-            has_text: false,
-            has_arrows: false,
-            has_outlines: false,
         });
-        expect(outlinedRow).toMatchObject({
-            has_blurs: false,
-            has_text: false,
-            has_arrows: false,
-            has_outlines: true,
-        });
+        expect(legacyRow).toMatchObject({ has_blurs: false });
         // Newest-updated first
         expect(projects.findIndex(p => p.id === rich.id))
             .toBeLessThan(projects.findIndex(p => p.id === bare.id));
+    });
+
+    it('pages the project list with an exclusive (updated_at, id) cursor', async () => {
+        const owner = await seedAuthUser(pool, { keepBootstrapWorkspace: true });
+        createdUsers.push(owner.id);
+        // Three rows sharing one timestamp: only the id tie-break orders them
+        const updatedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+        const seeded = await Promise.all(
+            [0, 1, 2].map(() => seedProject(pool, { ownerId: owner.id, uploadStatus: 'ready', updatedAt })),
+        );
+        createdProjects.push(...seeded.map(p => p.id));
+        const [cursor, ...rest] = seeded.map(p => p.id).sort().reverse();
+
+        const res = await post(testApp(), '/admin-project-list', await userToken({ email: ADMIN_EMAIL }), {
+            before: { updatedAt, id: cursor },
+        });
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as { projects: Array<{ id: string; updated_at: string }>; hasMore: boolean };
+
+        // The cursor row is excluded and its same-timestamp siblings come next, id descending
+        expect(body.projects.slice(0, 2).map(p => p.id)).toEqual(rest);
+        expect(body.projects.find(p => p.id === cursor)).toBeUndefined();
+        expect(body.projects.length).toBeLessThanOrEqual(100);
+        expect(typeof body.hasMore).toBe('boolean');
+        for (const p of body.projects) {
+            expect(new Date(p.updated_at).getTime()).toBeLessThanOrEqual(new Date(updatedAt).getTime());
+        }
     });
 
     it('lists subscribers with plan, status, cancellation and both start dates', async () => {

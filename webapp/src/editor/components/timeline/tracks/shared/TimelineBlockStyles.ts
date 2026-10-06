@@ -3,8 +3,9 @@ import type { CSSProperties } from 'react';
 // ============================================================================
 // TIMELINE BLOCK STYLES
 // Unified styling for all timeline track visual elements.
-// Color is driven by the CSS variable --block-bg, set on the container.
-// Hover changes --block-bg to primary-highlighted, cascading to all children.
+// Color is driven by the CSS variable --block-bg, set on the container from
+// the track's colour (trackBlockColor). Hover swaps it for the track's
+// highlighted variant, cascading to all children.
 // ============================================================================
 
 // ============= ICON CONSTANTS =============
@@ -18,8 +19,11 @@ export const MIN_BLOCK_LABEL_WIDTH_PX = 40;
 /** className for a block icon */
 export const blockIconClass = 'text-text-on-primary/70';
 
-/** className for a ghost block icon */
-export const ghostIconClass = 'text-text-on-secondary/70';
+/** className for text on a block (zoom factor, clip speed/duration) */
+export const blockLabelClass = `${blockIconClass} text-2xs leading-none whitespace-nowrap tabular-nums`;
+
+/** className for a ghost block icon — the translucent fill is pale on light theme, so follow text colour */
+export const ghostIconClass = 'text-text-main/70';
 
 // ============= SEGMENT RADIUS =============
 
@@ -39,6 +43,36 @@ export const blockBorder = {
     selected: 'border-2 !border-secondary',
 };
 
+// ============= TRACK COLORS =============
+
+/**
+ * Per-track block colour — tokens are --track-* in shared/theme/index.css.
+ * `base` goes on the block container; `hover` too, unless selected or disabled.
+ * Class strings stay literal so Tailwind picks them up.
+ */
+export const trackBlockColor = {
+    clip: {
+        base: '[--block-bg:var(--track-clip)]',
+        hover: 'hover:[--block-bg:var(--track-clip-highlighted)]',
+    },
+    zoom: {
+        base: '[--block-bg:var(--track-zoom)]',
+        hover: 'hover:[--block-bg:var(--track-zoom-highlighted)]',
+    },
+    spotlight: {
+        base: '[--block-bg:var(--track-spotlight)]',
+        hover: 'hover:[--block-bg:var(--track-spotlight-highlighted)]',
+    },
+    blur: {
+        base: '[--block-bg:var(--track-blur)]',
+        hover: 'hover:[--block-bg:var(--track-blur-highlighted)]',
+    },
+    camera: {
+        base: '[--block-bg:var(--track-camera)]',
+        hover: 'hover:[--block-bg:var(--track-camera-highlighted)]',
+    },
+};
+
 // ============= CONTAINER =============
 
 /** Cursor classes shared by all block containers */
@@ -47,10 +81,9 @@ export const containerCursors = {
     idle: 'cursor-grab',
 };
 
-/** Block container — absolute positioned with CSS color variable */
+/** Block container — absolute positioned; pair with a trackBlockColor entry */
 export const blockContainer = {
-    base: 'absolute flex items-center [--block-bg:var(--primary)]',
-    hoverClass: 'hover:[--block-bg:var(--primary-highlighted)]',
+    base: 'absolute flex items-center',
     ...containerCursors,
 };
 
@@ -62,10 +95,11 @@ export const resizeHandle = {
     width: 12,
 };
 
-/** Visible drag handle indicator that appears on hover */
+/** Visible drag handle indicator that appears on hover — only shown while the
+ *  block is hovered, so --block-bg already holds the highlighted track colour */
 export const dragHandleIndicator = {
     base: 'w-1 rounded-full transition-all duration-150 opacity-0 group-hover:opacity-100 border border-text-main/50',
-    defaultClass: 'bg-primary-highlighted',
+    defaultClass: 'bg-[var(--block-bg)]',
     selectedClass: 'bg-secondary',
     leftClass: 'border-r-0',
     rightClass: 'border-l-0',
@@ -85,7 +119,7 @@ export function holdShapeBase(height: number = BASE_HEIGHT): CSSProperties {
     };
 }
 
-/** Common semi-transparent shape for transition/fade segments */
+/** Common semi-transparent shape (ghost blocks, zoom-out indicator) */
 export function transitionShapeBase(height: number = BASE_HEIGHT): CSSProperties {
     return {
         height,
@@ -95,16 +129,7 @@ export function transitionShapeBase(height: number = BASE_HEIGHT): CSSProperties
 
 // ============= SEGMENT STYLES =============
 
-/** Transition segment base class (used for zoom transition-in, spotlight fades, camera layout transitions) */
-export const transitionSegment = {
-    base: `absolute flex-shrink-0 ${blockBorder.base} ${blockBorder.highlighted} transition-colors z-[5]`,
-    defaultClass: '',
-    selectedClass: blockBorder.selected,
-    hoverClass: '',
-    getStyle: (): CSSProperties => transitionShapeBase(),
-};
-
-/** Hold segment base class (used for zoom hold, spotlight hold, camera layout hold) */
+/** Hold segment — the solid body of every block */
 export const holdSegment = {
     base: `absolute flex-shrink-0 transition-colors z-10 ${blockBorder.base} ${blockBorder.highlighted}`,
     defaultClass: '',
@@ -115,39 +140,11 @@ export const holdSegment = {
 
 // ============= SEGMENT STYLE GETTERS =============
 
-/** Transition-in shape: left-rounded, semi-transparent, no right border */
-export function transitionInStyle(): CSSProperties {
-    return {
-        ...transitionShapeBase(),
-        borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-        borderRight: 'none',
-    };
-}
-
-/** Transition-out shape: right-rounded, semi-transparent, no left border */
-export function transitionOutStyle(): CSSProperties {
-    return {
-        ...transitionShapeBase(),
-        borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-        borderLeft: 'none',
-    };
-}
-
 /** Hold shape: solid fill, no border radius (inner edges) */
 export function holdStyle(): CSSProperties {
     return {
         ...holdShapeBase(),
         borderRadius: 0,
-    };
-}
-
-
-/** Spotlight fade shape: semi-transparent, no border radius, one border removed */
-export function fadeStyle(side: 'left' | 'right'): CSSProperties {
-    return {
-        ...transitionShapeBase(20),
-        borderRadius: 0,
-        ...(side === 'left' ? { borderRight: 'none' } : { borderLeft: 'none' }),
     };
 }
 
@@ -157,51 +154,31 @@ export function fadeStyle(side: 'left' | 'right'): CSSProperties {
 export const ghostLabel =
     'absolute bottom-[calc(100%+2px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-2xs text-secondary bg-black/90 px-1.5 py-0.5 rounded pointer-events-none';
 
-/** Base container class for ghost blocks */
+/** Base container class for ghost blocks — pair with a trackBlockColor entry */
 export const ghostContainerBase =
-    'absolute pointer-events-none z-25 flex items-center [--block-bg:var(--secondary)]';
+    'absolute pointer-events-none z-25 flex items-center';
 
-/** Ghost zoom block — transition-in + hold */
-export const ghostZoom = {
-    container: ghostContainerBase,
-    label: ghostLabel,
-    transitionIn: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => transitionInStyle(),
-    },
-    hold: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => ({
-            ...holdStyle(),
-            borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-        }),
-    },
+/** Ghost segment — single rounded segment, the track colour at half opacity */
+export const ghostBlock = {
+    className: blockBorder.base,
+    getStyle: (): CSSProperties => ({
+        ...transitionShapeBase(),
+        borderRadius: SEGMENT_RADIUS,
+    }),
 };
 
-/** Ghost spotlight block — fadeIn + hold + fadeOut */
-export const ghostSpotlight = {
-    container: ghostContainerBase,
+/** Ghost zoom block */
+export const ghostZoom = {
+    container: `${ghostContainerBase} ${trackBlockColor.zoom.base}`,
     label: ghostLabel,
-    fadeIn: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => ({
-            ...transitionShapeBase(),
-            borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
-            borderRight: 'none',
-        }),
-    },
-    hold: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => holdStyle(),
-    },
-    fadeOut: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => ({
-            ...transitionShapeBase(),
-            borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-            borderLeft: 'none',
-        }),
-    },
+    block: ghostBlock,
+};
+
+/** Ghost spotlight block */
+export const ghostSpotlight = {
+    container: `${ghostContainerBase} ${trackBlockColor.spotlight.base}`,
+    label: ghostLabel,
+    block: ghostBlock,
 };
 
 /** Ghost caption block — single rounded segment */
@@ -214,25 +191,11 @@ export const ghostCaption = {
     },
 };
 
-/** Ghost camera layout block — transitionIn + hold + transitionOut */
+/** Ghost camera layout block */
 export const ghostCameraMove = {
-    container: ghostContainerBase,
+    container: `${ghostContainerBase} ${trackBlockColor.camera.base}`,
     label: ghostLabel,
-    transitionIn: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => transitionInStyle(),
-    },
-    hold: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => ({
-            ...holdStyle(),
-            borderRadius: 0,
-        }),
-    },
-    transitionOut: {
-        className: blockBorder.base,
-        getStyle: (): CSSProperties => transitionOutStyle(),
-    },
+    block: ghostBlock,
 };
 
 // ============= ZOOM-OUT INDICATOR =============

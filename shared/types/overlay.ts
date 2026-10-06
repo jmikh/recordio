@@ -1,14 +1,13 @@
 /**
- * Overlay Types
+ * Overlay Item Types
  *
- * Data model for the overlay annotation system.
- * Overlays are visual annotations (blur, text, arrow, border) displayed on top of the video.
- * All spatial coordinates are in OUTPUT pixels (pinned to output viewport).
- * Temporal anchoring is source-time (via TimeSegment).
+ * Annotation items (blur, text, arrow, border) drawn by the screenshot editor
+ * (ScreenshotDoc.annotations). Video projects no longer carry overlays — they
+ * use blur segments (./blur.ts) instead.
+ * All spatial coordinates are in the host document's pixel space.
  */
 
 import type { ID, Point, Rect } from './core';
-import type { TimeSegment } from './timeline';
 
 // ==========================================
 // OVERLAY ITEM TYPES
@@ -98,13 +97,3 @@ export interface BorderOverlayItem extends BaseOverlayItem {
 
 /** Union of all overlay item types */
 export type OverlayItem = BlurOverlayItem | TextOverlayItem | ArrowOverlayItem | BorderOverlayItem;
-
-/**
- * An overlay segment is a time segment containing a single visual overlay.
- * Segments may overlap in time — shorter segments render on top.
- * Source-time anchored for trim/speed stability.
- */
-export interface OverlaySegment extends TimeSegment {
-    /** The single overlay item in this segment */
-    item: OverlayItem;
-}

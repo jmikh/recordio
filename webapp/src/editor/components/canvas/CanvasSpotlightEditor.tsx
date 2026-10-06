@@ -10,10 +10,11 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import { getZoomBoundsForRange } from '../../utils/zoomBounds';
+import { DEFAULT_SPOTLIGHT_FEATHER_PX } from '@shared/animators/spotlightAnimator';
 
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';
-import { drawOverlays } from '@shared/painters/overlayPainter';
+import { drawBlurs } from '@shared/painters/blurPainter';
 import type { Project } from '@shared/types';
 
 // ------------------------------------------------------------------
@@ -54,10 +55,9 @@ export const renderSpotlightEditor = (
     // Note: Camera is intentionally not rendered in spotlight edit mode
     // to avoid visual clutter while editing the spotlight region
 
-    // Render Overlay annotations (if any are active at this time)
-    const overlaySegments = project.timeline.overlaySegments || [];
-    if (overlaySegments.length > 0) {
-        drawOverlays(ctx, overlaySegments, state.currentTimeMs, outputSize, effectiveViewport);
+    // Render blur regions (if a blur segment is active at this time)
+    if (project.settings.blur?.enabled ?? true) {
+        drawBlurs(ctx, project.timeline.blurSegments || [], state.currentTimeMs, outputSize, effectiveViewport);
     }
 };
 
@@ -248,18 +248,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         project.settings.zoom,
     ]);
 
-    // Check if the spotlight exceeds the zoom bounds
-    const isOutOfBounds = useMemo(() => {
-        if (!zoomBoundsRect) return false;
-        const check = currentOutputRect;
-        return (
-            check.x < zoomBoundsRect.x - 1 ||
-            check.y < zoomBoundsRect.y - 1 ||
-            check.x + check.width > zoomBoundsRect.x + zoomBoundsRect.width + 1 ||
-            check.y + check.height > zoomBoundsRect.y + zoomBoundsRect.height + 1
-        );
-    }, [zoomBoundsRect, currentOutputRect]);
-
     // If zoom bounds are smaller than 1.2× the minimum spotlight size,
     // they're too tight to be useful — show a warning banner instead.
     const minSpotlightSize = Math.min(outputSize.width, outputSize.height) / 5;
@@ -278,7 +266,8 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
             <DimmedOverlay
                 holeRect={currentOutputRect}
                 cornerRadii={currentCornerRadii}
-                opacity={spotlight?.dimOpacity}
+                opacity={spotlight?.dimOpacity ?? project.settings.spotlight.dimOpacity}
+                featherPx={project.settings.spotlight.featherPx ?? DEFAULT_SPOTLIGHT_FEATHER_PX}
             />
 
             {/* Zoom Bounds: too-small warning banner */}
@@ -302,30 +291,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                     }}
                 >
                     ⚠ Spotlight may not display well — multiple zooms target different parts of the screen during this timeframe
-                </div>
-            )}
-
-            {/* Out-of-bounds warning banner */}
-            {isOutOfBounds && !zoomBoundsTooSmall && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 8,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        background: 'var(--surface-raised)',
-                        border: '1px solid var(--destructive)',
-                        color: 'var(--destructive)',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                    }}
-                >
-                    ⚠ Spotlight exceeds zoom area
                 </div>
             )}
 

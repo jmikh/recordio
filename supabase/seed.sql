@@ -254,7 +254,6 @@ VALUES (
                 "deviceFrameId": "macbook-air-dark",
                 "hasShadow": true,
                 "hasGlow": false,
-                "hasFeather": false,
                 "mute": false
             },
             "background": {
@@ -275,14 +274,7 @@ VALUES (
                 "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
             },
             "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
-            "overlay": {
-                "enabled": true,
-                "defaultDurationMs": 3000,
-                "blurDefaults": {"blurRadiusPx": 20},
-                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
-                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
-                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
-            },
+            "blur": {"enabled": true},
             "autoCutApplied": false
         },
         "timeline": {
@@ -293,9 +285,9 @@ VALUES (
             "spotlightSegments": [],
             "captionSegments": [],
             "cameraMoveSegments": [],
-            "overlaySegments": [],
+            "blurSegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showBlur": true, "collapsed": false}
         }
     }'::jsonb,
     'ready', 1, 5000
@@ -336,7 +328,6 @@ VALUES (
                 "deviceFrameId": "macbook-air-dark",
                 "hasShadow": true,
                 "hasGlow": false,
-                "hasFeather": false,
                 "mute": false
             },
             "background": {
@@ -356,14 +347,7 @@ VALUES (
                 "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
             },
             "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
-            "overlay": {
-                "enabled": true,
-                "defaultDurationMs": 3000,
-                "blurDefaults": {"blurRadiusPx": 20},
-                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
-                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
-                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
-            },
+            "blur": {"enabled": true},
             "autoCutApplied": false
         },
         "timeline": {
@@ -374,9 +358,9 @@ VALUES (
             "spotlightSegments": [],
             "captionSegments": [],
             "cameraMoveSegments": [],
-            "overlaySegments": [],
+            "blurSegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showBlur": true, "collapsed": false}
         }
     }'::jsonb,
     'ready', 1, 8000
@@ -417,7 +401,6 @@ VALUES (
                 "deviceFrameId": "macbook-air-dark",
                 "hasShadow": true,
                 "hasGlow": false,
-                "hasFeather": false,
                 "mute": false
             },
             "background": {
@@ -437,14 +420,7 @@ VALUES (
                 "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
             },
             "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
-            "overlay": {
-                "enabled": true,
-                "defaultDurationMs": 3000,
-                "blurDefaults": {"blurRadiusPx": 20},
-                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
-                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
-                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
-            },
+            "blur": {"enabled": true},
             "autoCutApplied": false
         },
         "timeline": {
@@ -455,9 +431,9 @@ VALUES (
             "spotlightSegments": [],
             "captionSegments": [],
             "cameraMoveSegments": [],
-            "overlaySegments": [],
+            "blurSegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showBlur": true, "collapsed": false}
         }
     }'::jsonb,
     'ready', 1, 6000
@@ -498,7 +474,6 @@ VALUES (
                 "deviceFrameId": "macbook-air-dark",
                 "hasShadow": false,
                 "hasGlow": false,
-                "hasFeather": false,
                 "mute": false
             },
             "background": {
@@ -518,14 +493,7 @@ VALUES (
                 "music": {"enabled": false, "source": "preset", "volume": 0.3, "fadeOutDurationMs": 3000}
             },
             "cameraMove": {"enabled": true, "transitionDurationMs": 500, "easing": "ease-in-out"},
-            "overlay": {
-                "enabled": true,
-                "defaultDurationMs": 3000,
-                "blurDefaults": {"blurRadiusPx": 20},
-                "textDefaults": {"color": "#454545", "backgroundColor": "#ffdb57", "fontSizePx": 0},
-                "arrowDefaults": {"color": "#7B61FF", "strokeWidthPx": 4},
-                "borderDefaults": {"color": "#7B61FF", "borderWidthPx": 4}
-            },
+            "blur": {"enabled": true},
             "autoCutApplied": false
         },
         "timeline": {
@@ -536,9 +504,9 @@ VALUES (
             "spotlightSegments": [],
             "captionSegments": [],
             "cameraMoveSegments": [],
-            "overlaySegments": [],
+            "blurSegments": [],
             "focusAreas": [],
-            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showOverlay": true, "collapsed": false}
+            "displaySettings": {"showZoom": true, "showSpotlight": true, "showCameraMove": true, "showBlur": true, "collapsed": false}
         }
     }'::jsonb,
     'ready', 1, 3000

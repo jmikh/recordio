@@ -13,7 +13,7 @@ export const CanvasMode = {
     ZoomEdit: 'zoomEdit',
     SpotlightEdit: 'spotlightEdit',
     CaptionEdit: 'captionEdit',
-    OverlayEdit: 'overlayEdit',
+    BlurEdit: 'blurEdit',
 } as const;
 export type CanvasMode = typeof CanvasMode[keyof typeof CanvasMode];
 
@@ -33,7 +33,9 @@ export interface UIState {
     selectedWindowId: ID | null;
     selectedCaptionId: ID | null;
     selectedCameraMoveId: ID | null;
-    selectedOverlaySegmentId: ID | null;
+    selectedBlurSegmentId: ID | null;
+    /** The region of the selected blur segment that the canvas edits (handles + inspector delete) */
+    selectedBlurRegionId: ID | null;
     selectedSettingsPanel: SettingsPanel;
     isResizingWindow: boolean;
 
@@ -44,7 +46,9 @@ export interface UIState {
     selectSpotlight: (id: ID | null) => void;
     selectCaption: (id: ID | null) => void;
     selectCameraMove: (id: ID | null) => void;
-    selectOverlaySegment: (blockId: ID | null) => void;
+    /** Selects a blur segment and one of its regions (default: its first region) */
+    selectBlurSegment: (segmentId: ID | null, regionId?: ID) => void;
+    selectBlurRegion: (regionId: ID | null) => void;
     deselectAllSegments: () => void;
     setSettingsPanel: (panel: SettingsPanel) => void;
 
@@ -131,7 +135,7 @@ export interface UIState {
     hoveredTrack: string | null;
     setHoveredTrack: (track: string | null) => void;
 
-    // Scissors Hover (show floating scissors on recording track)
+    // Scissors Hover (show floating scissors on clip track)
     isScissorsHovered: boolean;
     setScissorsHovered: (hovered: boolean) => void;
 
@@ -153,7 +157,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     selectedWindowId: null,
     selectedCaptionId: null,
     selectedCameraMoveId: null,
-    selectedOverlaySegmentId: null,
+    selectedBlurSegmentId: null,
+    selectedBlurRegionId: null,
     selectedSettingsPanel: SettingsPanel.Screen,
     settingsPanelActiveTab: 'screen' as SettingsPanelTab,
     isResizingWindow: false,
@@ -163,7 +168,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     // Selection Actions
     setCanvasMode: (canvasMode) => set({
         canvasMode,
-        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null } : { isPlaying: false })
+        ...(canvasMode === CanvasMode.Preview ? { selectedZoomId: null, selectedSpotlightId: null, selectedWindowId: null, selectedCameraMoveId: null, selectedBlurSegmentId: null, selectedBlurRegionId: null } : { isPlaying: false })
     }),
 
     selectWindow: (selectedWindowId) => {
@@ -172,7 +177,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectCameraMove(null);
-            get().selectOverlaySegment(null);
+            get().selectBlurSegment(null);
             set({ highlightRange: null });
         }
         set({
@@ -187,19 +192,16 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
-            get().selectOverlaySegment(null);
+            get().selectBlurSegment(null);
             set({ highlightRange: null });
         }
         set((state) => {
             if (selectedZoomId) {
-                // The zoom is edited in the Motion tab's Zoom card (badged
-                // "1 selected"), so open and expand it rather than swapping
-                // the panel for a separate inspector.
+                // The settings panel swaps to just the Zoom card; expand it
                 return {
                     selectedZoomId,
                     canvasMode: CanvasMode.ZoomEdit,
                     isPlaying: false,
-                    settingsPanelActiveTab: 'motion' as SettingsPanelTab,
                     showCollapsibleZoom: true,
                 };
             }
@@ -213,18 +215,16 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCaption(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
-            get().selectOverlaySegment(null);
+            get().selectBlurSegment(null);
             set({ highlightRange: null });
         }
         set((state) => {
             if (selectedSpotlightId) {
-                // Edited in the Motion tab's Spotlight card (badged
-                // "1 selected"), same as a selected zoom.
+                // Same as a selected zoom: the panel shows just the Spotlight card
                 return {
                     selectedSpotlightId,
                     canvasMode: CanvasMode.SpotlightEdit,
                     isPlaying: false,
-                    settingsPanelActiveTab: 'motion' as SettingsPanelTab,
                     showCollapsibleSpotlight: true,
                 };
             }
@@ -238,7 +238,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectWindow(null);
             get().selectCameraMove(null);
-            get().selectOverlaySegment(null);
+            get().selectBlurSegment(null);
             set({ highlightRange: null });
         }
         set(() => {
@@ -261,7 +261,7 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectSpotlight(null);
             get().selectCaption(null);
             get().selectWindow(null);
-            get().selectOverlaySegment(null);
+            get().selectBlurSegment(null);
             set({ highlightRange: null });
         }
         set((state) => {
@@ -282,12 +282,12 @@ export const useUIStore = create<UIState>((set, get) => ({
         get().selectWindow(null);
         get().selectCaption(null);
         get().selectCameraMove(null);
-        get().selectOverlaySegment(null);
+        get().selectBlurSegment(null);
         set({ canvasMode: CanvasMode.Preview, highlightRange: null });
     },
 
-    selectOverlaySegment: (selectedOverlaySegmentId) => {
-        if (selectedOverlaySegmentId) {
+    selectBlurSegment: (selectedBlurSegmentId, regionId) => {
+        if (selectedBlurSegmentId) {
             get().selectZoom(null);
             get().selectSpotlight(null);
             get().selectCaption(null);
@@ -295,22 +295,26 @@ export const useUIStore = create<UIState>((set, get) => ({
             get().selectCameraMove(null);
             set({ highlightRange: null });
         }
-        set((state) => {
-            if (selectedOverlaySegmentId) {
+        set(() => {
+            if (selectedBlurSegmentId) {
+                const segment = useProjectStore.getState().project.timeline.blurSegments
+                    .find(s => s.id === selectedBlurSegmentId);
                 return {
-                    selectedOverlaySegmentId,
-                    canvasMode: CanvasMode.OverlayEdit,
+                    selectedBlurSegmentId,
+                    selectedBlurRegionId: regionId ?? segment?.regions[0]?.id ?? null,
+                    canvasMode: CanvasMode.BlurEdit,
                     isPlaying: false,
                 };
             }
             return {
-                selectedOverlaySegmentId: null,
+                selectedBlurSegmentId: null,
+                selectedBlurRegionId: null,
                 canvasMode: CanvasMode.Preview,
             };
         });
     },
 
-
+    selectBlurRegion: (selectedBlurRegionId) => set({ selectedBlurRegionId }),
 
     setSettingsPanel: (selectedSettingsPanel) => set({ selectedSettingsPanel }),
     setSettingsPanelActiveTab: (settingsPanelActiveTab) => set({ settingsPanelActiveTab }),
@@ -337,7 +341,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     setPixelsPerSec: (pixelsPerSec) => set({ pixelsPerSec }),
 
-    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null, selectedOverlaySegmentId: null }),
+    setIsPlaying: (isPlaying) => set({ isPlaying, canvasMode: CanvasMode.Preview, selectedZoomId: null, selectedSpotlightId: null, selectedCameraMoveId: null, selectedBlurSegmentId: null, selectedBlurRegionId: null }),
     setCurrentTime: (currentTimeMs) => {
         const state = get();
         const container = state.timelineContainerRef?.current;
@@ -442,7 +446,7 @@ export const useUIStore = create<UIState>((set, get) => ({
         if (highlightRange) {
             const s = get();
             // Only deselect if something is actually selected
-            if (s.selectedZoomId || s.selectedSpotlightId || s.selectedWindowId || s.selectedCaptionId || s.selectedCameraMoveId || s.selectedOverlaySegmentId) {
+            if (s.selectedZoomId || s.selectedSpotlightId || s.selectedWindowId || s.selectedCaptionId || s.selectedCameraMoveId || s.selectedBlurSegmentId) {
                 s.deselectAllSegments();
             }
         }
@@ -458,7 +462,8 @@ export const useUIStore = create<UIState>((set, get) => ({
             selectedWindowId: null,
             selectedCaptionId: null,
             selectedCameraMoveId: null,
-            selectedOverlaySegmentId: null,
+            selectedBlurSegmentId: null,
+            selectedBlurRegionId: null,
             selectedSettingsPanel: SettingsPanel.Screen,
             settingsPanelActiveTab: 'screen' as SettingsPanelTab,
             timelineContainerRef: null,

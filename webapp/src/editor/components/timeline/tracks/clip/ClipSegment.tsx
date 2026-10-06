@@ -2,11 +2,11 @@ import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { OutputWindow } from '@shared/types';
 import { StaticAudioWave } from './StaticAudioWave';
-import { blockBorder, holdShapeBase, resizeHandle, dragHandleIndicator, SEGMENT_RADIUS } from '../shared/TimelineBlockStyles';
+import { blockBorder, holdShapeBase, resizeHandle, dragHandleIndicator, trackBlockColor, blockLabelClass, MIN_BLOCK_LABEL_WIDTH_PX, SEGMENT_RADIUS } from '../shared/TimelineBlockStyles';
 import type { DragState } from './useWindowDrag';
 import type { AudioAnalysisResult } from '../../../../hooks/useAudioAnalysis';
 
-interface RecordingSegmentProps {
+interface ClipSegmentProps {
     outputWindow: OutputWindow;
     dragState: DragState | null;
     isSelected: boolean;
@@ -24,7 +24,7 @@ interface RecordingSegmentProps {
     containerWidth: number;
 }
 
-export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
+export const ClipSegment: React.FC<ClipSegmentProps> = ({
     outputWindow: seg,
     dragState,
     isSelected,
@@ -91,7 +91,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
 
     return (
         <div
-            className={`absolute z-10 hover:z-[15] [--block-bg:var(--primary)] ${!isSelected ? 'hover:[--block-bg:var(--primary-highlighted)]' : ''} group`}
+            className={`absolute z-10 hover:z-[15] ${trackBlockColor.clip.base} ${!isSelected ? trackBlockColor.clip.hover : ''} group`}
             style={{ 
                 left: `${left}px`, 
                 width: `${width}px`, 
@@ -131,10 +131,10 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                 </div>
 
                 {/* Speed & Duration Labels (overlaid on the block) */}
-                {width >= 40 && (
-                    <div className="absolute top-[1px] left-[1px] z-20 px-1.5 py-0.5 flex items-center gap-1.5 text-xs text-white select-none pointer-events-none bg-black/40 rounded-lg">
+                {width >= MIN_BLOCK_LABEL_WIDTH_PX && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center gap-1.5 select-none pointer-events-none">
                         {/* Speed indicator */}
-                        <span className="opacity-80">
+                        <span className={blockLabelClass}>
                             {(() => {
                                 const speed = win.speed || 1.0;
                                 const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
@@ -143,7 +143,7 @@ export const RecordingSegment: React.FC<RecordingSegmentProps> = ({
                         </span>
 
                         {/* Duration - hide if window too small */}
-                        {width >= 70 && <span className="opacity-80">{(outputDurationMs / 1000).toFixed(1)}s</span>}
+                        {width >= 70 && <span className={blockLabelClass}>{(outputDurationMs / 1000).toFixed(1)}s</span>}
                     </div>
                 )}
             </div>

@@ -1,11 +1,9 @@
 /**
- * Default overlay item factory, shared by the video editor (items sized
- * to the output frame) and the screenshot editor (items sized to the
- * visible/cropped area — plans/screenshots).
+ * Default annotation item factory for the screenshot editor (items sized to
+ * the visible/cropped area — plans/screenshots).
  */
-import type { Rect, Size } from '@shared/types';
+import type { Rect } from '@shared/types';
 import type { OverlayItem, OverlayItemType } from '@shared/types/overlay';
-import type { OverlaySettings } from '@shared/types/settings';
 import type { AnnotationDefaults } from '@shared/types/screenshot';
 
 // Hardcoded fallbacks for projects without saved defaults
@@ -70,6 +68,3 @@ export const createDefaultItemInRect = (type: OverlayItemType, area: Rect, defau
     }
 };
 
-/** Video editor form: a new item centred in the output frame. */
-export const createDefaultItem = (type: OverlayItemType, outputSize: Size, overlaySettings: OverlaySettings): OverlayItem =>
-    createDefaultItemInRect(type, { x: 0, y: 0, width: outputSize.width, height: outputSize.height }, overlaySettings);

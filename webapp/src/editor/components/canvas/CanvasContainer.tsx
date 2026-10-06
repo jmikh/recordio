@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
@@ -15,30 +15,39 @@ import { SpotlightEditor, renderSpotlightEditor } from './CanvasSpotlightEditor'
 import { renderCropEditor, CropEditor } from './CanvasCropEditor';
 import { CameraEditor, renderCameraEditor } from './CanvasCameraEditor';
 import { CameraMoveEditor, renderCameraMoveEditor } from './CanvasCameraMoveEditor';
-import { OverlayEditor, renderOverlayEditor } from './CanvasOverlayEditor';
+import { BlurEditor, renderBlurEditor } from './CanvasBlurEditor';
 import { CanvasHoverLayer } from './CanvasHoverLayer';
 import { drawBackground } from '@shared/painters/backgroundPainter';
 
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
 
-import type { BackgroundSettings, CameraSettings, Rect, SourceMetadata } from '@shared/types';
-import type { OverlayItem } from '@shared/types/overlay';
+import type { BackgroundSettings, BlurRegion, CameraSettings, Rect, SourceMetadata } from '@shared/types';
+import { useCameraMaskPlayer } from '../../cameraMatte/useCameraMaskPlayer';
+import { withCameraMask } from '../../cameraMatte/MaskPlayer';
 
 /** Breathing room between the letterboxed rect and the canvas itself.
  *  Shared with the editor's loading placeholder so the two line up. */
 export const CANVAS_INSET_PX = 8;
 
-export const CanvasContainer = () => {
+interface CanvasContainerProps {
+    /** Layered over the canvas, inside its aspect rect (e.g. the loading overlay). */
+    children?: ReactNode;
+}
+
+export const CanvasContainer = ({ children }: CanvasContainerProps) => {
     const project = useProjectData();
     const canvasMode = useUIStore(s => s.canvasMode);
     const activeZoomId = useUIStore(s => s.selectedZoomId);
     const activeSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const activeCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
-    const activeOverlayBlockId = useUIStore(s => s.selectedOverlaySegmentId);
+    const activeBlurSegmentId = useUIStore(s => s.selectedBlurSegmentId);
 
     // Background music sync with playback
     useBackgroundMusic();
+
+    // Decodes the camera's person mask for playback while background removal is active
+    const maskPlayerRef = useCameraMaskPlayer();
 
     // Derived State
     const outputVideoSize = project?.settings?.outputSize || { width: 1920, height: 1080 };
@@ -81,7 +90,7 @@ export const CanvasContainer = () => {
     const previewCameraSettingsRef = useRef<CameraSettings | null>(null);
     const previewZoomRectRef = useRef<Rect | null>(null);
     const previewSpotlightRectRef = useRef<Rect | null>(null);
-    const previewOverlayItemRef = useRef<OverlayItem | null>(null);
+    const previewBlurRegionRef = useRef<BlurRegion | null>(null);
     const aspectWrapperRef = useRef<HTMLDivElement | null>(null);
 
     // Update canvas container size in UI store for DisplayMapper
@@ -157,7 +166,7 @@ export const CanvasContainer = () => {
 
             const uiState = useUIStore.getState();
             const { project } = useProjectStore.getState();
-            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraMoveId: activeCameraMoveId, selectedOverlaySegmentId: activeOverlayBlockId } = uiState;
+            const { canvasMode, selectedZoomId: activeZoomId, selectedSpotlightId: activeSpotlightId, selectedCameraMoveId: activeCameraMoveId, selectedBlurSegmentId: activeBlurSegmentId } = uiState;
 
             // Build sources from project
             const sources: Record<string, SourceMetadata> = {};
@@ -256,7 +265,8 @@ export const CanvasContainer = () => {
                     ctx,
                     renderCtx: browserRenderContext,
                     bgRef: bgRef.current,
-                    videoRefs: internalVideoRefs.current,
+                    // Background removal pairs the camera frame with its own mask
+                    videoRefs: withCameraMask(project, internalVideoRefs.current, maskPlayerRef.current),
                     deviceFrameImg: deviceFrameRef.current,
                     sourceCanvas: canvas
                 };
@@ -293,14 +303,11 @@ export const CanvasContainer = () => {
                             currentTimeMs: effectiveTimeMs,
                             overrideCameraSettings: previewCameraSettingsRef.current
                         });
-                    } else if (canvasMode === CanvasMode.OverlayEdit && activeOverlayBlockId) {
-                        // Find the selected segment's item id for editingItemId
-                        const overlayBlock = project.timeline.overlaySegments?.find((b: any) => b.id === activeOverlayBlockId);
-                        renderOverlayEditor(resources, {
+                    } else if (canvasMode === CanvasMode.BlurEdit && activeBlurSegmentId) {
+                        renderBlurEditor(resources, {
                             project,
-                            currentTimeMs: effectiveTimeMs,
-                            editingItemId: overlayBlock?.item?.id ?? null,
-                            overrideOverlayItem: previewOverlayItemRef.current,
+                            editingSegmentId: activeBlurSegmentId,
+                            previewRegion: previewBlurRegionRef.current,
                         });
                     } else {
                         const userEvents = useProjectStore.getState().userEvents;
@@ -324,8 +331,14 @@ export const CanvasContainer = () => {
                     }
                 });
 
-                // Thumbnail capture — only in playback mode, scaled to 480px webp
-                if (pendingThumbnailCaptureRef.current && canvasMode === CanvasMode.Preview) {
+                // Thumbnail capture — only in playback mode, scaled to 480px webp.
+                // The canvas mounts before media hydrates, so hold the capture
+                // until the screen video has painted a real frame.
+                const screenVideo = internalVideoRefs.current[project.screenSource.storagePath];
+                const hasScreenFrame = !!screenVideo
+                    && screenVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+                    && !screenVideo.seeking;
+                if (pendingThumbnailCaptureRef.current && canvasMode === CanvasMode.Preview && hasScreenFrame) {
                     pendingThumbnailCaptureRef.current = false;
                     lastCapturedBgRef.current = { ...project.settings.background };
                     const thumbMaxW = 480;
@@ -347,7 +360,7 @@ export const CanvasContainer = () => {
 
         animationFrameRef.current = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(animationFrameRef.current);
-    }, []);
+    }, [maskPlayerRef]);
 
     // -----------------------------------------------------------
     // LAYOUT & SIZING
@@ -413,7 +426,7 @@ export const CanvasContainer = () => {
         canvasMode === CanvasMode.SpotlightEdit ||
         canvasMode === CanvasMode.CameraEdit ||
         canvasMode === CanvasMode.CameraMoveEdit ||
-        canvasMode === CanvasMode.OverlayEdit;
+        canvasMode === CanvasMode.BlurEdit;
 
     return (
         <div
@@ -520,7 +533,7 @@ export const CanvasContainer = () => {
                     className="block w-full h-full object-contain"
                 />
 
-                {/* Canvas hover targets (camera first, then overlays) */}
+                {/* Canvas hover targets (camera first, then blur regions) */}
                 <CanvasHoverLayer />
 
                 {/* CROP OVERLAY (Highest Priority) */}
@@ -552,10 +565,12 @@ export const CanvasContainer = () => {
                     <CameraMoveEditor cameraRef={previewCameraSettingsRef} />
                 )}
 
-                {/* OVERLAY EDITOR */}
-                {canvasMode === CanvasMode.OverlayEdit && activeOverlayBlockId && (
-                    <OverlayEditor previewItemRef={previewOverlayItemRef} />
+                {/* BLUR EDITOR */}
+                {canvasMode === CanvasMode.BlurEdit && activeBlurSegmentId && (
+                    <BlurEditor previewRegionRef={previewBlurRegionRef} />
                 )}
+
+                {children}
             </div>
         </div>
     );

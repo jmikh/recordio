@@ -8,10 +8,10 @@ import { getTimeMapper } from '../../../../hooks/useTimeMapper';
 import { TimePixelMapper } from '../../../../utils/timePixelMapper';
 import { useWindowDrag } from './useWindowDrag';
 import { LuScissors } from 'react-icons/lu';
-import { RecordingSegment } from './RecordingSegment';
+import { ClipSegment } from './ClipSegment';
 
 
-interface RecordingTrackProps {
+interface ClipTrackProps {
     timeline: TimelineType;
     pixelsPerSec: number;
     trackHeight: number;
@@ -19,7 +19,8 @@ interface RecordingTrackProps {
     containerWidth: number;
 }
 
-export const RecordingTrack: React.FC<RecordingTrackProps> = ({
+/** Clip track — the always-visible main row; each clip is one `timeline.outputWindows` entry. */
+export const ClipTrack: React.FC<ClipTrackProps> = ({
     timeline,
     pixelsPerSec,
     trackHeight,
@@ -81,7 +82,7 @@ export const RecordingTrack: React.FC<RecordingTrackProps> = ({
                     const isMuted = project.settings.screen?.mute ?? false;
 
                     return (
-                        <RecordingSegment
+                        <ClipSegment
                             key={seg.id}
                             outputWindow={seg}
                             dragState={dragState}

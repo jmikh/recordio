@@ -83,7 +83,7 @@ describe('keepOnlyEditableDefaults', () => {
         s.spotlight.enabled = false;
         s.spotlight.defaultHoldDurationMs = 4000;
         s.cameraMove = { ...s.cameraMove!, transitionDurationMs: 4321 };
-        s.overlay = { ...s.overlay!, defaultDurationMs: 9000 };
+        s.blur = { enabled: false };
         const snapshot = structuredClone(s);
 
         const out = keepOnlyEditableDefaults(s);
@@ -109,7 +109,7 @@ describe('keepOnlyEditableDefaults', () => {
         // only reachable from the timeline inspectors
         expect(out.spotlight.defaultHoldDurationMs).toBe(factory.spotlight.defaultHoldDurationMs);
         expect(out.cameraMove).toEqual(factory.cameraMove);
-        expect(out.overlay).toEqual(factory.overlay);
+        expect(out.blur).toEqual(factory.blur);
 
         expect(s).toEqual(snapshot);
     });
@@ -178,7 +178,7 @@ describe('resolveProjectDefaults', () => {
             } as never,
         });
 
-        expect(resolved.overlay).toEqual(factory.overlay);
+        expect(resolved.blur).toEqual(factory.blur);
         expect(resolved.zoom).toEqual(factory.zoom);
         expect(resolved.background.type).toBe('custom');
         expect(resolved.background.storagePath).toBe('u/bg.webp');

@@ -484,6 +484,20 @@ export class CloudProjectService {
         ref: { projectId: string } | { slug: string },
         onStatus?: (status: string) => void,
     ): Promise<{ project: Project; name: string; meta: ProjectShareMeta } | null> {
+        const result = await this.fetchProject(ref, onStatus);
+        if (result) await this.hydrateProjectMedia(result.project, onStatus);
+        return result;
+    }
+
+    /**
+     * First half of loadProject: metadata, migration and storagePath
+     * backfill, without touching media. The editor uses it to mount the
+     * canvas (background, frame) while hydrateProjectMedia downloads.
+     */
+    static async fetchProject(
+        ref: { projectId: string } | { slug: string },
+        onStatus?: (status: string) => void,
+    ): Promise<{ project: Project; name: string; meta: ProjectShareMeta } | null> {
         onStatus?.('Loading project...');
         console.log('[CloudProjectService.loadProject] Loading project:', ref);
         const cloudProject = await CloudStorage.loadProjectMetadata(ref);
@@ -540,17 +554,26 @@ export class CloudProjectService {
             project.microphoneSource.storagePath = cloudStoragePath(userId, projectId, 'mic');
         }
 
-        // Hydrate media URLs into the media URL store (download on cache miss).
-        // getProjectMediaPaths() now includes background/music storagePaths,
-        // so custom assets are hydrated automatically alongside screen/camera/mic.
-        const { setUrl } = useMediaUrlStore.getState();
-        await hydrateMediaUrls(project, setUrl, onStatus);
-
-        // Set baseline hash
+        // Set baseline hash — before the caller can load the project into
+        // the store, whose auto-save compares against it
         const hash = await this.projectDataHash(project);
         this.projectHashes.set(projectId, hash);
 
         return { project, name: cloudProject.name, meta: toShareMeta(cloudProject) };
+    }
+
+    /**
+     * Second half of loadProject: hydrate media URLs into the media URL
+     * store (download on cache miss). getProjectMediaPaths() includes
+     * background/music storagePaths, so custom assets are hydrated
+     * alongside screen/camera/mic.
+     */
+    static async hydrateProjectMedia(
+        project: Project,
+        onStatus?: (status: string) => void,
+    ): Promise<void> {
+        const { setUrl } = useMediaUrlStore.getState();
+        await hydrateMediaUrls(project, setUrl, onStatus);
     }
 
     // ─── Save ────────────────────────────────────────────────

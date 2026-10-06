@@ -34,6 +34,7 @@ import { navigate } from '../lib/navigate';
 import { editorPath, viewPath } from '../lib/videoUrls';
 import { useProjectMetaStore } from '../share/useProjectMetaStore';
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import { cancelCameraMatte, ensureCameraMatte } from './cameraMatte/cameraMatteJob';
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
@@ -108,7 +109,7 @@ function Editor() {
             try {
                 useMediaUrlStore.getState().revokeAll();
 
-                const result = await CloudProjectService.loadProject(
+                const result = await CloudProjectService.fetchProject(
                     slug ? { slug } : { projectId: legacyProjectId! },
                     setLoadingStatus,
                 );
@@ -120,13 +121,23 @@ function Editor() {
                     return;
                 }
 
+                // Into the store before media hydrates, so the canvas mounts
+                // and paints what it can (background, frame) under the
+                // dimmed loading overlay
                 loadProject(result.project, result.name);
                 useProjectMetaStore.getState().setMeta(result.meta);
                 // Canonical URL: legacy links land on the slug form
                 if (!slug) {
                     navigate(editorPath(result.meta.slug), { replace: true });
                 }
+
+                await CloudProjectService.hydrateProjectMedia(result.project, setLoadingStatus);
+                if (cancelled) return;
                 setIsLoading(false);
+                // Compute the camera's background mask once its media is in —
+                // not earlier: until then the stores may still hold the last
+                // project opened, and its media URLs are revoked above
+                ensureCameraMatte();
                 trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId, result.meta.id);
 
                 // Load asset library in background (non-blocking)
@@ -165,7 +176,11 @@ function Editor() {
         }
 
         init();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            // Leaving the editor abandons the background-mask job
+            cancelCameraMatte();
+        };
     }, []);
 
     // Global Key Listener for Undo/Redo & Play/Pause
@@ -338,22 +353,31 @@ function Editor() {
                             }}
                         >
 
-                            {isLoading ? (
-                                /* Stand-in for the canvas: the same letterboxed rect it will
-                                   occupy, on the media surface, with the mark on top. */
+                            {hasActiveProject ? (
+                                <div
+                                    id="canvas-rendered-wrapper"
+                                    style={{ position: 'relative', ...renderedStyle }}
+                                >
+                                    <CanvasContainer>
+                                        {/* Media still hydrating: dim whatever the canvas
+                                            has painted so far, with the mark on top. */}
+                                        {isLoading && (
+                                            <LoadingLogo
+                                                text={loadingStatus}
+                                                className="bg-surface-media/70"
+                                            />
+                                        )}
+                                    </CanvasContainer>
+                                </div>
+                            ) : isLoading ? (
+                                /* No project yet: stand in for the canvas with the same
+                                   letterboxed rect it will occupy, on the media surface. */
                                 <div
                                     id="canvas-loading-placeholder"
                                     className="relative bg-surface-media"
                                     style={placeholderStyle}
                                 >
                                     <LoadingLogo text={loadingStatus} />
-                                </div>
-                            ) : hasActiveProject ? (
-                                <div
-                                    id="canvas-rendered-wrapper"
-                                    style={{ position: 'relative', ...renderedStyle }}
-                                >
-                                    <CanvasContainer />
                                 </div>
                             ) : null}
                         </div>

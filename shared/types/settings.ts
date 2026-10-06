@@ -29,7 +29,6 @@ export interface StyleSettings {
     borderColor: string; // Used for border and glow/shadow color
     hasShadow: boolean;
     hasGlow: boolean;
-    hasFeather: boolean;
 }
 
 // ==========================================
@@ -58,8 +57,11 @@ export interface CameraSettings extends StyleSettings {
     /** Horizontally flip the camera feed */
     mirrored: boolean;
 
-    /** Amount of edge feathering as percentage of size (0.0 = 0%, 0.25 = 25%) */
-    featherAmount: number;
+    /**
+     * Draw the camera as a background-removed cutout. Takes effect once
+     * `cameraSource.matte` exists; absent = off.
+     */
+    removeBackground?: boolean;
 }
 
 // ==========================================
@@ -264,19 +266,12 @@ export interface CameraMoveSettings {
 }
 
 // ==========================================
-// OVERLAY
+// BLUR
 // ==========================================
 
-export interface OverlaySettings {
-    /** Whether overlay effects are rendered. When false, overlays are disabled. */
+export interface BlurSettings {
+    /** Whether blur segments are rendered. When false, the blur track is disabled. */
     enabled: boolean;
-    /** Default overlay block duration in ms when adding a new block */
-    defaultDurationMs: number;
-    /** Per-type defaults — used when creating new items and updated by apply-to-all */
-    blurDefaults?: { blurRadiusPx: number };
-    textDefaults?: { color: string; backgroundColor: string; fontSizePx: number };
-    arrowDefaults?: { color: string; strokeWidthPx: number };
-    borderDefaults?: { color: string; borderWidthPx: number };
 }
 
 // ==========================================
@@ -311,8 +306,8 @@ export interface ProjectSettings {
     // Camera Layout (dynamic position/size blocks)
     cameraMove?: CameraMoveSettings;
 
-    // Overlay annotations
-    overlay?: OverlaySettings;
+    // Blur track
+    blur: BlurSettings;
 
     // Captions
     captions: CaptionSettings;

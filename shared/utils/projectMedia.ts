@@ -6,9 +6,13 @@ const EXT_MAP: Record<string, string> = {
     camera: 'webm',
     mic: 'wav',
     thumbnail: 'webp',
+    cameraMatte: 'webm',
 };
 
-export type MediaFileType = 'screen' | 'camera' | 'mic' | 'thumbnail';
+export type MediaFileType = 'screen' | 'camera' | 'mic' | 'thumbnail' | 'cameraMatte';
+
+/** Storage bucket holding every project's media (matches project-create-v2). */
+export const PROJECT_MEDIA_BUCKET = 'project-media';
 
 /**
  * Compute the deterministic cloud storage path for a media file.
@@ -23,7 +27,7 @@ export function cloudStoragePath(
     return `${userId}/${projectId}/${fileType}.${EXT_MAP[fileType]}`;
 }
 
-export type MediaEntryType = 'screen' | 'camera' | 'mic' | 'background' | 'music';
+export type MediaEntryType = 'screen' | 'camera' | 'cameraMatte' | 'mic' | 'background' | 'music';
 
 /** Entry returned by getProjectMediaPaths(). */
 export interface MediaEntry {
@@ -51,6 +55,10 @@ export function getProjectCameraPath(project: Project): string | null {
     return project.cameraSource?.storagePath ?? null;
 }
 
+export function getProjectCameraMattePath(project: Project): string | null {
+    return project.cameraSource?.matte?.storagePath ?? null;
+}
+
 export function getProjectMicPath(project: Project): string | null {
     return project.microphoneSource?.storagePath ?? null;
 }
@@ -71,6 +79,9 @@ export function getProjectMediaPaths(project: Project): MediaEntry[] {
 
     const camera = getProjectCameraPath(project);
     if (camera) entries.push({ storagePath: camera, type: 'camera' });
+
+    const cameraMatte = getProjectCameraMattePath(project);
+    if (cameraMatte) entries.push({ storagePath: cameraMatte, type: 'cameraMatte' });
 
     const mic = getProjectMicPath(project);
     if (mic) entries.push({ storagePath: mic, type: 'mic' });

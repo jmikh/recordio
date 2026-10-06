@@ -292,6 +292,49 @@ describe('v6 → v7: drag effect off, autoGenerate flags', () => {
 });
 
 // ==========================================
+// v7 → v8: overlays replaced by the blur track
+// ==========================================
+
+describe('v7 → v8: overlays dropped, blur track added', () => {
+    it('drops every overlay segment (blurs included) and the overlay settings', () => {
+        const proj = makeV1Project({
+            schemaVersion: 7,
+            settings: {
+                overlay: { enabled: false, defaultDurationMs: 3000, blurDefaults: { blurRadiusPx: 20 } },
+            },
+        });
+        proj.timeline.overlaySegments = [
+            { id: 'o1', item: { type: 'blur', rectPx: { x: 0, y: 0, width: 10, height: 10 } } },
+            { id: 'o2', item: { type: 'text', text: 'hi' } },
+            { id: 'o3', item: { type: 'arrow' } },
+            { id: 'o4', item: { type: 'border' } },
+        ];
+        proj.timeline.displaySettings = { showZoom: true, showSpotlight: true, showCameraMove: true, showOverlay: false, collapsed: false };
+
+        const result = migrateProject(proj);
+        expect(result.timeline.overlaySegments).toBeUndefined();
+        expect(result.timeline.blurSegments).toEqual([]);
+        expect(result.settings.overlay).toBeUndefined();
+        expect(result.settings.blur).toEqual({ enabled: true });
+        expect(result.timeline.displaySettings).toEqual({
+            showZoom: true, showSpotlight: true, showCameraMove: true, showBlur: true, collapsed: false,
+        });
+    });
+
+    it('keeps existing blur segments and settings on a current project', () => {
+        const blurSegments = [{ id: 'b1', blurRadiusPx: 12, regions: [{ id: 'r1', rectPx: { x: 0, y: 0, width: 10, height: 10 }, borderRadiusPx: [0, 0, 0, 0] }] }];
+        const proj = makeV1Project({ schemaVersion: CURRENT_SCHEMA_VERSION, settings: { blur: { enabled: false } } });
+        proj.timeline.blurSegments = blurSegments;
+        proj.timeline.displaySettings.showBlur = false;
+
+        const result = migrateProject(proj);
+        expect(result.timeline.blurSegments).toEqual(blurSegments);
+        expect(result.settings.blur).toEqual({ enabled: false });
+        expect(result.timeline.displaySettings.showBlur).toBe(false);
+    });
+});
+
+// ==========================================
 // Spotlight feather backfill (version-independent)
 // ==========================================
 
@@ -315,6 +358,25 @@ describe('spotlight feather backfill', () => {
         const result = migrateProject(proj);
         expect(result.settings.spotlight.featherPx).toBe(0);
         expect(result.settings.spotlight.featherTransition).toBe('fade');
+    });
+});
+
+// ==========================================
+// Camera feather removal (version-independent)
+// ==========================================
+
+describe('camera feather removal', () => {
+    it('drops the retired camera feather fields and the screen flag', () => {
+        const proj = makeV1Project({
+            schemaVersion: CURRENT_SCHEMA_VERSION,
+            settings: {
+                camera: { shape: 'circle', hasShadow: false, hasFeather: true, featherAmount: 0.3 },
+                screen: { mode: 'border', hasShadow: true, hasFeather: false },
+            },
+        });
+        const result = migrateProject(proj);
+        expect(result.settings.camera).toEqual({ shape: 'circle', hasShadow: false });
+        expect(result.settings.screen).toEqual({ mode: 'border', hasShadow: true });
     });
 });
 
@@ -343,6 +405,7 @@ describe('common migration behaviors', () => {
             showZoom: true,
             showSpotlight: true,
             showCameraMove: true,
+            showBlur: true,
             collapsed: false,
         });
     });
@@ -430,6 +493,11 @@ describe('full migration chain v1 → current', () => {
 
         // v3→v4: background URL rewritten
         expect(result.settings.background.imageUrl).toBe(`${CDN_ORIGIN}/backgrounds/dark-mesh.webp`);
+
+        // v7→v8: overlays replaced by the blur track
+        expect(result.timeline.overlaySegments).toBeUndefined();
+        expect(result.timeline.blurSegments).toEqual([]);
+        expect(result.settings.blur).toEqual({ enabled: true });
 
         // Common: version stamped, metadata stripped
         expect(result.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);

@@ -23,9 +23,11 @@ test('editor opens a project: media hydrates and the UI renders', async ({ page 
     await expect(page).toHaveURL(/\/video\/[^/]+\/edit/);
 
     // The editor shell rendered: canvas + timeline are up and the loading
-    // overlay is gone.
+    // overlay is gone. The canvas mounts (dimmed) as soon as metadata lands,
+    // so the overlay's status — "Loading project..." then "Loading Project"
+    // while media hydrates — is what proves hydration finished.
     await expect(page.locator('canvas').first()).toBeVisible();
-    await expect(page.getByText('Loading project...')).toBeHidden();
+    await expect(page.getByRole('status').filter({ hasText: /loading project/i })).toBeHidden({ timeout: 20_000 });
 });
 
 test('share modal opens with the owner controls', async ({ page }) => {

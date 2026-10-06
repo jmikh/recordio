@@ -11,7 +11,15 @@ interface TimelineRulerProps {
     containerWidth?: number;
 }
 
-// ... (interface remains same)
+// Tick spacing per zoom level, checked top-down (first match wins)
+const RULER_TIERS = [
+    { minPps: 50, major: 1000, minor: 100 },
+    { minPps: 20, major: 2000, minor: 500 },
+    { minPps: 10, major: 5000, minor: 1000 },
+    { minPps: 5, major: 10000, minor: 2000 },
+    { minPps: 2, major: 30000, minor: 5000 },
+    { minPps: 0, major: 60000, minor: 10000 },
+];
 
 export const TimelineRuler: React.FC<TimelineRulerProps> = ({
     totalWidth,
@@ -69,7 +77,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
             // Read theme colors from semantic tokens
             const style = getComputedStyle(document.documentElement);
-            const textColor = style.getPropertyValue('--text-muted').trim();
+            const textColor = style.getPropertyValue('--text-disabled').trim();
             const tickColor = style.getPropertyValue('--text-disabled').trim();
 
             // Strip quotes from CSS variable so canvas font string is well-formed
@@ -80,16 +88,10 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
             ctx.font = `500 10px ${fontFamily}`;
             ctx.textBaseline = 'top';
 
-            let majorInterval = 1000;
-            let minorInterval = 100;
-
-            if (pixelsPerSec < 20) {
-                majorInterval = 5000;
-                minorInterval = 1000;
-            } else if (pixelsPerSec < 50) {
-                majorInterval = 2000;
-                minorInterval = 500;
-            }
+            // Coarser intervals as we zoom out, keeping labeled ticks ~50px+ apart
+            const tier = RULER_TIERS.find(t => pixelsPerSec >= t.minPps) ?? RULER_TIERS[RULER_TIERS.length - 1];
+            const majorInterval = tier.major;
+            const minorInterval = tier.minor;
 
             // Calculate visible time range
             const visibleDurationMs = (fullWidth / pixelsPerSec) * 1000;
@@ -108,7 +110,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
                 if (t % majorInterval === 0) {
                     ctx.moveTo(x, 0);
                     ctx.lineTo(x, height);
-                    const label = formatTimeCode(t);
+                    const label = formatTimeCode(t, false);
                     ctx.fillText(label, x + 4, 2);
                     // 700 is too heavy here, so a hairline stroke fakes the
                     // in-between weight. (Now that the UI font is loaded as a

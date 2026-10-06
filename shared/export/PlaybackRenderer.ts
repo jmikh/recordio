@@ -2,9 +2,10 @@ import { drawScreen } from '../painters/screenPainter';
 import { paintMouseClicks } from '../painters/mouseClickPainter';
 import { drawDragEffects } from '../painters/mouseDragPainter';
 import { drawCamera } from '../painters/cameraPainter';
+import { resolveCameraImage } from '../painters/cameraCutout';
 import { drawKeyboardOverlay } from '../painters/keyboardPainter';
 import { drawCaptions } from '../painters/captionPainter';
-import { drawOverlays } from '../painters/overlayPainter';
+import { drawBlurs } from '../painters/blurPainter';
 import { paintFocusAreaDebug } from '../painters/focusAreaDebugPainter';
 
 import { getViewportStateAtTime } from '../animators/zoomAnimator';
@@ -165,20 +166,20 @@ export class PlaybackRenderer {
         }
 
 
-        // Render Overlay annotations (before camera, so camera always appears on top)
-        if (project.settings.overlay?.enabled ?? true) {
-            const overlaySegments = timeline.overlaySegments || [];
-            if (overlaySegments.length > 0) {
-                this._t('overlays', () => {
-                    drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport);
+        // Render Blur regions (before camera, so camera always appears on top)
+        if (project.settings.blur?.enabled ?? true) {
+            const blurSegments = timeline.blurSegments || [];
+            if (blurSegments.length > 0) {
+                this._t('blur', () => {
+                    drawBlurs(ctx, blurSegments, currentTimeMs, outputSize, effectiveViewport);
                 });
             }
         }
 
-        // Render Camera Layer (after overlays, so camera always appears on top)
+        // Render Camera Layer (after blur, so camera always appears on top)
         if (cameraSource) {
-            const video = videoRefs[cameraSource.storagePath];
-            if (video) {
+            const camera = resolveCameraImage(project, videoRefs);
+            if (camera) {
                 const cameraSettings = project.settings.camera;
 
                 if (!cameraSettings) {
@@ -189,7 +190,7 @@ export class PlaybackRenderer {
                 this._t('camera', () => {
                     if (state.overrideCameraSettings) {
                         // Override mode (drag preview): use provided settings directly, no resolver
-                        drawCamera(ctx, video, cameraSource.size, state.overrideCameraSettings!, outputSize, renderCtx);
+                        drawCamera(ctx, camera.image, cameraSource.size, state.overrideCameraSettings!, outputSize, camera.cutout);
                     } else {
                         // Use the unified resolver: layout blocks → transitions → auto-shrink
                         const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
@@ -217,10 +218,10 @@ export class PlaybackRenderer {
                             if (resolved.opacity < 1) {
                                 ctx.save();
                                 ctx.globalAlpha = resolved.opacity;
-                                drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize, renderCtx);
+                                drawCamera(ctx, camera.image, cameraSource.size, effectiveSettings, outputSize, camera.cutout);
                                 ctx.restore();
                             } else {
-                                drawCamera(ctx, video, cameraSource.size, effectiveSettings, outputSize, renderCtx);
+                                drawCamera(ctx, camera.image, cameraSource.size, effectiveSettings, outputSize, camera.cutout);
                             }
                         }
                     }

@@ -112,6 +112,28 @@ export function migrateProject(raw: any): any {
         if (raw.settings?.spotlight && raw.settings.spotlight.autoGenerate === undefined) raw.settings.spotlight.autoGenerate = true;
     }
 
+    // v7 → v8: overlays (blur/text/arrow/border, overlapping single-item
+    // segments) are replaced by the blur track. Old overlay segments are
+    // dropped, not converted — blurs included.
+    if (version < 8) {
+        if (raw.timeline) {
+            delete raw.timeline.overlaySegments;
+            if (raw.timeline.displaySettings) {
+                delete raw.timeline.displaySettings.showOverlay;
+                raw.timeline.displaySettings.showBlur = true;
+            }
+        }
+        if (raw.settings) delete raw.settings.overlay;
+    }
+
+    // Backfill the blur track if missing (projects saved before blur segments).
+    if (raw.timeline && !Array.isArray(raw.timeline.blurSegments)) {
+        raw.timeline.blurSegments = [];
+    }
+    if (raw.settings && !raw.settings.blur) {
+        raw.settings.blur = { enabled: true };
+    }
+
     // Backfill spotlight feather settings if missing (projects saved before feathering).
     // Version-independent so the defaults land on every load until the project is re-saved.
     if (raw.settings?.spotlight) {
@@ -123,12 +145,21 @@ export function migrateProject(raw: any): any {
         delete sp.edgeMode;
     }
 
+    // Drop the retired camera feather option (and the unused screen flag it shared
+    // StyleSettings with). Version-independent, like edgeMode above.
+    if (raw.settings?.camera) {
+        delete raw.settings.camera.hasFeather;
+        delete raw.settings.camera.featherAmount;
+    }
+    if (raw.settings?.screen) delete raw.settings.screen.hasFeather;
+
     // Backfill displaySettings if missing (pre-displaySettings projects)
     if (raw.timeline && !raw.timeline.displaySettings) {
         raw.timeline.displaySettings = {
             showZoom: true,
             showSpotlight: true,
             showCameraMove: true,
+            showBlur: true,
             collapsed: false,
         };
     }

@@ -13,7 +13,6 @@
 
 import type { ID, Point, Rect, Size, RawRecording } from './core';
 import type { OverlayItem } from './overlay';
-import type { OverlaySettings } from './settings';
 
 export type ScreenshotCaptureMode = 'visible' | 'fullPage' | 'region';
 
@@ -92,11 +91,13 @@ export interface ScreenshotSource {
     captureMode: ScreenshotCaptureMode;
 }
 
-/** Per-type defaults used when creating new annotations (same shape as the video overlay defaults). */
-export type AnnotationDefaults = Pick<
-    OverlaySettings,
-    'blurDefaults' | 'textDefaults' | 'arrowDefaults' | 'borderDefaults'
->;
+/** Per-type defaults used when creating new annotations. */
+export interface AnnotationDefaults {
+    blurDefaults?: { blurRadiusPx: number };
+    textDefaults?: { color: string; backgroundColor: string; fontSizePx: number };
+    arrowDefaults?: { color: string; strokeWidthPx: number };
+    borderDefaults?: { color: string; borderWidthPx: number };
+}
 
 /**
  * The editor document stored in screenshots.screenshot_data.

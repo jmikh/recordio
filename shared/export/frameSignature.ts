@@ -25,7 +25,7 @@ import { getActiveClicks } from '../painters/mouseClickPainter';
 import { getActiveDrags } from '../painters/mouseDragPainter';
 import { getKeyboardOverlayState } from '../painters/keyboardPainter';
 import { getActiveCaptions } from '../painters/captionPainter';
-import { getActiveOverlaySegments } from '../painters/overlayPainter';
+import { getActiveBlurSegment } from '../painters/blurPainter';
 import { createScreenViewMapper, getScreenInputSize, getToolbarAddressText } from '../painters/screenPainter';
 
 export interface FrameSignatureInput {
@@ -83,8 +83,8 @@ export function computeFrameSignature(input: FrameSignatureInput): string {
         parts.keyboard = keyboard ? [keyboard.index, keyboard.opacity] : null;
     }
 
-    if (settings.overlay?.enabled ?? true) {
-        parts.overlays = getActiveOverlaySegments(timeline.overlaySegments || [], currentTimeMs).map(s => s.id);
+    if (settings.blur?.enabled ?? true) {
+        parts.blur = getActiveBlurSegment(timeline.blurSegments || [], currentTimeMs)?.id ?? null;
     }
 
     const cameraSource = project.cameraSource;

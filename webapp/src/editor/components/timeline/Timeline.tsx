@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
-import { MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './TimelineToolbar';
+import { fitTimelineToScreen } from './fitTimeline';
 import { ZoomTrack } from './tracks/zoom/ZoomTrack';
 
 import { SpotlightTrack } from './tracks/spotlight/SpotlightTrack';
@@ -10,13 +10,13 @@ import { SpotlightHeaderCell } from './tracks/spotlight/SpotlightHeaderCell';
 import { LayoutHeaderCell } from './tracks/cameraMove/LayoutHeaderCell';
 
 import { CameraMoveTrack } from './tracks/cameraMove/CameraMoveTrack';
-import { OverlayTrack } from './tracks/overlay/OverlayTrack';
-import { OverlayHeaderCell } from './tracks/overlay/OverlayHeaderCell';
+import { BlurTrack } from './tracks/blur/BlurTrack';
+import { BlurHeaderCell } from './tracks/blur/BlurHeaderCell';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 
 // New Components
-import { RecordingTrack } from './tracks/recording/RecordingTrack';
-import { RecordingHeaderCell } from './tracks/recording/RecordingHeaderCell';
+import { ClipTrack } from './tracks/clip/ClipTrack';
+import { ClipHeaderCell } from './tracks/clip/ClipHeaderCell';
 
 import { TimelineHeaderCell } from './tracks/shared/TimelineHeaderCell';
 import { TimelineTrackRow } from './tracks/shared/TimelineTrackRow';
@@ -31,7 +31,7 @@ import { useUIStore } from '../../stores/useUIStore';
 
 
 // Constants
-const HEADER_WIDTH = 152;
+const HEADER_WIDTH = 40;
 const RULER_HEIGHT = 26; // 24px canvas + 2px borders (border-t + border-b on ruler wrapper)
 const SCROLLBAR_GUTTER = 8; // Space below tracks so horizontal scrollbar doesn't overlap bottom track
 const TRANSITION_STYLE = 'height 150ms ease';
@@ -59,7 +59,7 @@ export function Timeline() {
         const el = containerRef.current;
         if (!el) return;
         setContainerWidth(el.clientWidth);
-        const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
+        const ro = new ResizeObserver(([entry]) => { console.log('[FitDebug] resize', { width: entry.contentRect.width, t: performance.now() }); setContainerWidth(entry.contentRect.width); });
         ro.observe(el);
         return () => ro.disconnect();
     }, [containerEl]); // re-attach when the element changes
@@ -118,10 +118,9 @@ export function Timeline() {
     const hasCameraSource = useProjectStore(s => !!s.project.cameraSource);
 
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
-    const setPixelsPerSec = useUIStore(s => s.setPixelsPerSec);
     const displaySettings = useProjectStore(s => s.project.timeline.displaySettings);
     const setHoveredTrack = useUIStore(s => s.setHoveredTrack);
-    const { tracks: trackSizing, recordingHeight, totalHeight: timelineTotalHeight } = useTrackSizing();
+    const { tracks: trackSizing, clipHeight, totalHeight: timelineTotalHeight } = useTrackSizing();
 
 
     // Memoize TimeMapper
@@ -131,17 +130,16 @@ export function Timeline() {
     const totalOutputDuration = timeMapper.getOutputDuration();
     const totalWidth = (totalOutputDuration / 1000) * pixelsPerSec + 25;
 
-    // Auto-fit timeline zoom on initial mount
-    const hasFittedRef = useRef(false);
+    // Fit the timeline once per loaded project, after the container has been measured
+    // and the project's duration is known (same function as the toolbar's Fit button)
+    const projectId = useProjectStore(s => s.project.id);
+    const fittedProjectIdRef = useRef<string | null>(null);
     useEffect(() => {
-        if (!hasFittedRef.current && containerRef.current && totalOutputDuration > 0) {
-            hasFittedRef.current = true;
-            const availableWidth = containerRef.current.clientWidth - 50;
-            const fitPps = (availableWidth * 1000) / totalOutputDuration;
-            const clampedPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, fitPps));
-            setPixelsPerSec(clampedPps);
-        }
-    }, [containerEl, totalOutputDuration]);
+        if (fittedProjectIdRef.current === projectId) return;
+        if (containerWidth <= 0 || totalOutputDuration <= 0) return;
+        fittedProjectIdRef.current = projectId;
+        fitTimelineToScreen(totalOutputDuration);
+    }, [projectId, containerWidth, totalOutputDuration]);
 
     // -- Interaction Hook --
     const {
@@ -170,9 +168,7 @@ export function Timeline() {
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
     const selectCameraMove = useUIStore(s => s.selectCameraMove);
     const deleteCameraMove = useProjectStore(s => s.deleteCameraMove);
-    const selectedOverlaySegmentId = useUIStore(s => s.selectedOverlaySegmentId);
-    const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
-    const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
+    const selectedBlurSegmentId = useUIStore(s => s.selectedBlurSegmentId);
     const deselectAllSegments = useUIStore(s => s.deselectAllSegments);
 
     useEffect(() => {
@@ -199,10 +195,9 @@ export function Timeline() {
                     e.preventDefault();
                     deleteCameraMove(selectedCameraMoveId);
                     selectCameraMove(null);
-                } else if (selectedOverlaySegmentId) {
+                } else if (selectedBlurSegmentId) {
                     e.preventDefault();
-                    deleteOverlaySegment(selectedOverlaySegmentId);
-                    selectOverlaySegment(null);
+                    deleteSelectedBlurRegion();
                 }
             }
 
@@ -220,7 +215,7 @@ export function Timeline() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedWindowId, removeOutputWindow, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedOverlaySegmentId, deleteOverlaySegment, selectOverlaySegment, deselectAllSegments, cutOutputRange]);
+    }, [selectedWindowId, removeOutputWindow, selectWindow, selectedCameraMoveId, deleteCameraMove, selectCameraMove, selectedBlurSegmentId, deselectAllSegments, cutOutputRange]);
 
     // Initial check for overlays
     useEffect(() => {
@@ -274,9 +269,9 @@ export function Timeline() {
 
                     {/* Track headers wrapper — mirrors the tracks container on the right */}
                     <div className="flex flex-col" style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
-                        {/* Header: Recording (always visible) */}
-                        <div className="shrink-0" style={{ height: recordingHeight, transition: TRANSITION_STYLE }}>
-                            <RecordingHeaderCell height={recordingHeight} />
+                        {/* Header: Clip (always visible) */}
+                        <div className="shrink-0" style={{ height: clipHeight, transition: TRANSITION_STYLE }}>
+                            <ClipHeaderCell height={clipHeight} />
                         </div>
 
                         {/* Header: Zoom */}
@@ -300,10 +295,10 @@ export function Timeline() {
                             </div>
                         )}
 
-                        {/* Header: Overlay */}
-                        {displaySettings.showOverlay && (
-                            <div className="shrink-0" style={{ height: trackSizing.overlay.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('overlay')}>
-                                <OverlayHeaderCell height={trackSizing.overlay.height} isCollapsed={trackSizing.overlay.isCollapsed} />
+                        {/* Header: Blur */}
+                        {displaySettings.showBlur && (
+                            <div className="shrink-0" style={{ height: trackSizing.blur.height, transition: TRANSITION_STYLE }} onMouseEnter={() => setHoveredTrack('blur')}>
+                                <BlurHeaderCell height={trackSizing.blur.height} isCollapsed={trackSizing.blur.isCollapsed} />
                             </div>
                         )}
                     </div>
@@ -365,12 +360,12 @@ export function Timeline() {
 
                                 {/* Tracks Container */}
                                 <div id="timeline-tracks" className={`flex flex-col relative pl-0 ${isDraggingHighlight ? 'pointer-events-none' : ''}`} style={{ gap: TRACK_GAP, paddingTop: TRACK_GAP, paddingBottom: TRACK_GAP }}>
-                                    {/* Recording Track (always visible) */}
-                                    <TimelineTrackRow height={recordingHeight}>
-                                        <RecordingTrack
+                                    {/* Clip Track (always visible) */}
+                                    <TimelineTrackRow height={clipHeight}>
+                                        <ClipTrack
                                             timeline={timeline}
                                             pixelsPerSec={pixelsPerSec}
-                                            trackHeight={recordingHeight}
+                                            trackHeight={clipHeight}
                                             scrollLeft={rulerScrollLeft}
                                             containerWidth={containerWidth}
                                         />
@@ -397,10 +392,10 @@ export function Timeline() {
                                         </TimelineTrackRow>
                                     )}
 
-                                    {/* Overlay Track */}
-                                    {displaySettings.showOverlay && (
-                                        <TimelineTrackRow height={trackSizing.overlay.height} onMouseEnter={() => setHoveredTrack('overlay')}>
-                                            <OverlayTrack height={trackSizing.overlay.height} isCollapsed={trackSizing.overlay.isCollapsed} />
+                                    {/* Blur Track */}
+                                    {displaySettings.showBlur && (
+                                        <TimelineTrackRow height={trackSizing.blur.height} onMouseEnter={() => setHoveredTrack('blur')}>
+                                            <BlurTrack height={trackSizing.blur.height} isCollapsed={trackSizing.blur.isCollapsed} />
                                         </TimelineTrackRow>
                                     )}
 
@@ -441,3 +436,21 @@ export function Timeline() {
     );
 }
 
+/**
+ * Delete key on a selected blur block removes the region being edited on the
+ * canvas (the store drops the block with its last region), then moves the
+ * selection to a remaining region or clears it.
+ */
+function deleteSelectedBlurRegion() {
+    const { selectedBlurSegmentId, selectedBlurRegionId, selectBlurSegment, selectBlurRegion } = useUIStore.getState();
+    const { project, deleteBlurRegion } = useProjectStore.getState();
+    const segment = project.timeline.blurSegments.find(s => s.id === selectedBlurSegmentId);
+    if (!segment) return;
+
+    const regionId = selectedBlurRegionId ?? segment.regions[0]?.id;
+    if (regionId) deleteBlurRegion(segment.id, regionId);
+
+    const remaining = segment.regions.filter(r => r.id !== regionId);
+    if (remaining.length > 0) selectBlurRegion(remaining[remaining.length - 1].id);
+    else selectBlurSegment(null);
+}

@@ -1,8 +1,7 @@
 /**
  * ScreenshotDoc factory (plans/screenshots). The document is a plain
  * struct: source metadata, an optional crop, the annotation list and the
- * per-type defaults new annotations start from (same values as the video
- * overlay defaults in core/Project.ts so the two products match).
+ * per-type defaults new annotations start from.
  */
 import type { AnnotationDefaults, RawScreenshot, ScreenshotDoc, ScreenshotSource } from '@shared/types';
 

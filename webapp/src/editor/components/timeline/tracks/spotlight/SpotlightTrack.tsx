@@ -11,10 +11,8 @@ import type { SpotlightSegment } from '@shared/types';
 
 import {
     ghostSpotlight,
-    blockIconClass,
     ghostIconClass,
     MIN_ICON_WIDTH_PX,
-    SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
 
@@ -24,12 +22,7 @@ interface SpotlightTrackProps {
 }
 
 /**
- * SpotlightTrack renders spotlight effects on a timeline.
- * 
- * Visual elements:
- * - Fade In segment (shorter, striped, 45° angle)
- * - Hold segment (taller, solid fill)
- * - Fade Out segment (shorter, striped, -45° angle)
+ * SpotlightTrack renders spotlight effects on a timeline as single solid blocks.
  */
 export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
@@ -42,7 +35,6 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
     };
 
     const project = useProjectStore(s => s.project);
-    const globalTransitionDurationMs = project.settings.spotlight.transitionDurationMs;
     const spotlightEnabled = project.settings.spotlight.enabled ?? true;
 
     // Memoize TimeMapper and TimePixelMapper
@@ -89,9 +81,6 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
         timeMapper
     );
 
-    // Ghost fade width uses global transition duration
-    const ghostFadeWidthPx = coords.msToX(globalTransitionDurationMs);
-
     // Ghost vertical position — 1px padding
     const ghostY = 1;
 
@@ -119,17 +108,11 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                     const isSelected = editingSpotlightId === s.id;
                     const isDragging = dragState?.segmentId === s.id;
 
-                    // Per-segment fade width from segment's transitionDurationMs
-                    const segFadeWidthPx = coords.msToX(s.transitionDurationMs ?? globalTransitionDurationMs);
-                    const clampedFadeWidthPx = Math.min(segFadeWidthPx, totalWidth / 2);
-
                     return (
                         <SpotlightBlock
                             key={s.id}
                             left={startX}
                             width={totalWidth}
-                            fadeInWidth={clampedFadeWidthPx}
-                            fadeOutWidth={clampedFadeWidthPx}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
@@ -176,56 +159,21 @@ export const SpotlightTrack: React.FC<SpotlightTrackProps> = ({ height, isCollap
                         {/* Label above the ghost */}
                         <span className={ghostSpotlight.label}>+ Spotlight</span>
 
-                        {/* Ghost Fade In */}
                         <div
-                            className={ghostSpotlight.fadeIn.className}
+                            className={`${ghostSpotlight.block.className} flex items-center justify-center overflow-hidden`}
                             style={{
                                 position: 'absolute',
                                 left: 0,
                                 top: ghostY,
-                                width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
-                                ...ghostSpotlight.fadeIn.getStyle(),
+                                width: '100%',
+                                ...ghostSpotlight.block.getStyle(),
                                 height: height - 2,
-                                borderRadius: `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`,
                             }}
-                        />
-
-                        {/* Ghost Hold (may be 0 width when ghost is short) */}
-                        {(() => {
-                            const ghostHoldWidth = Math.max(0, hoverInfo.width - Math.min(hoverInfo.width / 2, ghostFadeWidthPx) * 2);
-                            return ghostHoldWidth > 0 && (
-                                <div
-                                    className={`${ghostSpotlight.hold.className} flex items-center justify-center overflow-hidden`}
-                                    style={{
-                                        position: 'absolute',
-                                        left: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
-                                        top: ghostY,
-                                        width: ghostHoldWidth,
-                                        ...ghostSpotlight.hold.getStyle(),
-                                        height: height - 2,
-                                        borderRadius: 0,
-                                    }}
-                                >
-                                    {ghostHoldWidth >= MIN_ICON_WIDTH_PX && (
-                                        <LuLightbulb className={`${ghostIconClass} icon-md`} />
-                                    )}
-                                </div>
-                            );
-                        })()}
-
-                        {/* Ghost Fade Out */}
-                        <div
-                            className={ghostSpotlight.fadeOut.className}
-                            style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: ghostY,
-                                width: Math.min(hoverInfo.width / 2, ghostFadeWidthPx),
-                                ...ghostSpotlight.fadeOut.getStyle(),
-                                height: height - 2,
-                                borderRadius: `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-                            }}
-                        />
+                        >
+                            {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
+                                <LuLightbulb className={`${ghostIconClass} icon-md`} />
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

@@ -11,7 +11,7 @@
  * project-create-v2) — typed loosely on purpose.
  */
 
-export type MediaEntryType = 'screen' | 'camera' | 'mic' | 'background' | 'music';
+export type MediaEntryType = 'screen' | 'camera' | 'cameraMatte' | 'mic' | 'background' | 'music';
 
 export interface MediaEntry {
     storagePath: string;
@@ -20,7 +20,7 @@ export interface MediaEntry {
 
 interface ProjectDataShape {
     screenSource?: { storagePath?: string };
-    cameraSource?: { storagePath?: string };
+    cameraSource?: { storagePath?: string; matte?: { storagePath?: string } };
     microphoneSource?: { storagePath?: string };
     settings?: {
         background?: { storagePath?: string };
@@ -44,6 +44,7 @@ export function getProjectMediaPaths(projectData: unknown): MediaEntry[] {
 
     push(data.screenSource?.storagePath, 'screen');
     push(data.cameraSource?.storagePath, 'camera');
+    push(data.cameraSource?.matte?.storagePath, 'cameraMatte');
     push(data.microphoneSource?.storagePath, 'mic');
     push(data.settings?.background?.storagePath, 'background');
     push(data.settings?.audio?.music?.storagePath, 'music');

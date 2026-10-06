@@ -18,7 +18,8 @@ import { createZoomSegmentSlice, type ZoomSegmentSlice } from './slices/zoomActi
 import { createSpotlightSlice, type SpotlightSlice } from './slices/spotlightSlice';
 import { createTranscriptionSlice, type TranscriptionSlice } from './slices/transcriptionSlice';
 import { createCameraMoveSlice, type CameraMoveSlice } from './slices/cameraMoveSlice';
-import { createOverlaySlice, type OverlaySlice } from './slices/overlaySlice';
+import { createBlurSlice, type BlurSlice } from './slices/blurSlice';
+import { createCameraMatteSlice, type CameraMatteSlice } from './slices/cameraMatteSlice';
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { TimeMapper } from '@shared/mappers/timeMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
@@ -26,7 +27,7 @@ import { calculateAutoZooms, getAllFocusAreas } from '../zoom';
 import { calculateAutoSpotlights } from '../spotlight/autoSpotlight';
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, OverlaySlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, BlurSlice, CameraMatteSlice {
     project: Project;
     /** Project name — stored as DB column, not in project_data. */
     projectName: string;
@@ -99,7 +100,8 @@ export const useProjectStore = create<ProjectState>()(
                 ...createSpotlightSlice(set, get, store),
                 ...createTranscriptionSlice(set, get, store),
                 ...createCameraMoveSlice(set, get, store),
-                ...createOverlaySlice(set, get, store),
+                ...createBlurSlice(set, get, store),
+                ...createCameraMatteSlice(set, get, store),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {
@@ -142,7 +144,6 @@ export const useProjectStore = create<ProjectState>()(
                             deviceFrameId: 'macbook-air-dark',
                             hasShadow: true,
                             hasGlow: false,
-                            hasFeather: false,
                             mute: false,
                         };
                     }
@@ -207,30 +208,6 @@ export const useProjectStore = create<ProjectState>()(
                             microphoneVolume: 1,
                             music: { enabled: false, source: 'preset', volume: 0.3, fadeOutDurationMs: 3000 },
                         };
-                    }
-
-                    if (!projectWithoutEvents.timeline.overlaySegments) {
-                        projectWithoutEvents.timeline.overlaySegments = [];
-                    }
-                    // Migration: clear old overlay segments that used items[] arrays
-                    // (pre-single-item model). Check for any segment that has 'items' instead of 'item'.
-                    projectWithoutEvents.timeline.overlaySegments =
-                        projectWithoutEvents.timeline.overlaySegments.filter(
-                            (s: any) => s.item && !s.items
-                        );
-                    if (!projectWithoutEvents.settings.overlay) {
-                        projectWithoutEvents.settings.overlay = {
-                            enabled: true,
-                            defaultDurationMs: 3000,
-                            blurDefaults: { blurRadiusPx: 20 },
-                            textDefaults: { color: '#454545', backgroundColor: '#ffdb5700', fontSizePx: 0 },
-                            arrowDefaults: { color: '#7B61FF', strokeWidthPx: 4 },
-                            borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
-                        };
-                    } else if (projectWithoutEvents.settings.overlay.textDefaults?.color === '#ffffff') {
-                        // Migrate old default white to new default colors
-                        projectWithoutEvents.settings.overlay.textDefaults.color = '#454545';
-                        projectWithoutEvents.settings.overlay.textDefaults.backgroundColor = '#ffdb5700';
                     }
 
                     // First open: generate auto zoom/spotlight segments and focus areas

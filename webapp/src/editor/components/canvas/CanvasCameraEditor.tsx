@@ -9,7 +9,8 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';
 import { drawCamera } from '@shared/painters/cameraPainter';
-import { drawOverlays } from '@shared/painters/overlayPainter';
+import { resolveCameraImage } from '@shared/painters/cameraCutout';
+import { drawBlurs } from '@shared/painters/blurPainter';
 import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
 
 // ------------------------------------------------------------------
@@ -53,12 +54,9 @@ export const renderCameraEditor = (
         }
     }
 
-    // Render Overlays
-    if (project.settings.overlay?.enabled ?? true) {
-        const overlaySegments = project.timeline.overlaySegments || [];
-        if (overlaySegments.length > 0) {
-            drawOverlays(ctx, overlaySegments, currentTimeMs, outputSize, effectiveViewport);
-        }
+    // Render blur regions
+    if (project.settings.blur?.enabled ?? true) {
+        drawBlurs(ctx, project.timeline.blurSegments || [], currentTimeMs, outputSize, effectiveViewport);
     }
 
     // Render Camera Layer (no auto-shrink)
@@ -66,9 +64,9 @@ export const renderCameraEditor = (
     const cameraSettings = state.overrideCameraSettings || project.settings.camera;
 
     if (cameraSource && cameraSettings) {
-        const video = videoRefs[cameraSource.storagePath];
-        if (video) {
-            drawCamera(ctx, video, cameraSource.size, cameraSettings);
+        const camera = resolveCameraImage(project, videoRefs);
+        if (camera) {
+            drawCamera(ctx, camera.image, cameraSource.size, cameraSettings, undefined, camera.cutout);
         }
     }
 };

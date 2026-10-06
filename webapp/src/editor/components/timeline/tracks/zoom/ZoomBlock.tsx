@@ -1,25 +1,28 @@
 import React from 'react';
 import { LuZoomIn } from 'react-icons/lu';
 import {
-    transitionSegment,
     holdSegment,
     blockContainer,
+    trackBlockColor,
     resizeHandle,
     dragHandleIndicator,
     zoomOutBlock,
-    transitionInStyle,
     blockIconClass,
+    blockLabelClass,
     MIN_ICON_WIDTH_PX,
     SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
+
+/** Minimum block width (px) before the zoom factor label is shown next to the icon */
+const MIN_ZOOM_FACTOR_LABEL_WIDTH_PX = 56;
 
 interface ZoomBlockProps {
     /** Left position in pixels */
     left: number;
     /** Total width of the zoom block in pixels */
     width: number;
-    /** Width of the transition-in segment in pixels */
-    transitionInWidth: number;
+    /** Zoom factor relative to the full output (e.g. 1.7 = 1.7x) */
+    zoomFactor: number;
     /** Whether this block is selected */
     isSelected: boolean;
     /** Whether this block is being dragged */
@@ -45,16 +48,16 @@ interface ZoomBlockProps {
 }
 
 /**
- * Renders a zoom block on the timeline with two visual segments:
- * - Transition-in (left): shorter, striped — represents the zoom-in ramp
- * - Hold (right): taller, solid — represents the held zoom position
+ * Renders a zoom block on the timeline as a single solid segment (the
+ * zoom-in ramp is part of the block), followed by an optional zoom-out
+ * segment overflowing to the right.
  *
  * Both edges have resize handles.
  */
 export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     left,
     width,
-    transitionInWidth,
+    zoomFactor,
     isSelected,
     isDragging,
     trackHeight,
@@ -67,36 +70,16 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
     disabled = false,
     isCollapsed = false,
 }) => {
-    // Clamp transition-in width so it never exceeds the block
-    const clampedTransitionWidth = Math.min(transitionInWidth, width);
-    const holdWidth = Math.max(0, width - clampedTransitionWidth);
-
     // All segments fill the track with 1px padding top/bottom
     const segmentHeight = trackHeight - 2;
     const segmentY = 1;
 
-    const transitionColorClass = isSelected && !disabled ? transitionSegment.selectedClass : transitionSegment.defaultClass;
     const holdColorClass = isSelected && !disabled ? holdSegment.selectedClass : holdSegment.defaultClass;
-    const transitionHoverClass = (isSelected || disabled) ? '' : transitionSegment.hoverClass;
     const holdHoverClass = (isSelected || disabled) ? '' : holdSegment.hoverClass;
-
-    // If hold is zero width, give the transition-in segment rounded right corners too
-    // (unless a zoom-out block follows — then keep right corners flat)
-    const transitionStyle = holdWidth === 0
-        ? {
-            ...transitionSegment.getStyle(),
-            borderRadius: hasZoomOut
-                ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
-                : SEGMENT_RADIUS,
-            borderRight: hasZoomOut ? 'none' : undefined,
-        }
-        : {
-            ...transitionInStyle(),
-        };
 
     return (
         <div
-            className={`${blockContainer.base} group z-10 hover:z-[15] ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? blockContainer.hoverClass : ''} ${disabled ? 'pointer-events-none' : ''}`}
+            className={`${blockContainer.base} ${trackBlockColor.zoom.base} group z-10 hover:z-[15] ${isDragging ? blockContainer.dragging : blockContainer.idle} ${(!isSelected && !disabled) ? trackBlockColor.zoom.hover : ''} ${disabled ? 'pointer-events-none' : ''}`}
             data-part="block-container"
             style={{
                 left: `${left}px`,
@@ -109,41 +92,31 @@ export const ZoomBlock: React.FC<ZoomBlockProps> = ({
             onMouseDown={disabled ? undefined : onMouseDown}
             onClick={disabled ? undefined : onClick}
         >
-            {/* Transition-in segment */}
-            {clampedTransitionWidth > 0 && (
-                <div
-                    className={`${transitionSegment.base} ${transitionColorClass} ${transitionHoverClass}`}
-                    data-part="transition-in"
-                    style={{
-                        left: 0,
-                        top: segmentY,
-                        width: clampedTransitionWidth,
-                        ...transitionStyle,
-                        height: segmentHeight,
-                    }}
-                />
-            )}
-
-            {/* Hold segment */}
-            {holdWidth > 0 && (
-                <div
-                    className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center overflow-hidden`}
-                    data-part="hold"
-                    style={{
-                        left: clampedTransitionWidth,
-                        top: segmentY,
-                        width: holdWidth,
-                        ...holdSegment.getStyle(),
-                        height: segmentHeight,
-                        borderRadius: hasZoomOut ? 0 : `0 ${SEGMENT_RADIUS}px ${SEGMENT_RADIUS}px 0`,
-                        borderRight: hasZoomOut && !isSelected ? 'none' : undefined,
-                    }}
-                >
-                    {!isCollapsed && holdWidth >= MIN_ICON_WIDTH_PX && (
-                        <LuZoomIn className={`${blockIconClass} icon-md`} />
-                    )}
-                </div>
-            )}
+            {/* Zoom segment */}
+            <div
+                className={`${holdSegment.base} ${holdColorClass} ${holdHoverClass} flex items-center justify-center gap-1 overflow-hidden`}
+                data-part="hold"
+                style={{
+                    left: 0,
+                    top: segmentY,
+                    width,
+                    ...holdSegment.getStyle(),
+                    height: segmentHeight,
+                    borderRadius: hasZoomOut
+                        ? `${SEGMENT_RADIUS}px 0 0 ${SEGMENT_RADIUS}px`
+                        : SEGMENT_RADIUS,
+                    borderRight: hasZoomOut && !isSelected ? 'none' : undefined,
+                }}
+            >
+                {!isCollapsed && width >= MIN_ICON_WIDTH_PX && (
+                    <LuZoomIn className={`${blockIconClass} icon-md shrink-0`} />
+                )}
+                {!isCollapsed && width >= MIN_ZOOM_FACTOR_LABEL_WIDTH_PX && (
+                    <span className={blockLabelClass}>
+                        {parseFloat(zoomFactor.toFixed(1))}x
+                    </span>
+                )}
+            </div>
 
             {/* Zoom-out segment (overflows the container to the right) */}
             {zoomOutWidth > 0 && (

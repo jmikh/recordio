@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { LuScanFace } from 'react-icons/lu';
 import { Modal, Button} from '@shared/components';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useTimeMapper } from '../../hooks/useTimeMapper';
 import { useUIStore } from '../../stores/useUIStore';
+import { detectFaceCenter } from '../../faceDetection/detectFaceCenter';
 
 export const FaceAnchorModal: React.FC<{
     isOpen: boolean;
@@ -21,15 +23,54 @@ export const FaceAnchorModal: React.FC<{
     const [localCenter, setLocalCenter] = useState<{x: number, y: number}>({ x: 0.5, y: 0.5 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState<{x: number, y: number} | null>(null);
+    const [detectStatus, setDetectStatus] = useState<'idle' | 'detecting' | 'notFound' | 'error'>('idle');
     
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const detectAbortRef = useRef<AbortController | null>(null);
+    // A drag during detection wins over the detected point
+    const userMovedRef = useRef(false);
 
     useEffect(() => {
         if (isOpen && cameraSettings) {
             setLocalCenter(cameraSettings.faceCenter || { x: 0.5, y: 0.5 });
         }
     }, [isOpen, cameraSettings]);
+
+    const cameraUrl = cameraSource ? mediaUrls[cameraSource.storagePath] : undefined;
+    const cameraDurationMs = cameraSource?.durationMs;
+
+    const runDetection = useCallback(async () => {
+        if (!cameraUrl || !cameraDurationMs) return;
+        detectAbortRef.current?.abort();
+        const controller = new AbortController();
+        detectAbortRef.current = controller;
+        userMovedRef.current = false;
+        setDetectStatus('detecting');
+
+        try {
+            const center = await detectFaceCenter(cameraUrl, cameraDurationMs, controller.signal);
+            if (controller.signal.aborted) return;
+            if (center && !userMovedRef.current) setLocalCenter(center);
+            setDetectStatus(center ? 'idle' : 'notFound');
+        } catch (err) {
+            if (controller.signal.aborted) return;
+            console.error('[FaceAnchorModal] Face detection failed', err);
+            setDetectStatus('error');
+        }
+    }, [cameraUrl, cameraDurationMs]);
+
+    // No saved anchor yet: place it automatically when the modal opens
+    const hasSavedAnchor = Boolean(cameraSettings?.faceCenter);
+    useEffect(() => {
+        if (!isOpen) return;
+        if (!hasSavedAnchor) runDetection();
+        return () => {
+            detectAbortRef.current?.abort();
+            setDetectStatus('idle');
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per open, not whenever the inputs change
+    }, [isOpen]);
 
     // Sync video time
     useEffect(() => {
@@ -46,6 +87,7 @@ export const FaceAnchorModal: React.FC<{
         e.stopPropagation();
         
         if (!containerRef.current || !cameraSource?.size) return;
+        userMovedRef.current = true;
         const rect = containerRef.current.getBoundingClientRect();
         
         const containerRatio = rect.width / rect.height;
@@ -142,11 +184,11 @@ export const FaceAnchorModal: React.FC<{
     }
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[800px]">
+        <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[800px]" ariaLabel="Center face">
             <div className="flex flex-col gap-4">
                 <h2 className="heading-2 border-b border-border pb-2">Center Face</h2>
                 <p className="text-sm text-text-muted">
-                    Drag the circle to center your face. We use this anchor to keep your face centered when you adjust size or crop zoom.
+                    We find your face automatically. Drag the circle to adjust it. We use this anchor to keep your face centered when you adjust size or crop zoom.
                 </p>
 
                 <div 
@@ -157,10 +199,10 @@ export const FaceAnchorModal: React.FC<{
                     onPointerUp={handlePointerUp}
                     onPointerCancel={handlePointerUp}
                 >
-                    {mediaUrls[cameraSource.storagePath] && (
+                    {cameraUrl && (
                         <video
                             ref={videoRef}
-                            src={mediaUrls[cameraSource.storagePath]}
+                            src={cameraUrl}
                             className="w-full h-full object-contain pointer-events-none"
                             muted
                             playsInline
@@ -187,9 +229,19 @@ export const FaceAnchorModal: React.FC<{
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-2 mt-2">
-                    <Button onClick={onClose}>Cancel</Button>
-                    <Button variant="primary" onClick={handleSave}>Save</Button>
+                <div className="flex items-center justify-between gap-2 mt-2">
+                    <div className="flex items-center gap-3">
+                        <Button icon={LuScanFace} onClick={runDetection} disabled={!cameraUrl || detectStatus === 'detecting'}>
+                            Auto-detect
+                        </Button>
+                        {detectStatus === 'detecting' && <span role="status" className="text-label">Detecting face...</span>}
+                        {detectStatus === 'notFound' && <span role="status" className="text-label">No face found. Drag the circle to place it.</span>}
+                        {detectStatus === 'error' && <span role="alert" className="text-label text-destructive">Face detection failed. Drag the circle to place it.</span>}
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={onClose}>Cancel</Button>
+                        <Button variant="primary" onClick={handleSave}>Save</Button>
+                    </div>
                 </div>
             </div>
         </Modal>

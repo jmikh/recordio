@@ -56,7 +56,7 @@ const testProjectData = {
         screen: {
             mode: 'border', toolbar: { enabled: false, theme: 'light', urlMode: 'short' },
             padding: 0, borderRadiusPx: 0, borderWidthPx: 0, borderColor: '#000000',
-            hasShadow: false, hasGlow: false, hasFeather: false, mute: false,
+            hasShadow: false, hasGlow: false, mute: false,
         },
         background: {
             type: 'color', color: '#000000ff', gradientColors: ['#000000ff', '#000000ff'],
@@ -64,7 +64,7 @@ const testProjectData = {
         },
         captions: { enabled: false, captionSize: 1.0, width: 75, textColor: '#ffffff', backgroundColor: '#000000cc', wordHighlight: false },
         audio: { muteMicrophone: false, muteScreenAudio: false, screenVolume: 1, microphoneVolume: 1, music: { enabled: false, source: 'preset', volume: 0.3, fadeOutDurationMs: 3000 } },
-        overlay: { enabled: false, defaultDurationMs: 3000 },
+        blur: { enabled: false },
         autoCutApplied: false,
     },
     timeline: {
@@ -75,9 +75,9 @@ const testProjectData = {
         spotlightSegments: [],
         captionSegments: [],
         cameraMoveSegments: [],
-        overlaySegments: [],
+        blurSegments: [],
         focusAreas: [],
-        displaySettings: { showZoom: true, showSpotlight: true, showCameraMove: true, showOverlay: true, collapsed: false },
+        displaySettings: { showZoom: true, showSpotlight: true, showCameraMove: true, showBlur: true, collapsed: false },
     },
 };
 

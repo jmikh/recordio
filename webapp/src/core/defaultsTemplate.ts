@@ -99,7 +99,7 @@ export function buildDefaultsTemplateProject(settings: ProjectSettings): Project
             focusAreas: [],
             captionSegments: [sampleCaptionSegment(timeMapper)],
             cameraMoveSegments: [],
-            overlaySegments: [],
+            blurSegments: [],
             displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
         },
     };

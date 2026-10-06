@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { BackgroundSettings } from './BackgroundSettings';
 import { ScreenSettings } from './ScreenSettings';
 import { EffectsSettings } from './EffectsSettings';
-import { MotionSettings } from './MotionSettings';
+import { ZoomSettings, SpotlightSettings } from './MotionSettings';
 import { CameraSettings } from './CameraSettings';
 import { CaptionsSettings } from './CaptionsSettings';
 import { AudioSettingsPanel } from './AudioSettings';
@@ -18,7 +18,7 @@ import { navigate } from '../../../lib/navigate';
 import type { SettingsPanelTab } from '../../stores/useUIStore';
 import { ClipInspector } from './ClipInspector';
 import { CameraMoveInspector } from './CameraMoveInspector';
-import { OverlayInspector } from './OverlayInspector';
+import { BlurInspector } from './BlurInspector';
 import { LuChevronRight, LuPanelLeftOpen } from 'react-icons/lu';
 import { useNavDrawerStore } from '../../../components/useNavDrawerStore';
 import { SETTINGS_NAV_ITEMS } from './settingsNavItems';
@@ -83,7 +83,8 @@ export const SettingsPanel = () => {
 
     const navItems = useMemo(() => {
         const items: { id: SettingsPanelTab; label: string; icon: React.ComponentType<{ className?: string }>; disabled?: boolean; disabledTooltip?: string }[] =
-            SETTINGS_NAV_ITEMS.map(item => item.id === 'camera'
+            // No Motion tab in the editor: zoom/spotlight settings show when a block is selected
+            SETTINGS_NAV_ITEMS.filter(item => item.id !== 'motion').map(item => item.id === 'camera'
                 ? { ...item, disabled: !hasCameraSource, disabledTooltip: 'No camera detected' }
                 : item);
         return items;
@@ -92,11 +93,14 @@ export const SettingsPanel = () => {
     // Check if any timeline item is selected
     const selectedWindowId = useUIStore(s => s.selectedWindowId);
     const selectedCameraMoveId = useUIStore(s => s.selectedCameraMoveId);
-    const selectedOverlaySegmentId = useUIStore(s => s.selectedOverlaySegmentId);
-    // A selected zoom or spotlight is edited inside the Motion tab (its card,
-    // badged "1 selected") rather than in an inspector that replaces the panel,
-    // so neither counts as a panel-replacing selection here.
-    const hasSelection = !!(selectedWindowId || selectedCameraMoveId || selectedOverlaySegmentId);
+    const selectedBlurSegmentId = useUIStore(s => s.selectedBlurSegmentId);
+    const selectedZoomId = useUIStore(s => s.selectedZoomId);
+    const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
+    // Delete All / Auto Apply / undo can remove the selected block without
+    // clearing the selection; fall back to the active tab when that happens.
+    const selectedZoomExists = useProjectStore(s => !!selectedZoomId && s.project.timeline.zoomSegments.some(z => z.id === selectedZoomId));
+    const selectedSpotlightExists = useProjectStore(s => !!selectedSpotlightId && s.project.timeline.spotlightSegments.some(z => z.id === selectedSpotlightId));
+    const hasSelection = !!(selectedWindowId || selectedCameraMoveId || selectedBlurSegmentId || selectedZoomExists || selectedSpotlightExists);
 
     const outputWindows = useProjectStore(s => s.project.timeline.outputWindows);
     const cameraMoveSegments = useProjectStore(s => s.project.timeline.cameraMoveSegments);
@@ -104,8 +108,8 @@ export const SettingsPanel = () => {
     const selectedWindow = selectedWindowId ? outputWindows.find(w => w.id === selectedWindowId) : null;
     const selectedCameraMove = selectedCameraMoveId ? (cameraMoveSegments || []).find(s => s.id === selectedCameraMoveId) : null;
 
-    const overlaySegments = useProjectStore(s => s.project.timeline.overlaySegments);
-    const selectedOverlaySegment = selectedOverlaySegmentId ? (overlaySegments || []).find(b => b.id === selectedOverlaySegmentId) : null;
+    const blurSegments = useProjectStore(s => s.project.timeline.blurSegments);
+    const selectedBlurSegment = selectedBlurSegmentId ? (blurSegments || []).find(b => b.id === selectedBlurSegmentId) : null;
 
     // Save before leaving, mirroring the old header logo behavior
     const handleGoToDashboard = async () => {
@@ -193,7 +197,9 @@ export const SettingsPanel = () => {
                         <>
                             {selectedWindow && <ClipInspector window={selectedWindow} />}
                             {selectedCameraMove && <CameraMoveInspector segment={selectedCameraMove} />}
-                            {selectedOverlaySegment && <OverlayInspector block={selectedOverlaySegment} />}
+                            {selectedBlurSegment && <BlurInspector segment={selectedBlurSegment} />}
+                            {selectedZoomExists && <ZoomSettings />}
+                            {selectedSpotlightExists && <SpotlightSettings />}
                         </>
                     ) : (
                         <>
@@ -202,7 +208,6 @@ export const SettingsPanel = () => {
                             {activeTab === 'screen' && <ScreenSettings />}
                             {activeTab === 'camera' && <CameraSettings />}
                             {activeTab === 'effects' && <EffectsSettings />}
-                            {activeTab === 'motion' && <MotionSettings />}
                             {activeTab === 'captions' && <CaptionsSettings />}
                             {activeTab === 'audio' && <AudioSettingsPanel />}
                         </>

@@ -70,8 +70,6 @@ export const EDITABLE_DEFAULT_PATHS = [
     'camera.borderWidthPx',
     'camera.hasShadow',
     'camera.hasGlow',
-    'camera.hasFeather',
-    'camera.featherAmount',
     'camera.autoShrink',
     'camera.shrinkScale',
 
@@ -137,7 +135,7 @@ function copyPath(src: unknown, dest: Record<string, unknown>, path: string): vo
  * EDITABLE_DEFAULT_PATHS copied over from `settings`. Everything else —
  * aspect ratio, frame rate, the whole audio tree, screen mute, camera
  * mirror/crop-zoom, crop, face anchor, transcription source, track
- * toggles, autoCutApplied, the camera-layout and overlay block defaults —
+ * toggles, autoCutApplied, the camera-layout block defaults —
  * comes back at its shipped value.
  *
  * Note `background` and the other listed subtrees are replaced whole, not

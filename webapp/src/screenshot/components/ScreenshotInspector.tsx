@@ -6,7 +6,7 @@
 import { LuBringToFront, LuSendToBack, LuTrash2 } from 'react-icons/lu';
 import { Button, CollapsibleCard, MultiToggle } from '@shared/components';
 import type { ArrowOverlayItem, BlurOverlayItem, BorderOverlayItem, OverlayItem } from '@shared/types/overlay';
-import { OverlayItemSettings } from '../../editor/components/settings/OverlayInspector';
+import { OverlayItemSettings } from '../../editor/components/settings/OverlayItemSettings';
 import { useScreenshotDoc, useScreenshotHistoryBatcher, useScreenshotStore } from '../store/useScreenshotStore';
 import { useScreenshotUIStore } from '../store/useScreenshotUIStore';
 import { applyCrop, cancelCrop, deleteSelected, resetCrop } from '../actions';

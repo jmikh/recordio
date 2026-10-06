@@ -1,134 +1,18 @@
-import React, { useCallback, useMemo } from 'react';
-import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore } from '../../stores/useUIStore';
-import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { CollapsibleCard, Button, Slider, MultiToggle, Tooltip } from '@shared/components';
+import React from 'react';
+import { Slider, MultiToggle } from '@shared/components';
 import { ColorButton } from './ColorButton';
-import { LuArrowUpRight, LuType } from 'react-icons/lu';
-import { TbBlur, TbBorderOuter } from 'react-icons/tb';
-import type { OverlaySegment, OverlayItem, OverlayItemType, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '@shared/types/overlay';
-import type { OverlaySettings } from '@shared/types/settings';
+import type { OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '@shared/types/overlay';
 import type { AnnotationDefaults } from '@shared/types/screenshot';
-import { createDefaultItem } from '../../overlay/defaultItems';
-
-// Default item factory lives in ../../overlay/defaultItems (shared with the
-// screenshot editor); re-exported so existing imports keep working
-export { createDefaultItem };
-
-const OVERLAY_TYPE_LABELS: Record<OverlayItemType, string> = {
-    blur: 'Blur',
-    text: 'Text',
-    arrow: 'Arrow',
-    border: 'Outline',
-};
-
-const OVERLAY_TYPE_ICONS: Record<OverlayItemType, React.ReactNode> = {
-    blur: <TbBlur className="icon-sm" />,
-    text: <LuType className="icon-sm" />,
-    arrow: <LuArrowUpRight className="icon-sm" />,
-    border: <TbBorderOuter className="icon-sm" />,
-};
 
 // ============================================================================
-// MAIN INSPECTOR
-// ============================================================================
-
-export const OverlayInspector: React.FC<{ block: OverlaySegment }> = ({ block }) => {
-    const deleteOverlaySegment = useProjectStore(s => s.deleteOverlaySegment);
-    const clearOverlaySegments = useProjectStore(s => s.clearOverlaySegments);
-    const updateOverlayItemData = useProjectStore(s => s.updateOverlayItemData);
-    const updateSettings = useProjectStore(s => s.updateSettings);
-    const selectOverlaySegment = useUIStore(s => s.selectOverlaySegment);
-    const outputSize = useProjectStore(s => s.project.settings.outputSize);
-    const overlaySettings = useProjectStore(s => s.project.settings.overlay) as OverlaySettings;
-    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
-
-    const item = block.item;
-
-    const handleDelete = useCallback(() => {
-        deleteOverlaySegment(block.id);
-        selectOverlaySegment(null);
-    }, [block.id, deleteOverlaySegment, selectOverlaySegment]);
-
-    const handleDeleteAll = useCallback(() => {
-        clearOverlaySegments();
-        selectOverlaySegment(null);
-    }, [clearOverlaySegments, selectOverlaySegment]);
-
-    const handleChangeType = useCallback((newType: OverlayItemType) => {
-        if (newType === item.type) return;
-        // Replace the item with a new default of the selected type
-        const newItem = createDefaultItem(newType, outputSize, overlaySettings);
-        updateOverlayItemData(block.id, newItem);
-    }, [item.type, block.id, outputSize, overlaySettings, updateOverlayItemData]);
-
-    const handleUpdateItem = useCallback((updates: Partial<OverlayItem>) => {
-        updateOverlayItemData(block.id, updates);
-    }, [block.id, updateOverlayItemData]);
-
-    return (
-        <div className="flex flex-col gap-2">
-            {/* Type Selector */}
-            <CollapsibleCard title={OVERLAY_TYPE_LABELS[item.type]} icon={OVERLAY_TYPE_ICONS[item.type]} notCollapsible>
-                <div className="flex flex-col gap-2">
-                    <p className="text-label">Change overlay type:</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                        {(['blur', 'text', 'arrow', 'border'] as OverlayItemType[]).map(type => (
-                            <Button
-                                key={type}
-                                variant={item.type === type ? 'primary' : undefined}
-                                onClick={() => handleChangeType(type)}
-                            >
-                                {OVERLAY_TYPE_ICONS[type]}
-                                <span>{OVERLAY_TYPE_LABELS[type]}</span>
-                            </Button>
-                        ))}
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                        <Button fullWidth onClick={handleDelete} className="text-danger hover:text-danger">
-                            <span>Delete Selected</span>
-                        </Button>
-                        <Button fullWidth onClick={handleDeleteAll} className="text-danger hover:text-danger">
-                            <span>Delete All</span>
-                        </Button>
-                    </div>
-                </div>
-            </CollapsibleCard>
-
-            {/* Item Settings */}
-            <CollapsibleCard
-                title="Settings"
-                icon={OVERLAY_TYPE_ICONS[item.type]}
-                notCollapsible
-            >
-                <OverlayItemSettings
-                    block={block}
-                    item={item}
-                    overlaySettings={overlaySettings}
-                    updateItem={handleUpdateItem}
-                    updateSettings={updateSettings}
-                    startInteraction={startInteraction}
-                    endInteraction={endInteraction}
-                    batchAction={batchAction}
-                />
-            </CollapsibleCard>
-        </div>
-    );
-};
-
-// ============================================================================
-// ITEM SETTINGS — type-specific property controls
-// Store-free; also hosted by the screenshot inspector (plans/screenshots).
+// ITEM SETTINGS — type-specific property controls for an annotation item.
+// Store-free; hosted by the screenshot inspector (plans/screenshots).
 // ============================================================================
 
 export interface OverlayItemSettingsProps {
-    /** Video only — the owning segment (unused by the controls themselves) */
-    block?: OverlaySegment;
     item: OverlayItem;
     overlaySettings: AnnotationDefaults;
     updateItem: (updates: Partial<OverlayItem>) => void;
-    /** Video only — reserved for apply-to-all defaults */
-    updateSettings?: (s: any) => void;
     startInteraction: () => void;
     endInteraction: () => void;
     batchAction: (fn: () => void) => void;

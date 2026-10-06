@@ -9,6 +9,7 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
 import { drawScreen } from '@shared/painters/screenPainter';
 import { drawCamera } from '@shared/painters/cameraPainter';
+import { resolveCameraImage } from '@shared/painters/cameraCutout';
 import { getViewportStateAtTime } from '@shared/animators/zoomAnimator';
 
 // ------------------------------------------------------------------
@@ -49,9 +50,9 @@ export const renderCameraMoveEditor = (
     const cameraSettings = state.overrideCameraSettings;
 
     if (cameraSource && cameraSettings) {
-        const video = videoRefs[cameraSource.storagePath];
-        if (video) {
-            drawCamera(ctx, video, cameraSource.size, cameraSettings);
+        const camera = resolveCameraImage(project, videoRefs);
+        if (camera) {
+            drawCamera(ctx, camera.image, cameraSource.size, cameraSettings, undefined, camera.cutout);
         }
     }
 };

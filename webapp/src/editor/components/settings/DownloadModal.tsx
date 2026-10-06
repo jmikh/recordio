@@ -96,7 +96,7 @@ export function DownloadModal({
 
     const lockIcon = entitlements.can4k ? undefined : <LuLock className="icon-sm" />;
     const resolutionOptions: MultiToggleOption<ExportResolutionChoice>[] = [
-        { value: 'HD', label: '1080p (HD)', tooltip: 'Full HD' },
+        { value: 'HD', label: 'HD', tooltip: 'HD (1080p)' },
         { value: '4K', label: '4K', icon: lockIcon, tooltip: entitlements.can4k ? 'Ultra HD' : 'Ultra HD — Pro' },
     ];
 

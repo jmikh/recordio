@@ -1,5 +1,4 @@
 import type { CameraSettings, Size } from '../types';
-import type { RenderContext, CanvasHandle } from '../utils/renderContext';
 import { roundRectPath } from './utils/roundRect';
 
 const REF_OUTPUT_HEIGHT = 1080;
@@ -7,17 +6,6 @@ const REF_SHADOW_BLUR = 20;
 const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
 const REF_SHADOW_OFFSET_Y = 10;
 const REF_GLOW_BLUR = 25;
-const FEATHER_SIZE = 40;
-
-// Canvas cache for feather effect (reuse to avoid creating new canvases every frame)
-let cachedOffscreen: CanvasHandle | null = null;
-let cachedMask: CanvasHandle | null = null;
-let cachedWidth = 0;
-let cachedHeight = 0;
-let cachedShape: 'circle' | 'rect' | 'square' | null = null;
-let cachedMaskWidth = 0;
-let cachedMaskHeight = 0;
-let cachedMaskShape: 'circle' | 'rect' | 'square' | null = null;
 
 /**
  * Draws the camera overlay (Picture-in-Picture) onto the canvas.
@@ -26,6 +14,9 @@ let cachedMaskShape: 'circle' | 'rect' | 'square' | null = null;
  * @param video - The source video element for the camera.
  * @param inputSize - The dimensions of the source camera video.
  * @param settings - Configuration for position/size.
+ * @param cutout - `video` is a transparent background-removed cutout
+ *   (shared/painters/cameraCutout.ts): drawn free-standing, without the
+ *   shape clip, border or glow; the shadow follows the silhouette.
  */
 export function drawCamera(
     ctx: CanvasRenderingContext2D,
@@ -33,18 +24,15 @@ export function drawCamera(
     inputSize: Size,
     settings: CameraSettings,
     outputSize?: Size,
-    renderCtx?: RenderContext
+    cutout = false
 ) {
     const {
         xPx: x, yPx: y, widthPx: width, heightPx: height,
-        shape = 'rect',
         borderRadiusPx: borderRadius = 0,
         borderWidthPx: borderWidth = 0,
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,
-        hasFeather = false,
-        featherAmount = 0.15,
         cropZoom = 1,
         mirrored = false
     } = settings;
@@ -127,8 +115,20 @@ export function drawCamera(
         ctx.translate(-x, 0);
     }
 
-    // 1. Glow Pass (only in border mode)
-    if (hasGlow && !hasFeather) {
+    if (cutout) {
+        if (hasShadow) {
+            ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
+            ctx.shadowColor = SHADOW_COLOR;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
+        }
+        ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+        ctx.restore();
+        return;
+    }
+
+    // 1. Glow Pass
+    if (hasGlow) {
         ctx.save();
         ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
         ctx.shadowColor = borderColor;
@@ -147,8 +147,8 @@ export function drawCamera(
         ctx.restore();
     }
 
-    // 2. Shadow Pass (only in border mode)
-    if (hasShadow && !hasFeather) {
+    // 2. Shadow Pass
+    if (hasShadow) {
         ctx.save();
         ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
         ctx.shadowColor = SHADOW_COLOR;
@@ -168,119 +168,14 @@ export function drawCamera(
     }
 
     // 3. Content Pass
-    if (hasFeather && featherAmount > 0 && renderCtx) {
-        // Feather mode: use off-screen canvas for clean compositing isolation
-        // Reuse cached canvas if dimensions and shape match, otherwise create new one
-        if (!cachedOffscreen || cachedWidth !== width || cachedHeight !== height || cachedShape !== shape) {
-            cachedOffscreen = renderCtx.createCanvas(width, height);
-            cachedWidth = width;
-            cachedHeight = height;
-            cachedShape = shape;
-        }
+    ctx.save();
+    definePath();
+    ctx.clip();
+    ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+    ctx.restore();
 
-        const offscreen = cachedOffscreen.canvas;
-        const offCtx = cachedOffscreen.ctx;
-
-        // Clear previous frame
-        offCtx.clearRect(0, 0, width, height);
-        offCtx.globalCompositeOperation = 'source-over';
-
-        // Draw video to off-screen canvas at origin (0,0)
-        offCtx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
-
-        // Apply feathered alpha mask using destination-in
-        offCtx.globalCompositeOperation = 'destination-in';
-
-        if (shape === 'circle') {
-            const centerX = width / 2;
-            const centerY = height / 2;
-            const radius = Math.min(width, height) / 2;
-            const featherSize = radius * featherAmount;
-            const innerRadius = Math.max(0, radius - featherSize);
-
-            // Radial gradient: opaque center, transparent edge
-            const gradient = offCtx.createRadialGradient(
-                centerX, centerY, innerRadius,
-                centerX, centerY, radius
-            );
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-            offCtx.fillStyle = gradient;
-            offCtx.fillRect(0, 0, width, height);
-        } else {
-            // For rect/square: build mask with faded edges
-            const smallerDim = Math.min(width, height);
-            const featherSize = smallerDim * featherAmount;
-
-            // Reuse cached mask canvas if dimensions and shape match
-            if (!cachedMask || cachedMaskWidth !== width || cachedMaskHeight !== height || cachedMaskShape !== shape) {
-                cachedMask = renderCtx.createCanvas(width, height);
-                cachedMaskWidth = width;
-                cachedMaskHeight = height;
-                cachedMaskShape = shape;
-            }
-
-            const maskCanvas = cachedMask.canvas;
-            const maskCtx = cachedMask.ctx;
-
-            // Clear and rebuild mask
-            maskCtx.clearRect(0, 0, width, height);
-            maskCtx.globalCompositeOperation = 'source-over';
-
-            // Fill entire rect with opaque white first
-            maskCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-            maskCtx.fillRect(0, 0, width, height);
-
-            // Use destination-out to remove the edges with gradients
-            maskCtx.globalCompositeOperation = 'destination-out';
-
-            // Top edge fade (remove)
-            let grad = maskCtx.createLinearGradient(0, 0, 0, featherSize);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 1)'); // Remove outer edge
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Keep inner
-            maskCtx.fillStyle = grad;
-            maskCtx.fillRect(0, 0, width, featherSize);
-
-            // Bottom edge fade (remove)
-            grad = maskCtx.createLinearGradient(0, height, 0, height - featherSize);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            maskCtx.fillStyle = grad;
-            maskCtx.fillRect(0, height - featherSize, width, featherSize);
-
-            // Left edge fade (remove)
-            grad = maskCtx.createLinearGradient(0, 0, featherSize, 0);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            maskCtx.fillStyle = grad;
-            maskCtx.fillRect(0, 0, featherSize, height);
-
-            // Right edge fade (remove)
-            grad = maskCtx.createLinearGradient(width, 0, width - featherSize, 0);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            maskCtx.fillStyle = grad;
-            maskCtx.fillRect(width - featherSize, 0, featherSize, height);
-
-            // Apply the completed mask to the video with destination-in
-            offCtx.globalCompositeOperation = 'destination-in';
-            offCtx.drawImage(maskCanvas, 0, 0);
-        }
-
-        // Copy the feathered result to the main canvas
-        ctx.drawImage(offscreen, 0, 0, width, height, x, y, width, height);
-    } else {
-        // No feather: draw directly to main canvas with standard clipping
-        ctx.save();
-        definePath();
-        ctx.clip();
-        ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
-        ctx.restore();
-    }
-
-    // 4. Border Pass (only in border mode)
-    if (scaledBorderWidth > 0 && !hasFeather) {
+    // 4. Border Pass
+    if (scaledBorderWidth > 0) {
         definePath();
         ctx.lineWidth = scaledBorderWidth;
         ctx.strokeStyle = borderColor;

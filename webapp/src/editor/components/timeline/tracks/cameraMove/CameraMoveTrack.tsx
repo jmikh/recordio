@@ -9,10 +9,8 @@ import { useCameraMoveHover } from './useCameraMoveHover';
 import { CameraMoveBlock } from './CameraMoveBlock';
 import {
     ghostCameraMove,
-    blockIconClass,
     ghostIconClass,
     MIN_ICON_WIDTH_PX,
-    SEGMENT_RADIUS,
 } from '../shared/TimelineBlockStyles';
 import { DisabledTrackOverlay } from '../shared/DisabledTrackOverlay';
 import type { CameraMoveSegment } from '@shared/types';
@@ -23,8 +21,7 @@ interface CameraMoveTrackProps {
 }
 
 /**
- * CameraMoveTrack renders camera layout segments as time-range blocks.
- * Follows the same visual pattern as ZoomTrack: transition-in zone + hold zone.
+ * CameraMoveTrack renders camera layout segments as single solid time-range blocks.
  */
 export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isCollapsed }) => {
     const pixelsPerSec = useUIStore(s => s.pixelsPerSec);
@@ -36,7 +33,6 @@ export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isColl
     };
 
     const project = useProjectStore(s => s.project);
-    const globalTransitionDurationMs = project.settings.cameraMove?.transitionDurationMs ?? 500;
     const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
 
     const timeMapper = useTimeMapper();
@@ -97,15 +93,12 @@ export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isColl
 
                     const isSelected = selectedId === s.id;
                     const isDragging = dragState?.segmentId === s.id;
-                    const segTransitionWidthPx = coords.msToX(s.transitionDurationMs ?? globalTransitionDurationMs);
 
                     return (
                         <CameraMoveBlock
                             key={s.id}
                             left={startX}
                             width={blockWidth}
-                            transitionInWidth={segTransitionWidthPx}
-                            transitionOutWidth={segTransitionWidthPx}
                             isSelected={isSelected}
                             isDragging={isDragging}
                             trackHeight={height}
@@ -136,78 +129,34 @@ export const CameraMoveTrack: React.FC<CameraMoveTrackProps> = ({ height, isColl
                 })}
 
                 {/* Ghost block */}
-                {cameraMoveEnabled && hoverInfo && !selectedId && !dragState && (() => {
-                    const ghostTransitionWidthPx = coords.msToX(globalTransitionDurationMs);
-                    const totalTransitions = ghostTransitionWidthPx * 2;
-                    const clampedTransitionWidth = totalTransitions > hoverInfo.width
-                        ? hoverInfo.width / 2
-                        : ghostTransitionWidthPx;
-                    const holdWidth = Math.max(0, hoverInfo.width - clampedTransitionWidth * 2);
+                {cameraMoveEnabled && hoverInfo && !selectedId && !dragState && (
+                    <div
+                        className={ghostCameraMove.container}
+                        style={{
+                            left: `${hoverInfo.x}px`,
+                            width: `${hoverInfo.width}px`,
+                            height,
+                        }}
+                    >
+                        <span className={ghostCameraMove.label}>+ Layout</span>
 
-                    return (
                         <div
-                            className={ghostCameraMove.container}
+                            className={`${ghostCameraMove.block.className} flex items-center justify-center overflow-hidden`}
                             style={{
-                                left: `${hoverInfo.x}px`,
-                                width: `${hoverInfo.width}px`,
-                                height,
+                                position: 'absolute',
+                                left: 0,
+                                top: ghostY,
+                                width: '100%',
+                                ...ghostCameraMove.block.getStyle(),
+                                height: height - 2,
                             }}
                         >
-                            <span className={ghostCameraMove.label}>+ Layout</span>
-
-                            {/* Ghost transition-in */}
-                            {clampedTransitionWidth > 0 && (
-                                <div
-                                    className={ghostCameraMove.transitionIn.className}
-                                    style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: ghostY,
-                                        width: clampedTransitionWidth,
-                                        ...ghostCameraMove.transitionIn.getStyle(),
-                                        height: height - 2,
-                                        ...(holdWidth <= 0 ? { borderRight: '1px solid var(--block-bg)' } : {}),
-                                    }}
-                                />
-                            )}
-
-                            {/* Ghost hold */}
-                            {holdWidth > 0 && (
-                                <div
-                                    className={`${ghostCameraMove.hold.className} flex items-center justify-center overflow-hidden`}
-                                    style={{
-                                        position: 'absolute',
-                                        left: clampedTransitionWidth,
-                                        top: ghostY,
-                                        width: holdWidth,
-                                        ...ghostCameraMove.hold.getStyle(),
-                                        height: height - 2,
-                                    }}
-                                >
-                                    {holdWidth >= MIN_ICON_WIDTH_PX && (
-                                        <LuCamera className={`${ghostIconClass} icon-md`} />
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Ghost transition-out */}
-                            {clampedTransitionWidth > 0 && (
-                                <div
-                                    className={ghostCameraMove.transitionOut.className}
-                                    style={{
-                                        position: 'absolute',
-                                        right: 0,
-                                        top: ghostY,
-                                        width: clampedTransitionWidth,
-                                        ...ghostCameraMove.transitionOut.getStyle(),
-                                        height: height - 2,
-                                        ...(holdWidth <= 0 ? { borderLeft: '1px solid var(--block-bg)' } : {}),
-                                    }}
-                                />
+                            {hoverInfo.width >= MIN_ICON_WIDTH_PX && (
+                                <LuCamera className={`${ghostIconClass} icon-md`} />
                             )}
                         </div>
-                    );
-                })()}
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -2,14 +2,14 @@ import { type Project, type ScreenMetadata, type CameraMetadata, type Microphone
 import { scaleProject } from '@shared/utils/projectScale';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 // Default display settings for tracks — single source of truth
 export const DEFAULT_DISPLAY_SETTINGS = {
     showZoom: true,
     showSpotlight: true,
     showCameraMove: true,
-    showOverlay: true,
+    showBlur: true,
     collapsed: false,
 };
 
@@ -95,7 +95,6 @@ export const createDefaultSettings = (): ProjectSettings => ({
         deviceFrameId: 'macbook-air-dark',
         hasShadow: true,
         hasGlow: false,
-        hasFeather: false,
         mute: false
     },
 
@@ -142,12 +141,10 @@ export const createDefaultSettings = (): ProjectSettings => ({
         borderColor: 'white',
         hasShadow: true,
         hasGlow: false,
-        hasFeather: false,
         cropZoom: 1,
         autoShrink: true,
         shrinkScale: 0.5,
         mirrored: false,
-        featherAmount: 0.15,
     },
 
     cameraMove: {
@@ -156,13 +153,8 @@ export const createDefaultSettings = (): ProjectSettings => ({
         easing: 'ease-in-out'
     },
 
-    overlay: {
+    blur: {
         enabled: true,
-        defaultDurationMs: 3000,
-        blurDefaults: { blurRadiusPx: 20 },
-        textDefaults: { color: '#454545', backgroundColor: '#ffdb5700', fontSizePx: 0 },
-        arrowDefaults: { color: '#7B61FF', strokeWidthPx: 4 },
-        borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
     },
 
     autoCutApplied: false,
@@ -177,7 +169,7 @@ export const createDefaultTimeline = (): Timeline => ({
     zoomSegments: [],
     spotlightSegments: [],
     cameraMoveSegments: [],
-    overlaySegments: [],
+    blurSegments: [],
     outputWindows: [],
     focusAreas: [],
     captionSegments: [],
@@ -245,7 +237,7 @@ export class ProjectImpl {
             focusAreas: [],
             captionSegments: [],
             cameraMoveSegments: [],
-            overlaySegments: [],
+            blurSegments: [],
             displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
         };
 

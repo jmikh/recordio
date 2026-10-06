@@ -2,7 +2,7 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { ColorButton } from './ColorButton';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { Button, Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
+import { Button, Slider, MultiToggle, Toggle, Tooltip, CollapsibleCard, type PreviewItem } from '@shared/components';
 import { AutoShrinkTooltip } from '../shared/MediaTooltips';
 import { LuCircle, LuFocus, LuPalette, LuRatio, LuShapes, LuSquare } from 'react-icons/lu';
 import { TbBorderOuter } from 'react-icons/tb';
@@ -31,6 +31,7 @@ export const CameraSettings = () => {
     // no face anchor (per recording), no crop zoom / mirror; size via a slider
     // (no canvas drag) and a Preview button for auto-shrink
     const templateMode = useProjectStore(s => s.templateMode);
+    const cameraMatteJob = useProjectStore(s => s.cameraMatteJob);
 
     if (!cameraConfig) {
         return (
@@ -54,41 +55,45 @@ export const CameraSettings = () => {
         borderColor = '#ffffff',
         hasShadow = false,
         hasGlow = false,
-        hasFeather = false,
-        featherAmount = 0.15,
         cropZoom = 1,
         autoShrink = false,
         shrinkScale = 0.5,
-        mirrored = false
+        mirrored = false,
+        removeBackground = false
     } = cameraConfig;
 
-    // Build preview items for collapsed outline state
+    // Remove Background waits for the camera's mask, computed in the background
+    // once the project has loaded. Until then the toggle is disabled and this
+    // is its tooltip.
+    const hasMatte = !!cameraSource?.matte;
+    const mattePercent = Math.floor(cameraMatteJob.progress * 100);
+    const matteFailed = cameraMatteJob.status === 'error' && !hasMatte;
+    const matteWaitMessage = cameraMatteJob.status === 'processing' ? `Computing background mask… ${mattePercent}%`
+        : cameraMatteJob.status === 'uploading' ? `Saving background mask… ${mattePercent}%`
+            : matteFailed ? "Couldn't compute the background mask. Reopen the project to try again."
+                : cameraMatteJob.status === 'preparing' || !hasMatte ? 'Computing background mask…'
+                    : '';
+
+    // Build preview items for collapsed outline state: color, thickness, and effect
     const borderPreviewItems: PreviewItem[] = [];
 
-    if (hasFeather) {
-        // Feather mode: show "Feather" and percentage
-        borderPreviewItems.push({ type: 'text', content: 'Feather' });
-        borderPreviewItems.push({ type: 'text', content: `${Math.round(featherAmount * 100)}%` });
-    } else {
-        // Border mode: always show color, thickness, and effect
-        borderPreviewItems.push({
-            type: 'custom',
-            content: (
-                <div
-                    className="w-5 h-5 rounded-full border border-border"
-                    style={{ backgroundColor: borderColor }}
-                />
-            )
-        });
+    borderPreviewItems.push({
+        type: 'custom',
+        content: (
+            <div
+                className="w-5 h-5 rounded-full border border-border"
+                style={{ backgroundColor: borderColor }}
+            />
+        )
+    });
 
-        borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
+    borderPreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
 
-        // Add effect type (shadow/glow) if enabled
-        if (hasShadow) {
-            borderPreviewItems.push({ type: 'text', content: 'Shadow' });
-        } else if (hasGlow) {
-            borderPreviewItems.push({ type: 'text', content: 'Glow' });
-        }
+    // Add effect type (shadow/glow) if enabled
+    if (hasShadow) {
+        borderPreviewItems.push({ type: 'text', content: 'Shadow' });
+    } else if (hasGlow) {
+        borderPreviewItems.push({ type: 'text', content: 'Glow' });
     }
 
     return (
@@ -180,6 +185,7 @@ export const CameraSettings = () => {
                     previewItems={templateMode
                         ? [{ type: 'text', content: autoShrink ? 'Shrink' : 'No shrink' }]
                         : [
+                            ...(removeBackground ? [{ type: 'text' as const, content: 'Cutout' }] : []),
                             ...(mirrored ? [{ type: 'text' as const, content: 'Mirror' }] : []),
                             ...(autoShrink ? [{ type: 'text' as const, content: 'Shrink' }] : []),
                             { type: 'text', content: `${cropZoom.toFixed(1)}x` }
@@ -188,6 +194,25 @@ export const CameraSettings = () => {
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleShape', v)}
                 >
                     <div className="flex flex-col gap-4">
+                        {/* Remove Background (per recording, not a default) — a flip once the
+                            mask exists; disabled until then, with the reason in its tooltip */}
+                        {!templateMode && (
+                            <>
+                                <Tooltip text={matteWaitMessage} className="w-full">
+                                    <Toggle
+                                        label="Remove Background"
+                                        value={removeBackground}
+                                        disabled={!!matteWaitMessage}
+                                        className="w-full"
+                                        onChange={(val) => updateSettings({ camera: { ...cameraConfig, removeBackground: val } })}
+                                    />
+                                </Tooltip>
+                                {matteWaitMessage && (
+                                    <span role={matteFailed ? 'alert' : 'status'} className="sr-only">{matteWaitMessage}</span>
+                                )}
+                            </>
+                        )}
+
                         {/* Mirrored Toggle (per recording, not a default) */}
                         {!templateMode && (
                             <Toggle
@@ -236,78 +261,47 @@ export const CameraSettings = () => {
                     onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleBorder', v)}
                 >
                     <div className="space-y-4">
-                        {/* Feather Toggle */}
-                        <Toggle
-                            label="Feather"
-                            value={hasFeather}
-                            onChange={(enabled) => {
-                                batchAction(() => updateSettings({ camera: { ...cameraConfig, hasFeather: enabled } }));
-                            }}
+                        {/* Color Picker */}
+                        <ColorButton
+                            title="Color"
+                            color={borderColor}
+                            onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
+                            onPopoverOpen={startInteraction}
+                            onPopoverClose={endInteraction}
+                            showAlpha
                         />
 
-                        {/* Border Mode Controls */}
-                        {!hasFeather && (
-                            <>
-                                {/* Color Picker */}
-                                <ColorButton
-                                    title="Color"
-                                    color={borderColor}
-                                    onChange={(color) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderColor: color } }))}
-                                    onPopoverOpen={startInteraction}
-                                    onPopoverClose={endInteraction}
-                                    showAlpha
-                                />
+                        {/* Thickness Slider */}
+                        <Slider
+                            label="Thickness"
+                            min={0}
+                            max={20}
+                            value={borderWidthPx}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidthPx: val } }))}
+                            showTooltip
+                            units="px"
+                        />
 
-                                {/* Thickness Slider */}
-                                <Slider
-                                    label="Thickness"
-                                    min={0}
-                                    max={20}
-                                    value={borderWidthPx}
-                                    onPointerDown={startInteraction}
-                                    onPointerUp={endInteraction}
-                                    onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, borderWidthPx: val } }))}
-                                    showTooltip
-                                    units="px"
-                                />
-
-                                {/* Shadow/Glow/None Toggle */}
-                                <MultiToggle
-                                    options={[
-                                        { value: 'shadow', label: 'Shadow' },
-                                        { value: 'none', label: 'None' },
-                                        { value: 'glow', label: 'Glow' }
-                                    ]}
-                                    value={hasShadow ? 'shadow' : hasGlow ? 'glow' : 'none'}
-                                    onChange={(val) => {
-                                        if (val === 'shadow') {
-                                            batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: true, hasGlow: false } }));
-                                        } else if (val === 'glow') {
-                                            batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: true } }));
-                                        } else {
-                                            batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: false } }));
-                                        }
-                                    }}
-                                />
-                            </>
-                        )}
-
-                        {/* Feather Mode Controls */}
-                        {hasFeather && (
-                            <Slider
-                                label="Amount"
-                                min={0}
-                                max={0.5}
-                                value={featherAmount}
-                                onPointerDown={startInteraction}
-                                onPointerUp={endInteraction}
-                                onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, featherAmount: val } }))}
-                                showTooltip
-                                units="%"
-                                decimals={0}
-                                valueTransform={(v) => v * 100}
-                            />
-                        )}
+                        {/* Shadow/Glow/None Toggle */}
+                        <MultiToggle
+                            options={[
+                                { value: 'shadow', label: 'Shadow' },
+                                { value: 'none', label: 'None' },
+                                { value: 'glow', label: 'Glow' }
+                            ]}
+                            value={hasShadow ? 'shadow' : hasGlow ? 'glow' : 'none'}
+                            onChange={(val) => {
+                                if (val === 'shadow') {
+                                    batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: true, hasGlow: false } }));
+                                } else if (val === 'glow') {
+                                    batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: true } }));
+                                } else {
+                                    batchAction(() => updateSettings({ camera: { ...cameraConfig, hasShadow: false, hasGlow: false } }));
+                                }
+                            }}
+                        />
                     </div>
                 </CollapsibleCard>
             </div>

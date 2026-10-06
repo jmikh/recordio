@@ -7,8 +7,8 @@
 import type { ID, TimeMs, Rect } from './core';
 import type { EasingStyle } from './settings';
 
-// Re-export overlay types (defined in their own file for complexity management)
-export type { OverlayItemType, BaseOverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem, OverlayItem, OverlaySegment } from './overlay';
+// Re-export blur types (defined in their own file for complexity management)
+export type { BlurRegion, BlurSegment } from './blur';
 
 // ==========================================
 // BASE SEGMENT INTERFACE
@@ -173,7 +173,7 @@ export interface DisplaySettings {
     showZoom: boolean;
     showSpotlight: boolean;
     showCameraMove: boolean;
-    showOverlay: boolean;
+    showBlur: boolean;
     /** Whether hover-to-expand collapse is active */
     collapsed: boolean;
 }
@@ -206,8 +206,8 @@ export interface Timeline {
     captionSegments: CaptionSegment[];
     /** Camera layout overrides for dynamic camera position/size changes */
     cameraMoveSegments: CameraMoveSegment[];
-    /** Overlay annotation segments (may overlap, single-item each, source-time anchored) */
-    overlaySegments: import('./overlay').OverlaySegment[];
+    /** Blur segments (non-overlapping, each blurring one or more regions) */
+    blurSegments: import('./blur').BlurSegment[];
     /** Cached focus areas computed from user events and output windows */
     focusAreas: FocusArea[];
     /** Timeline display settings (track visibility, collapse state) */

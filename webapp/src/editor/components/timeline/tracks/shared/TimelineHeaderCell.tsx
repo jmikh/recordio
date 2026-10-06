@@ -1,99 +1,71 @@
 import React from 'react';
-import { LuEye, LuEyeOff, LuVolume2, LuVolumeOff } from 'react-icons/lu';
-import { Button } from '@shared/components';
+import type { IconType } from 'react-icons';
+import { Button, Tooltip } from '@shared/components';
 
 interface TimelineHeaderCellProps {
-    icon?: React.ReactNode;
+    icon: IconType;
+    /** Track name — the button's accessible name and the default tooltip subject */
     title: string;
     height: number;
-    hasAudio?: boolean;
-    isMuted?: boolean;
-    onToggleMute?: () => void;
-    /** Optional element to show next to the title (e.g., legend icon) */
-    infoElement?: React.ReactNode;
-    /** Optional custom title element (e.g., tooltip-wrapped title). Replaces the default title span. */
-    titleElement?: React.ReactNode;
-    /** When true, shows a compact "…" placeholder instead of full header content */
+    /** When true the track is squeezed to a sliver, so the icon shrinks to fit */
     isCollapsed?: boolean;
-    /** When provided, renders an eye icon button to toggle the apply state */
+    /** When provided, the icon becomes a button that toggles the track's apply state */
     applyEnabled?: boolean;
     onToggleApply?: () => void;
 }
 
 /**
  * Unified header cell component for timeline track headers.
- * Provides consistent height, styling, and layout for all track headers.
+ * Icon-only: for effect tracks the icon itself is the enable/disable toggle —
+ * dimmed with a slash through it while the effect is off.
  */
 export const TimelineHeaderCell: React.FC<TimelineHeaderCellProps> = ({
-    icon,
+    icon: Icon,
     title,
     height,
-    hasAudio,
-    isMuted,
-    onToggleMute,
-    infoElement,
-    titleElement,
     isCollapsed = false,
-    applyEnabled,
+    applyEnabled = true,
     onToggleApply,
 }) => {
+    const isToggle = onToggleApply !== undefined;
+    // Icon + slash scale together so the collapsed sliver still shows the on/off state
+    const glyphClass = `relative flex transition-transform duration-150 ${isCollapsed ? 'scale-[0.6]' : ''}`;
+
+    const trigger = isToggle ? (
+        <Button
+            variant="ghost"
+            onClick={(e) => {
+                e.stopPropagation();
+                onToggleApply();
+            }}
+            // Ghost resolves to main -> highlighted on hover; the off state drops
+            // to disabled so the whole column reads at a glance.
+            className={`transition-[color,transform] active:scale-90 ${applyEnabled ? '' : 'text-text-disabled hover:text-text-muted'}`}
+            aria-label={title}
+            aria-pressed={applyEnabled}
+        >
+            <span className={glyphClass}>
+                <Icon className="icon-md" />
+                <span
+                    aria-hidden
+                    className={`pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 -translate-y-1/2 -rotate-45 rounded-full bg-current ring-2 ring-surface transition-transform duration-150 ${applyEnabled ? 'scale-x-0' : 'scale-x-100'}`}
+                />
+            </span>
+        </Button>
+    ) : (
+        <span className={`${glyphClass} px-1 text-text-muted`} aria-label={title} role="img">
+            <Icon className="icon-md" />
+        </span>
+    );
+
+    const tooltipText = isToggle ? `${applyEnabled ? 'Disable' : 'Enable'} ${title.toLowerCase()}` : title;
+
     return (
         <div
-            className="flex items-center justify-between pl-3 pr-1 bg-surface rounded-sm overflow-hidden mx-1"
+            className="flex items-center justify-center bg-surface rounded-sm overflow-hidden mx-1"
             style={{ height, minHeight: height, transition: 'height 150ms ease' }}
         >
-            {!isCollapsed && (
-                <>
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        {icon && (
-                            <span className="flex-shrink-0 text-label">
-                                {icon}
-                            </span>
-                        )}
-                        {titleElement ?? (
-                            <span
-                                className="truncate select-none text-label"
-                                title={title}
-                            >
-                                {title}
-                            </span>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                        {infoElement}
-                        {hasAudio && onToggleMute && (
-                            <Button
-                                variant="ghost"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleMute();
-                                }}
-                                className={isMuted ? 'text-destructive' : ''}
-                                title={isMuted ? "Unmute" : "Mute"}
-                            >
-                                {isMuted ? <LuVolumeOff className="icon-sm" /> : <LuVolume2 className="icon-sm" />}
-                            </Button>
-                        )}
-                        {onToggleApply !== undefined && (
-                            <Button
-                                variant="ghost"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleApply();
-                                }}
-                                // Ghost already resolves to muted -> highlighted on hover,
-                                // so only the hidden state needs its own dimmer treatment.
-                                className={!applyEnabled ? 'text-text-disabled hover:text-text-muted' : ''}
-                                icon={applyEnabled ? LuEye : LuEyeOff}
-                                aria-label={applyEnabled ? 'Disable effect' : 'Enable effect'}
-                                title={applyEnabled ? 'Disable effect' : 'Enable effect'}
-                            />
-                        )}
-                    </div>
-                </>
-            )}
+            <Tooltip text={tooltipText} position="right">{trigger}</Tooltip>
         </div>
     );
 };
-
