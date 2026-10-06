@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore, CanvasMode } from '../../stores/useUIStore';
 import type { CameraSettings, Rect, Project } from '@shared/types';
@@ -96,17 +97,11 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // so it won't cause feedback loops like x/y/width/height would
     const currentShape = useProjectStore(s => s.project.settings.camera?.shape ?? 'rect');
 
-    // Subscribe to non-positional settings that can change via sliders/toggles while editor is open
-    // These won't cause feedback loops since the bounding box doesn't modify them
-    const cropZoom = useProjectStore(s => s.project.settings.camera?.cropZoom);
-    const autoShrink = useProjectStore(s => s.project.settings.camera?.autoShrink);
-    const shrinkScale = useProjectStore(s => s.project.settings.camera?.shrinkScale);
-    const borderRadius = useProjectStore(s => s.project.settings.camera?.borderRadiusPx);
-    const borderWidth = useProjectStore(s => s.project.settings.camera?.borderWidthPx);
-    const borderColor = useProjectStore(s => s.project.settings.camera?.borderColor);
-    const hasShadow = useProjectStore(s => s.project.settings.camera?.hasShadow);
-    const hasGlow = useProjectStore(s => s.project.settings.camera?.hasGlow);
-
+    // Subscribe to the whole camera settings so any change from the settings panel while the
+    // editor is open (remove background, mirror, sliders...) re-syncs local state. No feedback
+    // loop: the bounding box only writes to the store on release, and the re-sync keeps the
+    // local position.
+    const storeCamera = useProjectStore(useShallow(s => s.project.settings.camera));
 
 
     // Batcher for consistent history behavior
@@ -135,11 +130,11 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // EFFECTS
     // ------------------------------------------------------------------
 
-    // Re-sync local state when non-positional settings change externally (from settings panel)
-    // This ensures the live preview updates when changing sliders, shape, etc.
+    // Re-sync local state when settings change externally (from settings panel)
+    // This ensures the live preview updates when changing sliders, shape, toggles, etc.
     // We merge fresh settings with current local position to avoid overwriting active drags
     useEffect(() => {
-        const freshSettings = useProjectStore.getState().project.settings.camera;
+        const freshSettings = storeCamera;
         if (freshSettings && currentSettings) {
             // Merge: take position from local state, everything else from store
             const merged = {
@@ -160,7 +155,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
             cameraRef.current = merged;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentShape, cropZoom, autoShrink, shrinkScale, borderRadius, borderWidth, borderColor, hasShadow, hasGlow, cameraRef]);
+    }, [storeCamera, cameraRef]);
 
     // Initialize cameraRef on mount and cleanup on unmount
     useEffect(() => {
@@ -231,16 +226,21 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
         cameraRef.current = newSettings; // Update canvas live preview
     };
 
+    // Commit only the fields the bounding box owns, on top of fresh store settings — writing
+    // the whole local copy could clobber settings changed in the panel since the editor opened
+    const commitCamera = (patch: Partial<CameraSettings>) => {
+        const freshSettings = useProjectStore.getState().project.settings.camera;
+        if (!freshSettings) return;
+        batchAction(() => updateSettings({ camera: { ...freshSettings, ...patch } }));
+    };
+
     const onCommit = (rect: Rect) => {
         const cameraShape = currentSettings.shape;
-        // Merge all local changes with rect and commit to store
-        const newSettings: CameraSettings = {
-            ...currentSettings,
+        commitCamera({
             xPx: rect.x, yPx: rect.y, widthPx: rect.width, heightPx: rect.height,
             // Keep borderRadiusPx in sync for circles
             ...(cameraShape === 'circle' ? { borderRadiusPx: Math.min(rect.width, rect.height) / 2 } : {}),
-        };
-        batchAction(() => updateSettings({ camera: newSettings }));
+        });
         endInteraction();
         cameraRef.current = null;
     };
@@ -255,11 +255,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
 
     const handleCornerRadiiCommit = (radii: CornerRadii) => {
         const newRadius = radii[0];
-        const newSettings: CameraSettings = {
-            ...currentSettings,
-            borderRadiusPx: newRadius
-        };
-        batchAction(() => updateSettings({ camera: newSettings }));
+        commitCamera({ borderRadiusPx: newRadius });
         endInteraction();
     };
 
