@@ -7,6 +7,7 @@
 import { LuImage } from 'react-icons/lu';
 import { CHROME_EXTENSION_URL } from '@shared/types/bridge';
 import { ProjectCard } from './ProjectCard';
+import { ProjectGridSkeleton } from './ProjectCardSkeleton';
 import { screenshotUrl } from '../../lib/screenshotUrls';
 import type { ScreenshotListItem } from '../../screenshot/screenshotService';
 
@@ -83,11 +84,7 @@ interface ScreenshotsViewProps {
 
 export function ScreenshotsView({ items, loading, filtered, userId, showUpdatedAt, onOpen, onRename, onDelete, onShare }: ScreenshotsViewProps) {
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-text-muted">Loading screenshots...</div>
-            </div>
-        );
+        return <ProjectGridSkeleton label="Loading screenshots..." />;
     }
     if (items.length === 0) {
         return (

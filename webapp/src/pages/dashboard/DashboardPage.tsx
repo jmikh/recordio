@@ -6,6 +6,7 @@ import { CloudProjectService, toShareMeta, type ProjectListItem } from '../../st
 import { ShareModal } from '../../share/ShareModal';
 import { useProjectMetaStore } from '../../share/useProjectMetaStore';
 import { ProjectCard } from './ProjectCard';
+import { ProjectGridSkeleton } from './ProjectCardSkeleton';
 import { CardActivityBadge } from './CardActivityBadge';
 import { useActivityStore, uploadTaskId, renderTaskId } from '../../activity/useActivityStore';
 import { DashboardSidebar, type DashboardView } from './DashboardSidebar';
@@ -783,9 +784,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                 {activeKind === 'all' ? (
                                     /* Mixed grid — videos and screenshots interleaved by date */
                                     loading || screenshotsLoading ? (
-                                        <div className="flex items-center justify-center h-64">
-                                            <div className="text-text-muted">Loading library...</div>
-                                        </div>
+                                        <ProjectGridSkeleton label="Loading library..." />
                                     ) : sortedMedia.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center py-16 gap-3">
                                             {isTrash && <LuTrash2 size={40} className="text-text-muted/50" />}
@@ -824,9 +823,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                 ) : activeKind === 'screenshots' ? (
                                     /* Trash — screenshots */
                                     screenshotsLoading ? (
-                                        <div className="flex items-center justify-center h-64">
-                                            <div className="text-text-muted">Loading screenshots...</div>
-                                        </div>
+                                        <ProjectGridSkeleton label="Loading screenshots..." />
                                     ) : sortedScreenshots.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center py-16 gap-3">
                                             <LuTrash2 size={40} className="text-text-muted/50" />
@@ -842,9 +839,7 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                                         </div>
                                     )
                                 ) : loading ? (
-                                    <div className="flex items-center justify-center h-64">
-                                        <div className="text-text-muted">Loading projects...</div>
-                                    </div>
+                                    <ProjectGridSkeleton label="Loading projects..." />
                                 ) : sortedProjects.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 gap-3">
                                         {isTrash && <LuTrash2 size={40} className="text-text-muted/50" />}
