@@ -16,7 +16,7 @@ import type { TimeMapper } from '@shared/mappers/timeMapper';
  *  already below this threshold, its initial duration is used as the floor
  *  instead (to avoid forcing growth of already-shrunken segments). */
 export const K_MIN_TIMELINE_BLOCK_MS = 500;
-export const K_DEFAULT_TIMELINE_BLOCK_MS = 3000;
+export const K_DEFAULT_TIMELINE_BLOCK_MS = 8000;
 
 export interface TimelineSegmentDragState {
     type: 'move' | 'resize-start' | 'resize-end';

@@ -9,10 +9,10 @@ interface MediaTooltipProps {
     trigger?: React.ReactNode;
 }
 
-/** Auto-shrink tooltip with demo video */
+/** Scale-on-zoom tooltip with demo video */
 export const AutoShrinkTooltip: React.FC<MediaTooltipProps> = ({ placement, trigger }) => (
     <InfoTooltip
-        description="Automatically shrinks the camera when screen zoom is active."
+        description="Automatically scales down the camera while the screen is zoomed in."
         videoSrc={`${CDN_ORIGIN}/demos/autoshrink-demo.mp4`}
         placement={placement}
         trigger={trigger}

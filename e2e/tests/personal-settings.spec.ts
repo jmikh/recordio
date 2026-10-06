@@ -56,9 +56,9 @@ test.describe('personal settings (authenticated)', () => {
         await expect(page.getByText('Playing auto-zoom')).toBeHidden({ timeout: 8000 });
         await nav.getByRole('button', { name: 'Camera', exact: true }).click();
         await expect(page.getByRole('switch', { name: 'Mirror' })).toHaveCount(0);
-        await page.getByRole('button', { name: 'Preview auto shrink', exact: true }).click();
-        await expect(page.getByText('Playing auto shrink')).toBeVisible();
-        await expect(page.getByText('Playing auto shrink')).toBeHidden({ timeout: 8000 });
+        await page.getByRole('button', { name: 'Preview scale on zoom', exact: true }).click();
+        await expect(page.getByText('Playing scale on zoom')).toBeVisible();
+        await expect(page.getByText('Playing scale on zoom')).toBeHidden({ timeout: 8000 });
 
         expect(saves, 'the defaults page must never save a project').toEqual([]);
     });

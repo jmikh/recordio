@@ -133,14 +133,12 @@ export const ClipSegment: React.FC<ClipSegmentProps> = ({
                 {/* Speed & Duration Labels (overlaid on the block) */}
                 {width >= MIN_BLOCK_LABEL_WIDTH_PX && (
                     <div className="absolute inset-0 z-20 flex items-center justify-center gap-1.5 select-none pointer-events-none">
-                        {/* Speed indicator */}
-                        <span className={blockLabelClass}>
-                            {(() => {
-                                const speed = win.speed || 1.0;
-                                const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
-                                return `${formatted}x`;
-                            })()}
-                        </span>
+                        {/* Speed indicator - only when not 1x */}
+                        {speed !== 1 && (
+                            <span className={blockLabelClass}>
+                                {`${speed.toFixed(2).replace(/\.?0+$/, '')}x`}
+                            </span>
+                        )}
 
                         {/* Duration - hide if window too small */}
                         {width >= 70 && <span className={blockLabelClass}>{(outputDurationMs / 1000).toFixed(1)}s</span>}

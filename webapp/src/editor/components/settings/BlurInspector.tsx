@@ -15,7 +15,6 @@ const toStrengthPercent = (radiusPx: number) =>
 export const BlurInspector: React.FC<{ segment: BlurSegment }> = ({ segment }) => {
     const updateBlurSegment = useProjectStore(s => s.updateBlurSegment);
     const deleteBlurSegment = useProjectStore(s => s.deleteBlurSegment);
-    const clearBlurSegments = useProjectStore(s => s.clearBlurSegments);
     const addBlurRegion = useProjectStore(s => s.addBlurRegion);
     const deleteBlurRegion = useProjectStore(s => s.deleteBlurRegion);
     const outputSize = useProjectStore(s => s.project.settings.outputSize);
@@ -50,11 +49,6 @@ export const BlurInspector: React.FC<{ segment: BlurSegment }> = ({ segment }) =
         deleteBlurSegment(segment.id);
         selectBlurSegment(null);
     }, [segment.id, deleteBlurSegment, selectBlurSegment]);
-
-    const handleDeleteAll = useCallback(() => {
-        clearBlurSegments();
-        selectBlurSegment(null);
-    }, [clearBlurSegments, selectBlurSegment]);
 
     return (
         <CollapsibleCard title="Blur" icon={<TbBlur className="icon-md" />} notCollapsible>
@@ -98,14 +92,9 @@ export const BlurInspector: React.FC<{ segment: BlurSegment }> = ({ segment }) =
                 </div>
 
                 {/* Delete */}
-                <div className="flex items-center gap-2">
-                    <Button onClick={handleDelete} className="flex-1 text-danger hover:text-danger">
-                        <span>Delete This</span>
-                    </Button>
-                    <Button onClick={handleDeleteAll} className="flex-1 text-danger hover:text-danger">
-                        <span>Delete All</span>
-                    </Button>
-                </div>
+                <Button onClick={handleDelete} fullWidth className="text-danger hover:text-danger">
+                    <span>Delete</span>
+                </Button>
             </div>
         </CollapsibleCard>
     );

@@ -334,6 +334,41 @@ describe('v7 → v8: overlays dropped, blur track added', () => {
     });
 });
 
+describe('v8 → v9: one shadow/glow effect and amount, no border stroke', () => {
+    const migrateStyles = (camera: any, screen: any) =>
+        migrateProject(makeV1Project({ schemaVersion: 8, settings: { camera, screen } })).settings;
+
+    it('keeps the on effect and its amount, and drops the border width', () => {
+        const s = migrateStyles(
+            { shape: 'circle', borderWidthPx: 2, hasShadow: true, hasGlow: false, shadowAmount: 0.7, glowAmount: 0.2 },
+            { mode: 'border', borderWidthPx: 1, hasShadow: false, hasGlow: true, shadowAmount: 0.3, glowAmount: 0.9 },
+        );
+        expect(s.camera).toEqual({ shape: 'circle', effect: 'shadow', effectAmount: 0.7 });
+        expect(s.screen).toEqual({ mode: 'border', effect: 'glow', effectAmount: 0.9 });
+    });
+
+    it('uses the default amount when the effect predates amounts, and 0 when neither is on', () => {
+        const s = migrateStyles(
+            { hasShadow: false, hasGlow: true },
+            { hasShadow: false, hasGlow: false },
+        );
+        expect(s.camera).toEqual({ effect: 'glow', effectAmount: 0.4 });
+        expect(s.screen).toEqual({ effect: 'shadow', effectAmount: 0 });
+    });
+
+    it('keeps the shadow when both flags are on', () => {
+        const s = migrateStyles({ hasShadow: true, hasGlow: true }, { hasShadow: true, hasGlow: true, glowAmount: 0.9 });
+        expect(s.camera).toEqual({ effect: 'shadow', effectAmount: 0.4 });
+        expect(s.screen).toEqual({ effect: 'shadow', effectAmount: 0.4 });
+    });
+
+    it('leaves a style without either flag for the factory merge', () => {
+        const s = migrateStyles({ shape: 'rect' }, { mode: 'device' });
+        expect(s.camera).toEqual({ shape: 'rect' });
+        expect(s.screen).toEqual({ mode: 'device' });
+    });
+});
+
 // ==========================================
 // Spotlight feather backfill (version-independent)
 // ==========================================
@@ -370,13 +405,13 @@ describe('camera feather removal', () => {
         const proj = makeV1Project({
             schemaVersion: CURRENT_SCHEMA_VERSION,
             settings: {
-                camera: { shape: 'circle', hasShadow: false, hasFeather: true, featherAmount: 0.3 },
-                screen: { mode: 'border', hasShadow: true, hasFeather: false },
+                camera: { shape: 'circle', effectAmount: 0, hasFeather: true, featherAmount: 0.3 },
+                screen: { mode: 'border', effectAmount: 0.4, hasFeather: false },
             },
         });
         const result = migrateProject(proj);
-        expect(result.settings.camera).toEqual({ shape: 'circle', hasShadow: false });
-        expect(result.settings.screen).toEqual({ mode: 'border', hasShadow: true });
+        expect(result.settings.camera).toEqual({ shape: 'circle', effectAmount: 0 });
+        expect(result.settings.screen).toEqual({ mode: 'border', effectAmount: 0.4 });
     });
 });
 

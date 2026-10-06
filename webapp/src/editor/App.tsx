@@ -35,6 +35,7 @@ import { editorPath, viewPath } from '../lib/videoUrls';
 import { useProjectMetaStore } from '../share/useProjectMetaStore';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { cancelCameraMatte, ensureCameraMatte } from './cameraMatte/cameraMatteJob';
+import { cancelFaceCenter, ensureFaceCenter } from './faceDetection/faceCenterJob';
 
 function Editor() {
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
@@ -134,10 +135,12 @@ function Editor() {
                 await CloudProjectService.hydrateProjectMedia(result.project, setLoadingStatus);
                 if (cancelled) return;
                 setIsLoading(false);
-                // Compute the camera's background mask once its media is in —
-                // not earlier: until then the stores may still hold the last
-                // project opened, and its media URLs are revoked above
+                // Compute the camera's background mask and find its face anchor
+                // once its media is in — not earlier: until then the stores may
+                // still hold the last project opened, and its media URLs are
+                // revoked above
                 ensureCameraMatte();
+                ensureFaceCenter();
                 trackEditorPageLoaded(useWorkspaceStore.getState().workspaceId, result.meta.id);
 
                 // Load asset library in background (non-blocking)
@@ -178,8 +181,9 @@ function Editor() {
         init();
         return () => {
             cancelled = true;
-            // Leaving the editor abandons the background-mask job
+            // Leaving the editor abandons the background-mask and face jobs
             cancelCameraMatte();
+            cancelFaceCenter();
         };
     }, []);
 

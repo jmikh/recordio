@@ -16,7 +16,7 @@ import { EASING_OPTIONS } from './easingOptions';
  * swaps the settings panel for just its card (see SettingsPanel). Every change
  * goes through applyZoomSettingsToAll / applySpotlightSettingsToAll, so it
  * updates the project defaults AND every existing segment in one undo step —
- * there is no per-segment editing. Auto Apply / Delete Selected / Delete All
+ * there is no per-segment editing. Auto Apply / Delete (the selected segment)
  * live on the cards too.
  *
  * Personal Settings (template mode): MotionSettings shows both cards as the
@@ -39,9 +39,7 @@ export const ZoomSettings = () => {
     const applyZoomSettingsToAll = useProjectStore(s => s.applyZoomSettingsToAll);
     const deleteZoomSegment = useProjectStore(s => s.deleteZoomSegment);
     const resetZooms = useProjectStore(s => s.resetZooms);
-    const clearZoomSegments = useProjectStore(s => s.clearZoomSegments);
     const zoomSegments = useProjectStore(s => s.project.timeline.zoomSegments);
-    const zoomCount = zoomSegments.length;
     const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
     const { addToast } = useToast();
@@ -60,7 +58,7 @@ export const ZoomSettings = () => {
 
     /**
      * The segment picked on the timeline. The look controls ignore it — they
-     * always apply to all — so it only decides whether Delete Selected is live.
+     * always apply to all — so it only decides whether Delete is live.
      */
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const selectZoom = useUIStore(s => s.selectZoom);
@@ -81,7 +79,7 @@ export const ZoomSettings = () => {
             previewItems={[
                 ...(templateMode ? [{ type: 'text' as const, content: autoZoom ? 'Auto' : 'Manual' }] : []),
                 ...(templateMode ? [{ type: 'text' as const, content: `${zoom.maxZoom.toFixed(1)}×` }] : []),
-                { type: 'text', content: `${zoom.transitionDurationMs}ms` },
+                { type: 'text', content: `${(zoom.transitionDurationMs / 1000).toFixed(2)}s` },
             ]}
             isExpanded={showCollapsibleZoom}
             onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleZoom', v)}
@@ -122,8 +120,9 @@ export const ZoomSettings = () => {
                     onPointerUp={endInteraction}
                     onChange={(v) => batchAction(() => applyZoomSettingsToAll({ transitionDurationMs: Math.round(v) }))}
                     showTooltip
-                    units="ms"
-                    decimals={0}
+                    units="s"
+                    decimals={2}
+                    valueTransform={(v) => v / 1000}
                 />
                 <Dropdown
                     label="Easing"
@@ -143,24 +142,14 @@ export const ZoomSettings = () => {
                                 <span>Auto Apply</span>
                             </Button>
                         )}
-                        <div className="flex gap-2">
-                            <Button
-                                fullWidth
-                                onClick={handleDeleteSelectedZoom}
-                                disabled={!selectedZoomExists}
-                                className="text-danger hover:text-danger"
-                            >
-                                <span>Delete Selected</span>
-                            </Button>
-                            <Button
-                                fullWidth
-                                onClick={() => clearZoomSegments()}
-                                disabled={zoomCount === 0}
-                                className="text-danger hover:text-danger"
-                            >
-                                <span>Delete All</span>
-                            </Button>
-                        </div>
+                        <Button
+                            fullWidth
+                            onClick={handleDeleteSelectedZoom}
+                            disabled={!selectedZoomExists}
+                            className="text-danger hover:text-danger"
+                        >
+                            <span>Delete</span>
+                        </Button>
                     </div>
                 )}
             </div>
@@ -175,9 +164,7 @@ export const SpotlightSettings = () => {
     const applySpotlightSettingsToAll = useProjectStore(s => s.applySpotlightSettingsToAll);
     const deleteSpotlight = useProjectStore(s => s.deleteSpotlight);
     const resetSpotlights = useProjectStore(s => s.resetSpotlights);
-    const clearSpotlights = useProjectStore(s => s.clearSpotlights);
     const spotlightSegments = useProjectStore(s => s.project.timeline.spotlightSegments);
-    const spotlightCount = spotlightSegments.length;
     const hasTrackableContent = useProjectStore(s => !!s.project.screenSource.trackableContentRect);
     const hasHoveredCards = useProjectStore(s => (s.userEvents.hoveredCards || []).length > 0);
     const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
@@ -185,7 +172,7 @@ export const SpotlightSettings = () => {
     const showCollapsibleSpotlight = useUIStore(s => s.showCollapsibleSpotlight);
     const setCollapsibleVisibility = useUIStore(s => s.setCollapsibleVisibility);
 
-    /** Same as zoom: the selection only decides whether Delete Selected is live. */
+    /** Same as zoom: the selection only decides whether Delete is live. */
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
     const selectSpotlight = useUIStore(s => s.selectSpotlight);
     const selectedSpotlightExists = !!selectedSpotlightId && spotlightSegments.some(s => s.id === selectedSpotlightId);
@@ -207,7 +194,7 @@ export const SpotlightSettings = () => {
             previewItems={[
                 ...(templateMode ? [{ type: 'text' as const, content: autoSpotlight ? 'Auto' : 'Manual' }] : []),
                 { type: 'text', content: `${Math.round(spotlight.dimOpacity * 100)}%` },
-                { type: 'text', content: `${spotlight.transitionDurationMs}ms` },
+                { type: 'text', content: `${(spotlight.transitionDurationMs / 1000).toFixed(2)}s` },
             ]}
             isExpanded={showCollapsibleSpotlight}
             onExpandChange={(v) => setCollapsibleVisibility('showCollapsibleSpotlight', v)}
@@ -266,8 +253,9 @@ export const SpotlightSettings = () => {
                     onPointerUp={endInteraction}
                     onChange={(v) => batchAction(() => applySpotlightSettingsToAll({ transitionDurationMs: Math.round(v) }))}
                     showTooltip
-                    units="ms"
-                    decimals={0}
+                    units="s"
+                    decimals={2}
+                    valueTransform={(v) => v / 1000}
                 />
                 <Dropdown
                     label="Easing"
@@ -294,24 +282,14 @@ export const SpotlightSettings = () => {
                                 </Button>
                             </Tooltip>
                         )}
-                        <div className="flex gap-2">
-                            <Button
-                                fullWidth
-                                onClick={handleDeleteSelectedSpotlight}
-                                disabled={!selectedSpotlightExists}
-                                className="text-danger hover:text-danger"
-                            >
-                                <span>Delete Selected</span>
-                            </Button>
-                            <Button
-                                fullWidth
-                                onClick={() => clearSpotlights()}
-                                disabled={spotlightCount === 0}
-                                className="text-danger hover:text-danger"
-                            >
-                                <span>Delete All</span>
-                            </Button>
-                        </div>
+                        <Button
+                            fullWidth
+                            onClick={handleDeleteSelectedSpotlight}
+                            disabled={!selectedSpotlightExists}
+                            className="text-danger hover:text-danger"
+                        >
+                            <span>Delete</span>
+                        </Button>
                     </div>
                 )}
             </div>

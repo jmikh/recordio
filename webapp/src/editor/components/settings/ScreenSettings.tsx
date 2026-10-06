@@ -4,7 +4,10 @@ import { ColorButton } from './ColorButton';
 import { DEVICE_FRAMES } from '@shared/utils/deviceFrames';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 import { Slider, MultiToggle, Toggle, CollapsibleCard, type PreviewItem } from '@shared/components';
-import { LuCheck, LuCrop, LuFrame, LuMoon, LuPanelTop, LuScaling, LuSun } from 'react-icons/lu';
+import { LuCheck, LuCrop, LuFrame, LuLaptop, LuMoon, LuPanelTop, LuScaling, LuSun } from 'react-icons/lu';
+import { TbBorderOuter, TbShadow } from 'react-icons/tb';
+import { DEFAULT_EFFECT_AMOUNT } from '@shared/painters/utils/outlineEffects';
+import type { StyleEffect } from '@shared/types';
 
 
 export const ScreenSettings = () => {
@@ -49,11 +52,12 @@ export const ScreenSettings = () => {
             framePreviewItems.push({ type: 'text', content: selectedDevice.name });
         }
     } else {
-        // Border mode - show color (only if glow or border > 0), thickness, and effect
-        const { borderWidthPx = 0, borderColor = '#ffffff', hasGlow = false, hasShadow = false } = screenConfig;
+        // Border mode - show the effect, and the color when it glows
+        const { borderColor = '#ffffff', effect = 'shadow', effectAmount = DEFAULT_EFFECT_AMOUNT } = screenConfig;
 
-        // Only show color if there's a visible border or glow effect
-        if (borderWidthPx > 0 || hasGlow) {
+        if (effectAmount > 0 && effect === 'shadow') {
+            framePreviewItems.push({ type: 'text', content: 'Shadow' });
+        } else if (effectAmount > 0 && effect === 'glow') {
             framePreviewItems.push({
                 type: 'custom',
                 content: (
@@ -63,17 +67,6 @@ export const ScreenSettings = () => {
                     />
                 )
             });
-        }
-
-        // Only show pixel count if there's a border
-        if (borderWidthPx > 0) {
-            framePreviewItems.push({ type: 'text', content: `${Math.round(borderWidthPx)}px` });
-        }
-
-        // Add effect type (shadow/glow) only if enabled
-        if (hasShadow) {
-            framePreviewItems.push({ type: 'text', content: 'Shadow' });
-        } else if (hasGlow) {
             framePreviewItems.push({ type: 'text', content: 'Glow' });
         }
     }
@@ -137,9 +130,9 @@ export const ScreenSettings = () => {
                 );
             })()}
 
-            {/* Frame Settings */}
+            {/* Outline Settings */}
             <CollapsibleCard
-                title="Frame"
+                title="Outline"
                 icon={<LuFrame className="icon-md" />}
                 previewItems={framePreviewItems}
                 isExpanded={showCollapsibleFrame}
@@ -148,8 +141,8 @@ export const ScreenSettings = () => {
                 <div className="space-y-4">
                     <MultiToggle
                         options={[
-                            { value: 'device', label: 'Device' },
-                            { value: 'border', label: 'Border' }
+                            { value: 'device', label: 'Device', icon: <LuLaptop className="icon-md" /> },
+                            { value: 'border', label: 'Border', icon: <TbBorderOuter className="icon-md" /> }
                         ]}
                         value={screenConfig.mode}
                         onChange={(val) => handleModeChange(val as 'device' | 'border')}
@@ -192,18 +185,6 @@ export const ScreenSettings = () => {
                     {/* Custom Style Controls - Inlined */}
                     {screenConfig.mode === 'border' && (
                         <div className="space-y-4">
-                            {/* Color Picker */}
-                            <ColorButton
-                                title="Color"
-                                color={screenConfig.borderColor}
-                                onChange={(color) => batchAction(() => updateSettings({
-                                    screen: { ...screenConfig, borderColor: color }
-                                }))}
-                                onPopoverOpen={startInteraction}
-                                onPopoverClose={endInteraction}
-                                showAlpha
-                            />
-
                             {/* Rounding Slider */}
                             <Slider
                                 label="Rounding"
@@ -219,38 +200,45 @@ export const ScreenSettings = () => {
                                 units="px"
                             />
 
-                            {/* Thickness Slider */}
+                            {/* Shadow/Glow Toggle — no effect is an amount of 0 */}
+                            <MultiToggle<StyleEffect>
+                                options={[
+                                    { value: 'shadow', label: 'Shadow', icon: <TbShadow className="icon-md" /> },
+                                    { value: 'glow', label: 'Glow', icon: <LuSun className="icon-md" /> }
+                                ]}
+                                value={screenConfig.effect ?? 'shadow'}
+                                onChange={(val) => updateSettings({ screen: { ...screenConfig, effect: val } })}
+                            />
+
+                            {/* Glow color — the only thing the color paints */}
+                            {screenConfig.effect === 'glow' && (
+                                <ColorButton
+                                    title="Color"
+                                    color={screenConfig.borderColor}
+                                    onChange={(color) => batchAction(() => updateSettings({
+                                        screen: { ...screenConfig, borderColor: color }
+                                    }))}
+                                    onPopoverOpen={startInteraction}
+                                    onPopoverClose={endInteraction}
+                                    showAlpha
+                                />
+                            )}
+
+                            {/* Amount of the selected effect — shadow and glow share it */}
                             <Slider
-                                label="Thickness"
+                                label="Amount"
                                 min={0}
-                                max={20}
-                                value={screenConfig.borderWidthPx}
+                                max={1}
+                                value={screenConfig.effectAmount ?? DEFAULT_EFFECT_AMOUNT}
                                 onPointerDown={startInteraction}
                                 onPointerUp={endInteraction}
                                 onChange={(val) => batchAction(() => updateSettings({
-                                    screen: { ...screenConfig, borderWidthPx: val }
+                                    screen: { ...screenConfig, effectAmount: val }
                                 }))}
                                 showTooltip
-                                units="px"
-                            />
-
-                            {/* Shadow/Glow Toggle */}
-                            <MultiToggle
-                                options={[
-                                    { value: 'shadow', label: 'Shadow' },
-                                    { value: 'none', label: 'None' },
-                                    { value: 'glow', label: 'Glow' }
-                                ]}
-                                value={screenConfig.hasShadow ? 'shadow' : screenConfig.hasGlow ? 'glow' : 'none'}
-                                onChange={(val) => {
-                                    if (val === 'shadow') {
-                                        batchAction(() => updateSettings({ screen: { ...screenConfig, hasShadow: true, hasGlow: false } }));
-                                    } else if (val === 'glow') {
-                                        batchAction(() => updateSettings({ screen: { ...screenConfig, hasShadow: false, hasGlow: true } }));
-                                    } else {
-                                        batchAction(() => updateSettings({ screen: { ...screenConfig, hasShadow: false, hasGlow: false } }));
-                                    }
-                                }}
+                                units="%"
+                                decimals={0}
+                                valueTransform={(v) => v * 100}
                             />
                         </div>
                     )}

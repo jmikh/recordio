@@ -49,6 +49,9 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
     // Blur: recompute output times for blur segments
     const nextBlurSegments = recomputeOutputTimes(project.timeline.blurSegments || [], timeMapper);
 
+    // Camera layout: recompute output times for camera move segments
+    const nextCameraMoveSegments = recomputeOutputTimes(project.timeline.cameraMoveSegments || [], timeMapper);
+
     return {
         ...project,
         timeline: {
@@ -58,6 +61,7 @@ const applyNewWindows = (project: Project, nextWindows: OutputWindow[]): Project
             spotlightSegments: nextSpotlightSegments,
             captionSegments: nextCaptionSegments,
             blurSegments: nextBlurSegments,
+            cameraMoveSegments: nextCameraMoveSegments,
         },
     };
 };

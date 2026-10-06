@@ -2,6 +2,7 @@ import { CURRENT_SCHEMA_VERSION } from './Project';
 import { textToWords } from '@shared/utils/captionUtils';
 import { CDN_ORIGIN } from '@shared/types/bridge';
 import { DEFAULT_SPOTLIGHT_FEATHER_PX, DEFAULT_SPOTLIGHT_FEATHER_TRANSITION } from '@shared/animators/spotlightAnimator';
+import { DEFAULT_EFFECT_AMOUNT } from '@shared/painters/utils/outlineEffects';
 
 /** Weight per word: letter count + base value. Matches textToWords(). */
 const WORD_BASE_VALUE = 3;
@@ -124,6 +125,29 @@ export function migrateProject(raw: any): any {
             }
         }
         if (raw.settings) delete raw.settings.overlay;
+    }
+
+    // v8 → v9: camera/screen hasShadow + hasGlow (+ per-effect amounts) become
+    // one `effect` and one `effectAmount`, where 0 is no effect. Shadow wins when
+    // both flags were on, as the old picker showed. The border stroke is gone too.
+    // A style without either flag (a partial defaults blob) is left for the
+    // factory merge to complete.
+    if (version < 9) {
+        for (const style of [raw.settings?.camera, raw.settings?.screen]) {
+            if (!style) continue;
+            if (style.hasShadow !== undefined || style.hasGlow !== undefined) {
+                const glow = !!style.hasGlow && !style.hasShadow;
+                style.effect = glow ? 'glow' : 'shadow';
+                style.effectAmount = glow ? style.glowAmount ?? DEFAULT_EFFECT_AMOUNT
+                    : style.hasShadow ? style.shadowAmount ?? DEFAULT_EFFECT_AMOUNT
+                        : 0;
+            }
+            delete style.hasShadow;
+            delete style.hasGlow;
+            delete style.shadowAmount;
+            delete style.glowAmount;
+            delete style.borderWidthPx;
+        }
     }
 
     // Backfill the blur track if missing (projects saved before blur segments).

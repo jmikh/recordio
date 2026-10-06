@@ -155,8 +155,18 @@ export interface CameraMoveSegment extends TimeSegment {
     borderRadiusPx: number;
     /** Whether the camera is hidden during this block */
     hidden?: boolean;
+    /**
+     * Draw the camera as a background-removed cutout during this block
+     * (copied from CameraSettings.removeBackground on creation). Absent =
+     * follows the camera setting. Needs `cameraSource.matte`, like the setting.
+     */
+    removeBackground?: boolean;
     /** Transition duration for entering this block (inherited from global on creation) */
     transitionDurationMs: number;
+    /** Animate into the block from the default camera. Absent = true; false cuts in */
+    animateIn?: boolean;
+    /** Animate back out to the default camera. Absent = true; false holds the block to its end, then cuts */
+    animateOut?: boolean;
     /** Easing curve for this block's transition */
     easing: EasingStyle;
 }

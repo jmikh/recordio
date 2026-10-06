@@ -99,7 +99,7 @@ export function computeFrameSignature(input: FrameSignatureInput): string {
             outputSize,
             settings.zoom
         );
-        parts.camera = [resolved.xPx, resolved.yPx, resolved.widthPx, resolved.heightPx, resolved.shape, resolved.borderRadiusPx, resolved.opacity];
+        parts.camera = [resolved.xPx, resolved.yPx, resolved.widthPx, resolved.heightPx, resolved.shape, resolved.borderRadiusPx, resolved.opacity, resolved.cutoutAmount];
         // The camera video only affects the frame while it's drawn
         if (resolved.opacity > 0) {
             parts.cameraFrame = cameraFrame.timestamp;

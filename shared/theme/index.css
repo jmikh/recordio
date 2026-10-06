@@ -401,12 +401,6 @@ body,
 /* ============================================================
    Animations (Retained)
    ============================================================ */
-/* Canvas Editor Glow - Secondary color border for edit modes */
-.canvas-editor-glow {
-   box-shadow: 0 0 0 2px var(--secondary),
-      0 0 12px 2px oklch(from var(--secondary) l c h / 40%);
-}
-
 /* Fade + slide-down entry — used for contextual banners that appear mid-UI */
 @keyframes fadeSlideIn {
    from {

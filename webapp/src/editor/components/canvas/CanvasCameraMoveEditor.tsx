@@ -3,7 +3,6 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import type { CameraSettings, CameraMoveSegment, Rect, Project } from '@shared/types';
 import { BoundingBox, type CornerRadii } from './bounding-box';
-import { DimmedOverlay } from './DimmedOverlay';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
@@ -50,9 +49,9 @@ export const renderCameraMoveEditor = (
     const cameraSettings = state.overrideCameraSettings;
 
     if (cameraSource && cameraSettings) {
-        const camera = resolveCameraImage(project, videoRefs);
+        const camera = resolveCameraImage(project, videoRefs, cameraSettings.removeBackground ? 1 : 0);
         if (camera) {
-            drawCamera(ctx, camera.image, cameraSource.size, cameraSettings, undefined, camera.cutout);
+            drawCamera(ctx, camera, cameraSource.size, cameraSettings);
         }
     }
 };
@@ -86,9 +85,7 @@ export const CameraMoveEditor: React.FC<{
     const segmentShape = segment?.shape ?? 'rect';
     const segmentBorderRadius = segment?.borderRadiusPx ?? 0;
     const segmentHidden = segment?.hidden ?? false;
-
-    // Spotlight dim opacity for overlay
-    const dimOpacity = useProjectStore(s => s.project.settings.spotlight.dimOpacity);
+    const segmentRemoveBackground = segment?.removeBackground;
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
 
@@ -104,6 +101,7 @@ export const CameraMoveEditor: React.FC<{
         borderRadiusPx: seg.shape === 'circle'
             ? Math.min(seg.widthPx, seg.heightPx) / 2
             : seg.borderRadiusPx,
+        removeBackground: seg.removeBackground ?? globalCameraSettings?.removeBackground,
     });
 
     // Local state for the editor session
@@ -122,7 +120,7 @@ export const CameraMoveEditor: React.FC<{
             cameraRef.current = merged;
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [segmentShape, segmentBorderRadius, segment?.xPx, segment?.yPx, segment?.widthPx, segment?.heightPx, cameraRef]);
+    }, [segmentShape, segmentBorderRadius, segmentRemoveBackground, segment?.xPx, segment?.yPx, segment?.widthPx, segment?.heightPx, cameraRef]);
 
     // When hidden, clear cameraRef so camera isn't drawn on canvas
     useEffect(() => {
@@ -169,14 +167,6 @@ export const CameraMoveEditor: React.FC<{
     const cornerRadii: CornerRadii = (() => {
         const r = currentSettings.borderRadiusPx ?? 0;
         return [r, r, r, r];
-    })();
-
-    const dimmedOverlayRadii: CornerRadii = (() => {
-        if (segmentShape === 'circle') {
-            const circleRadius = currentSettings.widthPx / 2;
-            return [circleRadius, circleRadius, circleRadius, circleRadius];
-        }
-        return cornerRadii;
     })();
 
     const cameraRect: Rect = {
@@ -229,12 +219,6 @@ export const CameraMoveEditor: React.FC<{
             ref={containerRef}
             className="absolute inset-0 w-full h-full z-[var(--z-index-modal)] pointer-events-none"
         >
-            <DimmedOverlay
-                holeRect={cameraRect}
-                cornerRadii={dimmedOverlayRadii}
-                opacity={dimOpacity}
-            />
-
             <div className="absolute inset-0 pointer-events-none">
                 <BoundingBox
                     rect={cameraRect}

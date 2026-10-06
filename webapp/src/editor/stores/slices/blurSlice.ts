@@ -8,7 +8,6 @@ export interface BlurSlice {
     addBlurSegment: (segment: BlurSegment) => void;
     updateBlurSegment: (id: ID, updates: Partial<Pick<BlurSegment, 'sourceStartTimeMs' | 'sourceEndTimeMs' | 'blurRadiusPx'>>) => void;
     deleteBlurSegment: (id: ID) => void;
-    clearBlurSegments: () => void;
     addBlurRegion: (segmentId: ID, region: BlurRegion) => void;
     updateBlurRegion: (segmentId: ID, regionId: ID, updates: Partial<Omit<BlurRegion, 'id'>>) => void;
     /** Removes a region; removing a segment's last region removes the segment too. */
@@ -79,15 +78,6 @@ export const createBlurSlice: StateCreator<ProjectState, [["zustand/subscribeWit
         },
 
         deleteBlurSegment: (id) => mapSegment(id, () => null),
-
-        clearBlurSegments: () => {
-            set(state => ({
-                project: {
-                    ...state.project,
-                    timeline: { ...state.project.timeline, blurSegments: [] },
-                },
-            }));
-        },
 
         addBlurRegion: (segmentId, region) => mapSegment(segmentId, segment => ({
             ...segment,

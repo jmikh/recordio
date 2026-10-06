@@ -8,7 +8,6 @@ export interface CameraMoveSlice {
     addCameraMove: (segment: CameraMoveSegment) => void;
     updateCameraMove: (id: ID, updates: Partial<CameraMoveSegment>) => void;
     deleteCameraMove: (id: ID) => void;
-    clearCameraMoves: () => void;
     toggleCameraMoveEnabled: () => void;
 }
 
@@ -72,20 +71,6 @@ export const createCameraMoveSlice: StateCreator<ProjectState, [["zustand/subscr
                     timeline: {
                         ...state.project.timeline,
                         cameraMoveSegments
-                    }
-                }
-            };
-        });
-    },
-
-    clearCameraMoves: () => {
-        set(state => {
-            return {
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        cameraMoveSegments: []
                     }
                 }
             };

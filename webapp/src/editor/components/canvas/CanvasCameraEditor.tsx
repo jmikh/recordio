@@ -65,9 +65,9 @@ export const renderCameraEditor = (
     const cameraSettings = state.overrideCameraSettings || project.settings.camera;
 
     if (cameraSource && cameraSettings) {
-        const camera = resolveCameraImage(project, videoRefs);
+        const camera = resolveCameraImage(project, videoRefs, cameraSettings.removeBackground ? 1 : 0);
         if (camera) {
-            drawCamera(ctx, camera.image, cameraSource.size, cameraSettings, undefined, camera.cutout);
+            drawCamera(ctx, camera, cameraSource.size, cameraSettings);
         }
     }
 };

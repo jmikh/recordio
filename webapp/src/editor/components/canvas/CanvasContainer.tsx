@@ -18,6 +18,7 @@ import { CameraMoveEditor, renderCameraMoveEditor } from './CanvasCameraMoveEdit
 import { BlurEditor, renderBlurEditor } from './CanvasBlurEditor';
 import { CanvasHoverLayer } from './CanvasHoverLayer';
 import { drawBackground } from '@shared/painters/backgroundPainter';
+import { StatusBadge } from '@shared/components';
 
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
 
@@ -420,13 +421,19 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
     // RENDER
     // -----------------------------------------------------------
 
-    // Check if we're in an editor mode that needs the glow
-    const isEditorMode = canvasMode === CanvasMode.ZoomEdit ||
-        canvasMode === CanvasMode.CropEdit ||
-        canvasMode === CanvasMode.SpotlightEdit ||
-        canvasMode === CanvasMode.CameraEdit ||
-        canvasMode === CanvasMode.CameraMoveEdit ||
-        canvasMode === CanvasMode.BlurEdit;
+    // Badge naming what's being edited — tinted with the block's track colour when
+    // editing a timeline block, neutral otherwise (crop, default camera layout)
+    const editingBadge: { label: string; trackBg?: string } | null = (() => {
+        switch (canvasMode) {
+            case CanvasMode.CropEdit: return { label: 'Editing crop' };
+            case CanvasMode.CameraEdit: return { label: 'Editing default camera layout' };
+            case CanvasMode.CameraMoveEdit: return activeCameraMoveId ? { label: 'Editing camera layout block', trackBg: 'bg-track-camera' } : null;
+            case CanvasMode.ZoomEdit: return activeZoomId ? { label: 'Editing zoom', trackBg: 'bg-track-zoom' } : null;
+            case CanvasMode.SpotlightEdit: return activeSpotlightId ? { label: 'Editing spotlight', trackBg: 'bg-track-spotlight' } : null;
+            case CanvasMode.BlurEdit: return activeBlurSegmentId ? { label: 'Editing blur', trackBg: 'bg-track-blur' } : null;
+            default: return null;
+        }
+    })();
 
     return (
         <div
@@ -439,12 +446,11 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
             <div
                 id="canvas-aspect-wrapper"
                 ref={aspectWrapperRef}
-                className={`relative ${isEditorMode ? 'canvas-editor-glow' : ''}`}
+                className="relative ring-1 ring-text-disabled"
                 style={{
                     aspectRatio: `${outputVideoSize.width} / ${outputVideoSize.height}`,
                     maxHeight: '100%',
                     maxWidth: '100%',
-                    boxShadow: !isEditorMode ? '0 0 0 1px var(--text-disabled)' : undefined
                 }}
             >
                 {/* HIDDEN RESOURCES LAYER */}
@@ -568,6 +574,15 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                 {/* BLUR EDITOR */}
                 {canvasMode === CanvasMode.BlurEdit && activeBlurSegmentId && (
                     <BlurEditor previewRegionRef={previewBlurRegionRef} />
+                )}
+
+                {/* EDITING BADGE — after the overlays so it stacks above them */}
+                {editingBadge && (
+                    <div className={`absolute top-2 left-1/2 -translate-x-1/2 z-[var(--z-index-modal)] pointer-events-none rounded-[var(--radius-sm)] shadow-float whitespace-nowrap ${editingBadge.trackBg ?? 'bg-surface-raised'}`}>
+                        <StatusBadge variant={editingBadge.trackBg ? 'onColor' : 'secondary'}>
+                            {editingBadge.label}
+                        </StatusBadge>
+                    </div>
                 )}
 
                 {children}

@@ -128,6 +128,7 @@ export function useCameraMoveHover(
             heightPx: h,
             shape: shapeVal,
             borderRadiusPx: bakedRadius,
+            removeBackground: cameraSettings?.removeBackground ?? false,
             transitionDurationMs: cameraMoveSettings?.transitionDurationMs ?? 500,
             easing: cameraMoveSettings?.easing ?? 'ease-in-out',
         };

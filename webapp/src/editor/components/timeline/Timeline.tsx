@@ -1,8 +1,8 @@
 // ... imports
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState } from 'react';
 import { useProjectStore, useProjectTimeline } from '../../stores/useProjectStore';
 import { TimelineRuler } from './TimelineRuler';
-import { fitTimelineToScreen } from './fitTimeline';
+import { fitTimelineToScreen, MIN_PIXELS_PER_SEC, MAX_PIXELS_PER_SEC } from './fitTimeline';
 import { ZoomTrack } from './tracks/zoom/ZoomTrack';
 
 import { SpotlightTrack } from './tracks/spotlight/SpotlightTrack';
@@ -35,6 +35,9 @@ const HEADER_WIDTH = 40;
 const RULER_HEIGHT = 26; // 24px canvas + 2px borders (border-t + border-b on ruler wrapper)
 const SCROLLBAR_GUTTER = 8; // Space below tracks so horizontal scrollbar doesn't overlap bottom track
 const TRANSITION_STYLE = 'height 150ms ease';
+// Wheel zoom: scale factor per wheel delta pixel (exponential so zoom feels uniform at any level)
+const WHEEL_ZOOM_SENSITIVITY = 0.01;
+const WHEEL_ZOOM_MAX_DELTA = 40;
 
 export function Timeline() {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -93,12 +96,40 @@ export function Timeline() {
         }
     };
 
+    // Time under the cursor when a wheel zoom started. Applied to scrollLeft in a layout effect
+    // once the new width is in the DOM (setting it earlier would clamp to the old scrollWidth).
+    const zoomAnchorRef = useRef<{ timeSec: number; cursorX: number } | null>(null);
+
     // Attach wheel listener imperatively with { passive: false } so preventDefault works
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
 
+        const zoomAtCursor = (e: WheelEvent) => {
+            const { pixelsPerSec, setPixelsPerSec } = useUIStore.getState();
+            // Firefox reports mouse wheels in lines; normalize to pixels and cap so a wheel notch
+            // is a comfortable step while small trackpad pinch deltas stay smooth
+            const deltaPx = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaY;
+            const delta = Math.max(-WHEEL_ZOOM_MAX_DELTA, Math.min(WHEEL_ZOOM_MAX_DELTA, deltaPx));
+            const nextPps = Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, pixelsPerSec * Math.exp(-delta * WHEEL_ZOOM_SENSITIVITY)));
+            if (nextPps === pixelsPerSec) return;
+
+            // Wheel events can outpace renders; keep a pending anchor since scrollLeft hasn't caught up yet
+            if (!zoomAnchorRef.current) {
+                const cursorX = e.clientX - el.getBoundingClientRect().left;
+                zoomAnchorRef.current = { timeSec: (el.scrollLeft + cursorX) / pixelsPerSec, cursorX };
+            }
+            setPixelsPerSec(nextPps);
+        };
+
         const handleWheel = (e: WheelEvent) => {
+            // Trackpad pinch arrives as a wheel event with ctrlKey set; cmd/ctrl + scroll zooms too
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                zoomAtCursor(e);
+                return;
+            }
+
             const maxScroll = el.scrollWidth - el.clientWidth;
             if (maxScroll > 0) {
                 e.preventDefault();
@@ -121,6 +152,17 @@ export function Timeline() {
     const displaySettings = useProjectStore(s => s.project.timeline.displaySettings);
     const setHoveredTrack = useUIStore(s => s.setHoveredTrack);
     const { tracks: trackSizing, clipHeight, totalHeight: timelineTotalHeight } = useTrackSizing();
+
+    // Keep the time under the cursor in place after a wheel zoom. Ruler/clip culling reads
+    // rulerScrollLeft, so sync it here too instead of waiting a frame for the scroll event.
+    useLayoutEffect(() => {
+        const anchor = zoomAnchorRef.current;
+        const el = containerRef.current;
+        zoomAnchorRef.current = null;
+        if (!anchor || !el) return;
+        el.scrollLeft = anchor.timeSec * pixelsPerSec - anchor.cursorX;
+        setRulerScrollLeft(el.scrollLeft);
+    }, [pixelsPerSec]);
 
 
     // Memoize TimeMapper
@@ -252,10 +294,10 @@ export function Timeline() {
     }, [totalOutputDuration, pixelsPerSec]); // deps that affect width
 
     return (
-        <div className="flex flex-col h-full bg-surface-body select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
+        <div className="flex flex-col h-full bg-surface select-none text-text-highlighted font-sans" style={{ boxShadow: 'inset 0 2px 4px oklch(0 0 0 / 4%)' }}>
 
             {/* 2. Timeline Body (Split Pane) */}
-            <div id="timeline-body" className="flex bg-surface-body overflow-hidden relative" style={{ height: timelineTotalHeight + SCROLLBAR_GUTTER }} onMouseLeave={() => setHoveredTrack(null)}>
+            <div id="timeline-body" className="flex bg-surface overflow-hidden relative" style={{ height: timelineTotalHeight + SCROLLBAR_GUTTER }} onMouseLeave={() => setHoveredTrack(null)}>
 
                 {/* LEFT COLUMN: HEADERS */}
                 <div

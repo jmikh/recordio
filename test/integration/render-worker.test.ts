@@ -55,8 +55,8 @@ const testProjectData = {
         keyboard: { showHotkeys: false, hotkeysSize: 1.0, hotkeysPlacement: 'top', hotkeysMargin: 4 },
         screen: {
             mode: 'border', toolbar: { enabled: false, theme: 'light', urlMode: 'short' },
-            padding: 0, borderRadiusPx: 0, borderWidthPx: 0, borderColor: '#000000',
-            hasShadow: false, hasGlow: false, mute: false,
+            padding: 0, borderRadiusPx: 0, borderColor: '#000000',
+            effect: 'shadow', effectAmount: 0, mute: false,
         },
         background: {
             type: 'color', color: '#000000ff', gradientColors: ['#000000ff', '#000000ff'],

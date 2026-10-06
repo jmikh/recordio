@@ -1,5 +1,5 @@
 /**
- * Face detection for the Center Face modal.
+ * Face detection for the camera's face anchor (faceCenterJob.ts).
  *
  * Uses MediaPipe's BlazeFace short-range model, tuned for faces within ~2m of
  * the camera (webcam distance). The library and its ~12MB WASM runtime are

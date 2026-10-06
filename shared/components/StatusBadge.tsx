@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 
-export type StatusBadgeVariant = 'default' | 'primary' | 'secondary';
+export type StatusBadgeVariant = 'default' | 'primary' | 'secondary' | 'onColor';
 
 interface StatusBadgeProps {
     children: ReactNode;
-    /** Neutral by default; `primary` for an active/affirmative state, `secondary` for one that wants attention. */
+    /** Neutral by default; `primary` for an active/affirmative state, `secondary` for one that wants attention,
+     *  `onColor` for light text on a saturated background the parent supplies (e.g. a timeline track colour). */
     variant?: StatusBadgeVariant;
     /** Render the label in caps. CSS-only, so the accessible name stays as written. */
     uppercase?: boolean;
@@ -15,6 +16,7 @@ const variantStyles: Record<StatusBadgeVariant, string> = {
     default: 'bg-state-inactive text-text-muted',
     primary: 'bg-primary/10 text-primary',
     secondary: 'bg-secondary/20 text-text-highlighted',
+    onColor: 'text-text-on-primary',
 } as const;
 
 /**

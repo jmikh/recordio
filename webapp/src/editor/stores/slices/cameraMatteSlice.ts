@@ -1,7 +1,7 @@
-import type { StateCreator, StoreApi } from 'zustand';
-import type { TemporalState } from 'zundo';
+import type { StateCreator } from 'zustand';
 import type { ProjectState } from '../useProjectStore';
 import type { CameraMatteMetadata, Project } from '@shared/types';
+import { setProjectOutsideHistory, type HistoryStore } from './outsideHistory';
 
 /** `preparing` covers the model load — a one-time download on first use. */
 export type CameraMatteJobStatus = 'idle' | 'preparing' | 'processing' | 'uploading' | 'error';
@@ -27,8 +27,6 @@ export interface CameraMatteSlice {
 
 export const IDLE_CAMERA_MATTE_JOB: CameraMatteJob = { status: 'idle', progress: 0, error: null };
 
-type HistoryStore = StoreApi<TemporalState<{ project: Project }>>;
-
 export const createCameraMatteSlice: StateCreator<ProjectState, [["zustand/subscribeWithSelector", never], ["temporal", unknown]], [], CameraMatteSlice> = (set, _get, store) => ({
     cameraMatteJob: IDLE_CAMERA_MATTE_JOB,
 
@@ -40,17 +38,6 @@ export const createCameraMatteSlice: StateCreator<ProjectState, [["zustand/subsc
         const withMatte = (project: Project): Project => project.cameraSource
             ? { ...project, cameraSource: { ...project.cameraSource, matte } }
             : project;
-
-        const history = store.temporal as HistoryStore;
-        // Only touch tracking when it's on — an in-flight slider drag holds
-        // it paused (useHistoryBatcher) and must keep it that way
-        const { isTracking, pause, resume } = history.getState();
-        if (isTracking) pause();
-        set(state => ({ project: withMatte(state.project) }));
-        if (isTracking) resume();
-
-        const patch = (states: Partial<{ project: Project }>[]) =>
-            states.map(s => (s.project ? { ...s, project: withMatte(s.project) } : s));
-        history.setState(h => ({ pastStates: patch(h.pastStates), futureStates: patch(h.futureStates) }));
+        setProjectOutsideHistory(set, store.temporal as HistoryStore, withMatte);
     },
 });

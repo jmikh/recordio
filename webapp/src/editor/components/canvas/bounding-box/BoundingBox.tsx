@@ -348,6 +348,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const displayRect = displayMapper.outputToDisplay(activeRect);
 
     const resolvedColor = 'var(--color-secondary)';
+    const showsRoundedCorners = !hideCornerPreview && borderRadiusCss !== '0';
 
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
@@ -356,17 +357,18 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         width: displayRect.width,
         height: displayRect.height,
         cursor: 'move',
-        borderRadius: hideCornerPreview ? '0' : borderRadiusCss,
+        borderRadius: showsRoundedCorners ? borderRadiusCss : '0',
         pointerEvents: 'auto',
         zIndex: Z_INDEX_BOUNDING_BOX,
         outline: `${BOX_BORDER_WIDTH}px solid ${resolvedColor}`,
         outlineOffset: 0,
     };
 
+    // Dashed when the rounded outline is visible, so the square frame reads as secondary
     const straightLineStyle: React.CSSProperties = {
         position: 'absolute',
         inset: -1,
-        border: `${OVERLAY_BORDER_WIDTH}px solid ${resolvedColor}`,
+        border: `${OVERLAY_BORDER_WIDTH}px ${showsRoundedCorners ? 'dashed' : 'solid'} ${resolvedColor}`,
         borderRadius: 0,
         pointerEvents: 'none',
     };

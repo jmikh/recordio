@@ -2,7 +2,6 @@ import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Project, ID, UserEvents, ProjectSettings } from '@shared/types';
-import { CDN_ORIGIN } from '@shared/types/bridge';
 import { ProjectImpl, EMPTY_USER_EVENTS } from '../../core/Project';
 import { buildDefaultsTemplateProject } from '../../core/defaultsTemplate';
 import { CloudProjectService } from '../../storage/cloudProjectService';
@@ -20,14 +19,16 @@ import { createTranscriptionSlice, type TranscriptionSlice } from './slices/tran
 import { createCameraMoveSlice, type CameraMoveSlice } from './slices/cameraMoveSlice';
 import { createBlurSlice, type BlurSlice } from './slices/blurSlice';
 import { createCameraMatteSlice, type CameraMatteSlice } from './slices/cameraMatteSlice';
+import { createCameraFaceSlice, type CameraFaceSlice } from './slices/cameraFaceSlice';
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { TimeMapper } from '@shared/mappers/timeMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
+import { DEFAULT_EFFECT_AMOUNT } from '@shared/painters/utils/outlineEffects';
 import { calculateAutoZooms, getAllFocusAreas } from '../zoom';
 import { calculateAutoSpotlights } from '../spotlight/autoSpotlight';
 
 
-export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, BlurSlice, CameraMatteSlice {
+export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, BlurSlice, CameraMatteSlice, CameraFaceSlice {
     project: Project;
     /** Project name — stored as DB column, not in project_data. */
     projectName: string;
@@ -102,6 +103,7 @@ export const useProjectStore = create<ProjectState>()(
                 ...createCameraMoveSlice(set, get, store),
                 ...createBlurSlice(set, get, store),
                 ...createCameraMatteSlice(set, get, store),
+                ...createCameraFaceSlice(set, get, store),
 
                 toggleSourceMute: (sourceId) => set(state => ({
                     mutedSources: {
@@ -139,23 +141,21 @@ export const useProjectStore = create<ProjectState>()(
                             toolbar: { enabled: true, theme: 'light', urlMode: 'short' },
                             padding: 0.02,
                             borderRadiusPx: 12,
-                            borderWidthPx: 1,
                             borderColor: '#667eea',
                             deviceFrameId: 'macbook-air-dark',
-                            hasShadow: true,
-                            hasGlow: false,
+                            effect: 'shadow',
+                            effectAmount: DEFAULT_EFFECT_AMOUNT,
                             mute: false,
                         };
                     }
                     if (!(projectWithoutEvents.settings as any).background) {
                         (projectWithoutEvents.settings as any).background = {
-                            type: 'preset',
+                            type: 'color',
                             color: '#6078c4ff',
-                            gradientColors: ['#95a6f2ff', '#83689dff'],
+                            gradientColors: ['#60bfffff', '#2e39ffff'],
                             gradientDirection: 135,
                             colorMode: 'gradient',
                             backgroundBlurPx: 0,
-                            imageUrl: `${CDN_ORIGIN}/backgrounds/nature4.avif`,
                         };
                     }
                     if (!(projectWithoutEvents.settings as any).zoom) {

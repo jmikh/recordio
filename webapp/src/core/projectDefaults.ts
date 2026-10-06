@@ -52,14 +52,13 @@ export const EDITABLE_DEFAULT_PATHS = [
     'screen.deviceFrameId',
     'screen.borderColor',
     'screen.borderRadiusPx',
-    'screen.borderWidthPx',
-    'screen.hasShadow',
-    'screen.hasGlow',
+    'screen.effect',
+    'screen.effectAmount',
     'screen.padding',
 
     // Camera tab. Shape/size come from the shape picker and the size
     // slider; no cropZoom or mirror (both hidden in templateMode), no
-    // faceCenter (an anchor picked on one camera video).
+    // faceCenter (an anchor detected on one camera video).
     'camera.shape',
     'camera.widthPx',
     'camera.heightPx',
@@ -67,9 +66,8 @@ export const EDITABLE_DEFAULT_PATHS = [
     'camera.yPx',
     'camera.borderRadiusPx',
     'camera.borderColor',
-    'camera.borderWidthPx',
-    'camera.hasShadow',
-    'camera.hasGlow',
+    'camera.effect',
+    'camera.effectAmount',
     'camera.autoShrink',
     'camera.shrinkScale',
 

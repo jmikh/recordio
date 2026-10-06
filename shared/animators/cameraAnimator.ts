@@ -212,6 +212,11 @@ export interface ResolvedCameraState {
     borderRadiusPx: number;
     /** Opacity (0 = hidden, 1 = visible, fractional = transitioning) */
     opacity: number;
+    /**
+     * How far the background is removed: 0 = drawn with it, 1 = cutout,
+     * fractional = transitioning (shared/painters/cameraPainter.ts)
+     */
+    cutoutAmount: number;
     /** Whether auto-shrink is actively scaling */
     isAutoShrunk: boolean;
 }
@@ -225,9 +230,45 @@ function bakedBorderRadius(shape: string, borderRadiusPx: number, widthPx: numbe
     return shape === 'circle' ? Math.min(widthPx, heightPx) / 2 : borderRadiusPx;
 }
 
+/** 1 when the block draws the cutout, 0 when it draws the camera with its background */
+function blockCutoutAmount(segment: CameraMoveSegment, cameraSettings: CameraSettings): number {
+    return (segment.removeBackground ?? cameraSettings.removeBackground) ? 1 : 0;
+}
+
+/**
+ * How far into a layout block's values the camera is at `currentTimeMs`
+ * (0 = defaults, 1 = block values, before easing) and which transition is
+ * running. A block too short for both transitions pivots at its halfway
+ * point (mirrors spotlightAnimator). Turning off animateIn/animateOut cuts instead.
+ */
+function getBlockProgress(segment: CameraMoveSegment, currentTimeMs: number): { progress: number; phase: 'in' | 'hold' | 'out' } {
+    const td = segment.transitionDurationMs;
+    const animateIn = segment.animateIn ?? true;
+    const animateOut = segment.animateOut ?? true;
+    const elapsed = currentTimeMs - segment.outputStartTimeMs;
+    const remaining = segment.outputEndTimeMs - currentTimeMs;
+    const duration = segment.outputEndTimeMs - segment.outputStartTimeMs;
+    const halfDuration = duration / 2;
+
+    if (td <= 0) return { progress: 1, phase: 'hold' };
+
+    if (animateIn && animateOut && duration < td * 2) {
+        // Short block: transition in until halfway, then reverse from peak
+        if (elapsed <= halfDuration) {
+            return { progress: elapsed / td, phase: 'in' };
+        }
+        const peakProgress = halfDuration / td;
+        const fadeOutElapsed = elapsed - halfDuration;
+        return { progress: peakProgress - (fadeOutElapsed / td) * peakProgress, phase: 'out' };
+    }
+    if (animateIn && elapsed < td) return { progress: elapsed / td, phase: 'in' };
+    if (animateOut && remaining < td) return { progress: remaining / td, phase: 'out' };
+    return { progress: 1, phase: 'hold' };
+}
+
 /**
  * Resolves the camera state at a given output time, accounting for:
- * 1. Camera layout blocks (position/size overrides with transitions)
+ * 1. Camera layout blocks (position/size/shape/background-removal overrides with transitions)
  * 2. Auto-shrink from zoom state
  *
  * Shape is only used as a UI hint for bounding box constraints.
@@ -249,6 +290,7 @@ export function getResolvedCameraStateAtTime(
     let shape = cameraSettings.shape;
     let borderRadius = bakedBorderRadius(cameraSettings.shape, cameraSettings.borderRadiusPx, cameraSettings.widthPx, cameraSettings.heightPx);
     let opacity = 1;
+    let cutoutAmount = cameraSettings.removeBackground ? 1 : 0;
 
     // Helper: compute auto-shrunk position/size at a specific time
     const getAutoShrunkRect = (timeMs: number, rect: { x: number; y: number; w: number; h: number }) => {
@@ -270,9 +312,9 @@ export function getResolvedCameraStateAtTime(
 
         if (activeSegment) {
             insideLayoutBlock = true;
-            const td = activeSegment.transitionDurationMs;
-            const elapsed = currentTimeMs - activeSegment.outputStartTimeMs;
-            const remaining = activeSegment.outputEndTimeMs - currentTimeMs;
+            // 0 = defaults, 1 = fully at the block's values (fully hidden for a hidden block)
+            const { progress, phase } = getBlockProgress(activeSegment, currentTimeMs);
+            const t = applyEasing(Math.min(1, Math.max(0, progress)), activeSegment.easing);
 
             if (activeSegment.hidden) {
                 // Hidden block: maintain previous visible block's position, transition opacity
@@ -286,36 +328,13 @@ export function getResolvedCameraStateAtTime(
                     h = prevVisible.heightPx;
                     shape = prevVisible.shape;
                     borderRadius = bakedBorderRadius(prevVisible.shape, prevVisible.borderRadiusPx, prevVisible.widthPx, prevVisible.heightPx);
+                    cutoutAmount = blockCutoutAmount(prevVisible, cameraSettings);
                 }
 
-                const duration = activeSegment.outputEndTimeMs - activeSegment.outputStartTimeMs;
-                const halfDuration = duration / 2;
-
-                // Compute fade progress (0 = fully visible, 1 = fully hidden)
-                // Mirrors spotlightAnimator: pivot at half for short blocks.
-                let fadeProgress: number;
-
-                if (duration < td * 2) {
-                    if (elapsed <= halfDuration) {
-                        fadeProgress = elapsed / td;
-                    } else {
-                        const peakProgress = halfDuration / td;
-                        const fadeOutElapsed = elapsed - halfDuration;
-                        fadeProgress = peakProgress - (fadeOutElapsed / td) * peakProgress;
-                    }
-                } else if (elapsed < td) {
-                    fadeProgress = elapsed / td;
-                } else if (remaining < td) {
-                    fadeProgress = remaining / td;
-                } else {
-                    fadeProgress = 1.0;
-                }
-
-                const t = applyEasing(Math.min(1, Math.max(0, fadeProgress)), activeSegment.easing);
                 opacity = lerp(1, 0, t);
 
                 // During fade-in from hidden, interpolate toward auto-shrunk post-block state
-                if (elapsed > halfDuration && t < 1.0) {
+                if (phase === 'out' && t < 1.0) {
                     const shrunk = getAutoShrunkRect(activeSegment.outputEndTimeMs + 1, { x, y, w, h });
                     const reverseT = 1 - t; // How far we are from fully hidden
                     x = lerp(x, shrunk.x, reverseT);
@@ -326,34 +345,7 @@ export function getResolvedCameraStateAtTime(
             } else {
                 // Active visible block — self-contained transitions from/to defaults
                 const segBR = bakedBorderRadius(activeSegment.shape, activeSegment.borderRadiusPx, activeSegment.widthPx, activeSegment.heightPx);
-                const duration = activeSegment.outputEndTimeMs - activeSegment.outputStartTimeMs;
-                const halfDuration = duration / 2;
-
-                // Compute animation progress (0 = defaults, 1 = fully at segment values)
-                // Mirrors spotlightAnimator: pivot at half for short blocks.
-                let animationProgress: number;
-
-                if (duration < td * 2) {
-                    // Short block: fade in until halfway, then reverse from peak
-                    if (elapsed <= halfDuration) {
-                        animationProgress = elapsed / td;
-                    } else {
-                        const peakProgress = halfDuration / td;
-                        const fadeOutElapsed = elapsed - halfDuration;
-                        animationProgress = peakProgress - (fadeOutElapsed / td) * peakProgress;
-                    }
-                } else if (elapsed < td) {
-                    // Transition IN
-                    animationProgress = elapsed / td;
-                } else if (remaining < td) {
-                    // Transition OUT
-                    animationProgress = remaining / td;
-                } else {
-                    // Steady state
-                    animationProgress = 1.0;
-                }
-
-                const t = applyEasing(Math.min(1, Math.max(0, animationProgress)), activeSegment.easing);
+                const segCutout = blockCutoutAmount(activeSegment, cameraSettings);
 
                 if (t >= 1.0) {
                     // Fully at segment values
@@ -363,10 +355,11 @@ export function getResolvedCameraStateAtTime(
                     h = activeSegment.heightPx;
                     shape = activeSegment.shape;
                     borderRadius = segBR;
+                    cutoutAmount = segCutout;
                 } else {
                     // Transitioning — interpolate between auto-shrunk defaults and segment
                     // Use pre-block shrink for transition-in, post-block for transition-out
-                    const peekTime = elapsed < halfDuration
+                    const peekTime = phase === 'in'
                         ? activeSegment.outputStartTimeMs - 1
                         : activeSegment.outputEndTimeMs + 1;
                     const shrunkDefault = getAutoShrunkRect(peekTime, { x, y, w, h });
@@ -376,6 +369,7 @@ export function getResolvedCameraStateAtTime(
                     w = lerp(shrunkDefault.w, activeSegment.widthPx, t);
                     h = lerp(shrunkDefault.h, activeSegment.heightPx, t);
                     borderRadius = lerp(borderRadius, segBR, t);
+                    cutoutAmount = lerp(cutoutAmount, segCutout, t);
                     shape = activeSegment.shape;
                 }
             }
@@ -395,5 +389,5 @@ export function getResolvedCameraStateAtTime(
         }
     }
 
-    return { xPx: x, yPx: y, widthPx: w, heightPx: h, shape, borderRadiusPx: borderRadius, opacity, isAutoShrunk };
+    return { xPx: x, yPx: y, widthPx: w, heightPx: h, shape, borderRadiusPx: borderRadius, opacity, cutoutAmount, isAutoShrunk };
 }

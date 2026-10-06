@@ -177,56 +177,58 @@ export class PlaybackRenderer {
         }
 
         // Render Camera Layer (after blur, so camera always appears on top)
-        if (cameraSource) {
-            const camera = resolveCameraImage(project, videoRefs);
-            if (camera) {
-                const cameraSettings = project.settings.camera;
+        if (cameraSource && videoRefs[cameraSource.storagePath]) {
+            const cameraSettings = project.settings.camera;
 
-                if (!cameraSettings) {
-                    console.error(`[PlaybackRenderer] Missing camera settings for source ${cameraSource.storagePath}`);
-                    throw new Error("Mandatory camera settings are missing.");
-                }
+            if (!cameraSettings) {
+                console.error(`[PlaybackRenderer] Missing camera settings for source ${cameraSource.storagePath}`);
+                throw new Error("Mandatory camera settings are missing.");
+            }
 
-                this._t('camera', () => {
-                    if (state.overrideCameraSettings) {
-                        // Override mode (drag preview): use provided settings directly, no resolver
-                        drawCamera(ctx, camera.image, cameraSource.size, state.overrideCameraSettings!, outputSize, camera.cutout);
-                    } else {
-                        // Use the unified resolver: layout blocks → transitions → auto-shrink
-                        const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
-                        const resolved = getResolvedCameraStateAtTime(
-                            cameraSettings,
-                            cameraMoveEnabled ? (timeline.cameraMoveSegments || []) : [],
-                            zoomSegments,
-                            currentTimeMs,
-                            outputSize,
-                            project.settings.zoom
-                        );
+            this._t('camera', () => {
+                if (state.overrideCameraSettings) {
+                    // Override mode (drag preview): use provided settings directly, no resolver
+                    const override = state.overrideCameraSettings;
+                    const camera = resolveCameraImage(project, videoRefs, override.removeBackground ? 1 : 0);
+                    if (camera) drawCamera(ctx, camera, cameraSource.size, override, outputSize);
+                } else {
+                    // Use the unified resolver: layout blocks → transitions → auto-shrink
+                    const cameraMoveEnabled = project.settings.cameraMove?.enabled ?? true;
+                    const resolved = getResolvedCameraStateAtTime(
+                        cameraSettings,
+                        cameraMoveEnabled ? (timeline.cameraMoveSegments || []) : [],
+                        zoomSegments,
+                        currentTimeMs,
+                        outputSize,
+                        project.settings.zoom
+                    );
 
-                        if (resolved.opacity > 0) {
-                            const effectiveSettings: CameraSettings = {
-                                ...cameraSettings,
-                                xPx: resolved.xPx,
-                                yPx: resolved.yPx,
-                                widthPx: resolved.widthPx,
-                                heightPx: resolved.heightPx,
-                                shape: resolved.shape,
-                                borderRadiusPx: resolved.borderRadiusPx,
-                            };
+                    const camera = resolved.opacity > 0
+                        ? resolveCameraImage(project, videoRefs, resolved.cutoutAmount)
+                        : null;
+                    if (camera) {
+                        const effectiveSettings: CameraSettings = {
+                            ...cameraSettings,
+                            xPx: resolved.xPx,
+                            yPx: resolved.yPx,
+                            widthPx: resolved.widthPx,
+                            heightPx: resolved.heightPx,
+                            shape: resolved.shape,
+                            borderRadiusPx: resolved.borderRadiusPx,
+                        };
 
-                            // Apply opacity for fade transitions (hidden blocks)
-                            if (resolved.opacity < 1) {
-                                ctx.save();
-                                ctx.globalAlpha = resolved.opacity;
-                                drawCamera(ctx, camera.image, cameraSource.size, effectiveSettings, outputSize, camera.cutout);
-                                ctx.restore();
-                            } else {
-                                drawCamera(ctx, camera.image, cameraSource.size, effectiveSettings, outputSize, camera.cutout);
-                            }
+                        // Apply opacity for fade transitions (hidden blocks)
+                        if (resolved.opacity < 1) {
+                            ctx.save();
+                            ctx.globalAlpha = resolved.opacity;
+                            drawCamera(ctx, camera, cameraSource.size, effectiveSettings, outputSize);
+                            ctx.restore();
+                        } else {
+                            drawCamera(ctx, camera, cameraSource.size, effectiveSettings, outputSize);
                         }
                     }
-                });
-            }
+                }
+            });
         }
 
         // Render Captions (on top of everything including spotlight)

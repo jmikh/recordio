@@ -25,11 +25,14 @@ export interface StyleSettings {
      * Clamped to half of smaller dimension during rendering.
      */
     borderRadiusPx: number;
-    borderWidthPx: number;
-    borderColor: string; // Used for border and glow/shadow color
-    hasShadow: boolean;
-    hasGlow: boolean;
+    borderColor: string; // Glow color
+    /** Which effect the edge casts (shared/painters/utils/outlineEffects.ts) */
+    effect: StyleEffect;
+    /** Strength of `effect`, 0–1. 0 = no effect */
+    effectAmount: number;
 }
+
+export type StyleEffect = 'shadow' | 'glow';
 
 // ==========================================
 // CAMERA
@@ -42,10 +45,10 @@ export interface CameraSettings extends StyleSettings {
     yPx: number;
     shape: 'circle' | 'rect' | 'square';
 
-    /** Zoom/crop within the camera video feed (1x = no crop, 3x = 3x zoom) */
+    /** Zoom/crop within the camera video feed (1x = no crop, 2x = 2x zoom) */
     cropZoom: number;
 
-    /** Face Tracking anchoring: Normalized (0-1) coordinates from original video center */
+    /** Face anchor the crop centers on: normalized (0-1) in source video coordinates. Detected on project load when missing (webapp/src/editor/faceDetection/faceCenterJob.ts) */
     faceCenter?: { x: number, y: number };
 
     /** Enable auto-shrink when screen is zoomed in */

@@ -7,12 +7,9 @@ import { getDeviceFrame } from '../utils/deviceFrames';
 import { drawDeviceFrame } from './smartFramePainter';
 import { drawToolbar, getUrlAtTime } from './toolbarPainter';
 import { roundRectPath } from './utils/roundRect';
+import { applyStyleEffect, DEFAULT_EFFECT_AMOUNT } from './utils/outlineEffects';
 
 const REF_OUTPUT_HEIGHT = 1080;
-const REF_SHADOW_BLUR = 20;
-const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
-const REF_SHADOW_OFFSET_Y = 10;
-const REF_GLOW_BLUR = 25;
 
 /**
  * Helper to define the rounded path for the FULL screen content.
@@ -104,10 +101,9 @@ export function drawScreen(
         mode: 'device',
         deviceFrameId: 'macbook-pro',
         borderRadiusPx: 24,
-        borderWidthPx: 0,
         borderColor: '#ffffff',
-        hasShadow: true,
-        hasGlow: false
+        effect: 'shadow',
+        effectAmount: DEFAULT_EFFECT_AMOUNT
     };
 
     // 1. Resolve video dimensions from the source
@@ -183,67 +179,22 @@ export function drawScreen(
             // ============================
             // MODE: BORDER / CUSTOM
             // ============================
-            const {
-                borderRadiusPx: borderRadius = 0,
-                borderWidthPx: borderWidth = 0,
-                borderColor = '#ffffff',
-                hasShadow = false,
-                hasGlow = false
-            } = screenConfig;
+            const { borderRadiusPx: borderRadius = 0 } = screenConfig;
 
             // Scale shadow/glow relative to output height
             const effectScale = outputSize.height / REF_OUTPUT_HEIGHT;
-            const shadowBlur = REF_SHADOW_BLUR * effectScale;
-            const shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
-            const glowBlur = REF_GLOW_BLUR * effectScale;
 
-            const renderBorderWidth = borderWidth;
-
-            // Outset rect so the border stroke sits entirely OUTSIDE the content
-            const halfBW = renderBorderWidth / 2;
-            const borderOutsetRect: Rect = {
-                x: contentRect.x - halfBW,
-                y: contentRect.y - halfBW,
-                width: contentRect.width + renderBorderWidth,
-                height: contentRect.height + renderBorderWidth
-            };
-
-            // --- PASS 1: GLOW ---
-            if (hasGlow) {
-                ctx.save();
-                defineScreenPath(ctx, borderOutsetRect, borderRadius + halfBW);
-                ctx.shadowColor = borderColor;
-                ctx.shadowBlur = glowBlur;
-                ctx.fillStyle = borderColor;
+            // --- PASS 1: GLOW/SHADOW — the caster is just the filled content shape ---
+            ctx.save();
+            const casterFill = applyStyleEffect(ctx, screenConfig, effectScale);
+            if (casterFill) {
+                defineScreenPath(ctx, contentRect, borderRadius);
+                ctx.fillStyle = casterFill;
                 ctx.fill();
-
-                if (renderBorderWidth > 0) {
-                    ctx.lineWidth = renderBorderWidth;
-                    ctx.strokeStyle = borderColor;
-                    ctx.stroke();
-                }
-                ctx.restore();
             }
+            ctx.restore();
 
-            // --- PASS 2: SHADOW ---
-            if (hasShadow) {
-                ctx.save();
-                defineScreenPath(ctx, borderOutsetRect, borderRadius + halfBW);
-                ctx.shadowColor = SHADOW_COLOR;
-                ctx.shadowBlur = shadowBlur;
-                ctx.shadowOffsetY = shadowOffsetY;
-                ctx.fillStyle = 'black';
-                ctx.fill();
-
-                if (renderBorderWidth > 0) {
-                    ctx.lineWidth = renderBorderWidth;
-                    ctx.strokeStyle = 'black';
-                    ctx.stroke();
-                }
-                ctx.restore();
-            }
-
-            // --- PASS 3: VIDEO CONTENT + TOOLBAR (Clipped) ---
+            // --- PASS 2: VIDEO CONTENT + TOOLBAR (Clipped) ---
             ctx.save();
             defineScreenPath(ctx, contentRect, borderRadius);
             ctx.clip();
@@ -261,16 +212,6 @@ export function drawScreen(
                 renderRects.destRect.x, renderRects.destRect.y, renderRects.destRect.width, renderRects.destRect.height
             );
             ctx.restore();
-
-            // --- PASS 4: BORDER ---
-            if (renderBorderWidth > 0) {
-                ctx.save();
-                defineScreenPath(ctx, borderOutsetRect, borderRadius + halfBW);
-                ctx.lineWidth = renderBorderWidth;
-                ctx.strokeStyle = borderColor;
-                ctx.stroke();
-                ctx.restore();
-            }
         }
 
         ctx.restore();

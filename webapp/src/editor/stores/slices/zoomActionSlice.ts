@@ -11,7 +11,6 @@ export interface ZoomSegmentSlice {
     updateZoomSegment: (id: ID, action: Partial<ZoomSegment>) => void;
     addZoomSegment: (action: ZoomSegment) => void;
     deleteZoomSegment: (id: ID) => void;
-    clearZoomSegments: () => void;
     /** Regenerates the auto zooms. Returns how many were created (0 = no usable focus areas). */
     resetZooms: () => number;
     toggleZoomEnabled: () => void;
@@ -82,21 +81,6 @@ export const createZoomSegmentSlice: StateCreator<ProjectState, [["zustand/subsc
                     timeline: {
                         ...state.project.timeline,
                         zoomSegments: actions
-                    }
-                }
-            };
-        });
-    },
-
-    clearZoomSegments: () => {
-
-        set(state => {
-            return {
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        zoomSegments: []
                     }
                 }
             };

@@ -17,7 +17,7 @@ const DEMO_LABEL: Record<DemoKind, string> = {
     click: 'click effect',
     keyboard: 'keyboard hotkeys',
     zoom: 'auto-zoom',
-    shrink: 'auto shrink',
+    shrink: 'scale on zoom',
     spotlight: 'spotlight',
 };
 

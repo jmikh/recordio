@@ -166,30 +166,35 @@ export function renderCameraCutout(
 }
 
 export interface CameraImage {
+    /** The camera frame as recorded */
     image: CanvasImageSource;
-    /** True when `image` is a transparent cutout (background removed) */
-    cutout: boolean;
+    /** Its transparent background-removed cutout, while one is drawn */
+    cutout: CanvasImageSource | null;
+    /** How far the background is removed (0–1); 0 whenever `cutout` is null */
+    cutoutAmount: number;
 }
 
 /**
- * What the camera layer draws this frame: the cutout while background
- * removal is active and both frames are ready, otherwise the plain camera.
+ * What the camera layer draws this frame: the plain camera, plus its cutout
+ * while `cutoutAmount` (ResolvedCameraState.cutoutAmount, or 1/0 from a
+ * camera's removeBackground) is above 0 and both frames are ready.
  * `videoRefs` holds the camera frame under the camera's storagePath and,
  * while active, its mask under the matte's.
  */
 export function resolveCameraImage(
     project: Project,
     videoRefs: { [storagePath: string]: CanvasImageSource },
+    cutoutAmount: number,
 ): CameraImage | null {
     const camera = project.cameraSource;
     const video = camera ? videoRefs[camera.storagePath] : undefined;
     if (!camera || !video) return null;
 
-    const matte = getActiveCameraMatte(project);
+    const matte = cutoutAmount > 0 ? getActiveCameraMatte(project) : null;
     const mask = matte ? videoRefs[matte.storagePath] : undefined;
     if (mask) {
         const cutout = renderCameraCutout(video, mask, camera.size);
-        if (cutout) return { image: cutout, cutout: true };
+        if (cutout) return { image: video, cutout, cutoutAmount: Math.min(1, cutoutAmount) };
     }
-    return { image: video, cutout: false };
+    return { image: video, cutout: null, cutoutAmount: 0 };
 }

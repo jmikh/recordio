@@ -31,7 +31,7 @@ export const renderCropEditor = (
 
     // Create a temporary project that IGNORES crop settings for rendering the "Full" video
     // We want the user to see the full input video so they can select a crop region
-    // Also hide radius, borders, and frames for cleaner crop editing view
+    // Also hide radius, effects, and frames for cleaner crop editing view
     const tempSettings = {
         ...project.settings,
         screen: {
@@ -39,9 +39,7 @@ export const renderCropEditor = (
             crop: undefined, // Force undefined to see full video
             mode: 'border' as const, // Force non-device mode to hide frames
             borderRadiusPx: 0,
-            borderWidthPx: 0, // Hide borders
-            hasShadow: false, // Hide shadow
-            hasGlow: false, // Hide glow
+            effectAmount: 0, // Hide shadow/glow
         }
     };
 

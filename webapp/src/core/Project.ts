@@ -1,8 +1,7 @@
 import { type Project, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type UserEvents, type ID, type Size, type Rect, type ProjectSettings, type Timeline } from '@shared/types';
 import { scaleProject } from '@shared/utils/projectScale';
-import { CDN_ORIGIN } from '@shared/types/bridge';
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 // Default display settings for tracks — single source of truth
 export const DEFAULT_DISPLAY_SETTINGS = {
@@ -89,23 +88,21 @@ export const createDefaultSettings = (): ProjectSettings => ({
             urlMode: 'short',
         },
         padding: 0.02,
-        borderRadiusPx: 12,
-        borderWidthPx: 1,
-        borderColor: '#667eea',
+        borderRadiusPx: 20,
+        borderColor: '#ffffffb0',
         deviceFrameId: 'macbook-air-dark',
-        hasShadow: true,
-        hasGlow: false,
+        effect: 'glow',
+        effectAmount: 0.5,
         mute: false
     },
 
     background: {
-        type: 'preset',
+        type: 'color',
         color: '#6078c4ff',
-        gradientColors: ['#95a6f2ff', '#83689dff'],
+        gradientColors: ['#60bfffff', '#2e39ffff'],
         gradientDirection: 135,
         colorMode: 'gradient',
-        backgroundBlurPx: 0,
-        imageUrl: `${CDN_ORIGIN}/backgrounds/nature4.avif`
+        backgroundBlurPx: 0
     },
 
     captions: {
@@ -137,10 +134,9 @@ export const createDefaultSettings = (): ProjectSettings => ({
         yPx: 1080 - 325,
         shape: 'circle',
         borderRadiusPx: 0,
-        borderWidthPx: 0,
         borderColor: 'white',
-        hasShadow: true,
-        hasGlow: false,
+        effect: 'shadow',
+        effectAmount: 0.7,
         cropZoom: 1,
         autoShrink: true,
         shrinkScale: 0.5,

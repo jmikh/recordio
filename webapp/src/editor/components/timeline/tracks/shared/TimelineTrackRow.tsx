@@ -21,8 +21,8 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
 }) => {
     return (
         <div
-            className={`relative w-full bg-surface rounded-sm overflow-hidden ${className}`}
-            style={{ height, boxShadow: 'var(--shadow-sm)', transition: 'height 150ms ease' }}
+            className={`relative w-full bg-surface-inset rounded-sm overflow-hidden ${className}`}
+            style={{ height, transition: 'height 150ms ease' }}
             onMouseEnter={onMouseEnter}
         >
             {children}

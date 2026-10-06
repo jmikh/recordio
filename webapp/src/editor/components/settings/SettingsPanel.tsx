@@ -96,7 +96,7 @@ export const SettingsPanel = () => {
     const selectedBlurSegmentId = useUIStore(s => s.selectedBlurSegmentId);
     const selectedZoomId = useUIStore(s => s.selectedZoomId);
     const selectedSpotlightId = useUIStore(s => s.selectedSpotlightId);
-    // Delete All / Auto Apply / undo can remove the selected block without
+    // Auto Apply / undo can remove the selected block without
     // clearing the selection; fall back to the active tab when that happens.
     const selectedZoomExists = useProjectStore(s => !!selectedZoomId && s.project.timeline.zoomSegments.some(z => z.id === selectedZoomId));
     const selectedSpotlightExists = useProjectStore(s => !!selectedSpotlightId && s.project.timeline.spotlightSegments.some(z => z.id === selectedSpotlightId));

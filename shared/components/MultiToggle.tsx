@@ -1,10 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Tooltip } from './Tooltip';
 
 export interface MultiToggleOption<T extends string> {
     value: T;
     label?: string;
     icon?: React.ReactNode;
     tooltip?: string;
+    /** Accessible name — required when the option is icon-only */
+    ariaLabel?: string;
+    disabled?: boolean;
 }
 
 interface MultiToggleProps<T extends string> {
@@ -72,31 +76,35 @@ export const MultiToggle = <T extends string>({
             {options.map((option) => {
                 const isSelected = option.value === value;
                 return (
-                    <button
-                        key={option.value}
-                        data-value={option.value}
-                        title={option.tooltip}
-                        onClick={() => onChange(option.value)}
-                        className={`
-                            relative flex-1 flex flex-row items-center justify-center gap-1.5 py-1 px-3 min-w-0
-                            text-sm z-10 outline-none cursor-pointer
-                            text-center
-                            transition-colors duration-200
-                            ${isSelected
-                                ? 'text-text-main'
-                                : 'text-text-disabled hover:text-text-muted'
-                            }
-                        `}
-                    >
-                        {option.icon && (
-                            <span className={`flex items-center justify-center text-current`}>
-                                {option.icon}
-                            </span>
-                        )}
-                        {option.label && (
-                            <span>{option.label}</span>
-                        )}
-                    </button>
+                    <Tooltip key={option.value} text={option.tooltip ?? ''} className="flex-1 min-w-0">
+                        <button
+                            data-value={option.value}
+                            aria-label={option.ariaLabel}
+                            aria-pressed={isSelected}
+                            disabled={option.disabled}
+                            onClick={() => onChange(option.value)}
+                            className={`
+                                relative flex-1 flex flex-row items-center justify-center gap-1.5 py-1 px-3 min-w-0
+                                text-sm z-10 outline-none cursor-pointer
+                                text-center
+                                transition-colors duration-200
+                                disabled:opacity-50 disabled:cursor-default
+                                ${isSelected
+                                    ? 'text-text-main'
+                                    : 'text-text-disabled hover:text-text-muted disabled:hover:text-text-disabled'
+                                }
+                            `}
+                        >
+                            {option.icon && (
+                                <span className={`flex items-center justify-center text-current`}>
+                                    {option.icon}
+                                </span>
+                            )}
+                            {option.label && (
+                                <span>{option.label}</span>
+                            )}
+                        </button>
+                    </Tooltip>
                 );
             })}
         </div>

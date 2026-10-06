@@ -1,38 +1,92 @@
 import type { CameraSettings, Size } from '../types';
+import type { CameraImage } from './cameraCutout';
 import { roundRectPath } from './utils/roundRect';
+import { applyStyleEffect } from './utils/outlineEffects';
 
 const REF_OUTPUT_HEIGHT = 1080;
-const REF_SHADOW_BLUR = 20;
-const SHADOW_COLOR = 'rgba(0,0,0,0.5)';
-const REF_SHADOW_OFFSET_Y = 10;
-const REF_GLOW_BLUR = 25;
+
+/** Scratch canvas the background-removal transition is composed on — reused across calls (never displayed). */
+let blendCanvas: OffscreenCanvas | HTMLCanvasElement | null | undefined;
+
+function getBlendCanvas(width: number, height: number): OffscreenCanvas | HTMLCanvasElement | null {
+    if (blendCanvas === undefined) {
+        blendCanvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(width, height)
+            : typeof document !== 'undefined' ? document.createElement('canvas')
+                : null;
+    }
+    if (!blendCanvas) return null;
+    // Grow only: the box resizes every frame of a transition
+    if (blendCanvas.width < width) blendCanvas.width = width;
+    if (blendCanvas.height < height) blendCanvas.height = height;
+    return blendCanvas;
+}
+
+/**
+ * The camera part-way between drawn with its background (amount 0) and the
+ * cutout (amount 1), composed at (0, 0) of the box size: the background
+ * fades with the shape it was clipped to, the person stays solid inside it,
+ * and the parts of the person the shape cropped (a circle cuts off the
+ * head) fade in. Null when no scratch canvas is available.
+ */
+function composeCutoutBlend(
+    video: CanvasImageSource,
+    cutout: CanvasImageSource,
+    crop: { sx: number, sy: number, sw: number, sh: number },
+    width: number,
+    height: number,
+    radius: number,
+    amount: number,
+): OffscreenCanvas | HTMLCanvasElement | null {
+    const canvas = getBlendCanvas(Math.ceil(width), Math.ceil(height));
+    const bctx = canvas?.getContext('2d') as CanvasRenderingContext2D | null | undefined;
+    if (!canvas || !bctx) return null;
+    const { sx, sy, sw, sh } = crop;
+
+    bctx.save();
+    bctx.clearRect(0, 0, Math.ceil(width), Math.ceil(height));
+
+    bctx.save();
+    roundRectPath(bctx, 0, 0, width, height, radius);
+    bctx.clip();
+    bctx.globalAlpha = 1 - amount;
+    bctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+    bctx.globalAlpha = 1;
+    bctx.drawImage(cutout, sx, sy, sw, sh, 0, 0, width, height);
+    bctx.restore();
+
+    // Outside the shape only: the box minus the rounded shape
+    roundRectPath(bctx, 0, 0, width, height, radius);
+    bctx.rect(0, 0, width, height);
+    bctx.clip('evenodd');
+    bctx.globalAlpha = amount;
+    bctx.drawImage(cutout, sx, sy, sw, sh, 0, 0, width, height);
+    bctx.restore();
+
+    return canvas;
+}
 
 /**
  * Draws the camera overlay (Picture-in-Picture) onto the canvas.
- * 
+ *
  * @param ctx - The 2D rendering context.
- * @param video - The source video element for the camera.
+ * @param camera - The camera frame and, while the background is removed,
+ *   its transparent cutout (shared/painters/cameraCutout.ts). At
+ *   cutoutAmount 1 the cutout is drawn free-standing, without the shape
+ *   clip, and the glow or shadow follows the silhouette; between 0 and 1
+ *   it's blended with the clipped frame (composeCutoutBlend).
  * @param inputSize - The dimensions of the source camera video.
  * @param settings - Configuration for position/size.
- * @param cutout - `video` is a transparent background-removed cutout
- *   (shared/painters/cameraCutout.ts): drawn free-standing, without the
- *   shape clip, border or glow; the shadow follows the silhouette.
  */
 export function drawCamera(
     ctx: CanvasRenderingContext2D,
-    video: CanvasImageSource,
+    camera: CameraImage,
     inputSize: Size,
     settings: CameraSettings,
-    outputSize?: Size,
-    cutout = false
+    outputSize?: Size
 ) {
     const {
         xPx: x, yPx: y, widthPx: width, heightPx: height,
         borderRadiusPx: borderRadius = 0,
-        borderWidthPx: borderWidth = 0,
-        borderColor = '#ffffff',
-        hasShadow = false,
-        hasGlow = false,
         cropZoom = 1,
         mirrored = false
     } = settings;
@@ -84,8 +138,14 @@ export function drawCamera(
     // Scale effect properties relative to output height
     const effectScale = outputSize ? outputSize.height / REF_OUTPUT_HEIGHT : 1;
 
-    // Scale Style Properties
-    const scaledBorderWidth = borderWidth;
+    // The shadow always falls downward, leaning toward the canvas center by how
+    // far the camera sits from it: straight down at the center, 45° at an edge.
+    // The editor overlays pass no outputSize, but their canvas is output-sized
+    const halfCanvasWidth = (outputSize ?? ctx.canvas).width / 2;
+    const shadowDirection = {
+        x: (halfCanvasWidth - (x + width / 2)) / halfCanvasWidth,
+        y: 1,
+    };
 
     // borderRadius is in output pixels — already scaled by ProjectImpl.scale
     const scaledBorderRadius = borderRadius;
@@ -115,72 +175,47 @@ export function drawCamera(
         ctx.translate(-x, 0);
     }
 
-    if (cutout) {
-        if (hasShadow) {
-            ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
-            ctx.shadowColor = SHADOW_COLOR;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
+    const video = camera.image;
+    const cutout = camera.cutout;
+    const cutoutAmount = cutout ? camera.cutoutAmount : 0;
+
+    if (cutout && cutoutAmount > 0 && cutoutAmount < 1) {
+        const r = Math.min(scaledBorderRadius, width / 2, height / 2);
+        const blend = composeCutoutBlend(video, cutout, { sx, sy, sw, sh }, width, height, r, cutoutAmount);
+        if (blend) {
+            // The shadow is cast from the blend's alpha: the fading shape plus the silhouette
+            applyStyleEffect(ctx, settings, effectScale, shadowDirection);
+            ctx.drawImage(blend, 0, 0, width, height, x, y, width, height);
+            ctx.restore();
+            return;
         }
-        ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
+    }
+
+    // Without a scratch canvas the transition snaps halfway
+    if (cutout && cutoutAmount >= 0.5) {
+        // The canvas shadow is cast from the image's alpha, so it traces the silhouette
+        applyStyleEffect(ctx, settings, effectScale, shadowDirection);
+        ctx.drawImage(cutout, sx, sy, sw, sh, x, y, width, height);
         ctx.restore();
         return;
     }
 
-    // 1. Glow Pass
-    if (hasGlow) {
-        ctx.save();
-        ctx.shadowBlur = REF_GLOW_BLUR * effectScale;
-        ctx.shadowColor = borderColor;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+    // 1. Glow/Shadow Pass — the caster is just the filled shape
+    ctx.save();
+    const casterFill = applyStyleEffect(ctx, settings, effectScale, shadowDirection);
+    if (casterFill) {
         definePath();
-
-        ctx.fillStyle = borderColor;
+        ctx.fillStyle = casterFill;
         ctx.fill();
-
-        if (scaledBorderWidth > 0) {
-            ctx.lineWidth = scaledBorderWidth;
-            ctx.strokeStyle = borderColor;
-            ctx.stroke();
-        }
-        ctx.restore();
     }
+    ctx.restore();
 
-    // 2. Shadow Pass
-    if (hasShadow) {
-        ctx.save();
-        ctx.shadowBlur = REF_SHADOW_BLUR * effectScale;
-        ctx.shadowColor = SHADOW_COLOR;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = REF_SHADOW_OFFSET_Y * effectScale;
-        definePath();
-
-        ctx.fillStyle = 'black';
-        ctx.fill();
-
-        if (scaledBorderWidth > 0) {
-            ctx.lineWidth = scaledBorderWidth;
-            ctx.strokeStyle = 'black'; // Color doesn't matter for shadow caster, but stroke needs color
-            ctx.stroke();
-        }
-        ctx.restore();
-    }
-
-    // 3. Content Pass
+    // 2. Content Pass
     ctx.save();
     definePath();
     ctx.clip();
     ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
     ctx.restore();
-
-    // 4. Border Pass
-    if (scaledBorderWidth > 0) {
-        definePath();
-        ctx.lineWidth = scaledBorderWidth;
-        ctx.strokeStyle = borderColor;
-        ctx.stroke();
-    }
 
     ctx.restore();
 }

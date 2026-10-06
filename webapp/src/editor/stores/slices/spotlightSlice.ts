@@ -11,7 +11,6 @@ export interface SpotlightSlice {
     updateSpotlight: (id: ID, spotlight: Partial<SpotlightSegment>) => void;
     addSpotlight: (spotlight: SpotlightSegment) => void;
     deleteSpotlight: (id: ID) => void;
-    clearSpotlights: () => void;
     resetSpotlights: () => void;
     toggleSpotlightEnabled: () => void;
     /**
@@ -86,21 +85,6 @@ export const createSpotlightSlice: StateCreator<ProjectState, [["zustand/subscri
                     timeline: {
                         ...state.project.timeline,
                         spotlightSegments
-                    }
-                }
-            };
-        });
-    },
-
-    clearSpotlights: () => {
-
-        set(state => {
-            return {
-                project: {
-                    ...state.project,
-                    timeline: {
-                        ...state.project.timeline,
-                        spotlightSegments: []
                     }
                 }
             };
