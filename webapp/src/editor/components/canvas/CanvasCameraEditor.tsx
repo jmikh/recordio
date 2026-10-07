@@ -191,6 +191,9 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
     // Only show corner radius handles for rect/square shapes (not circle)
     const showCornerEditing = currentShape !== 'circle';
 
+    // The cutout has no edge of its own (and only draws once the matte exists)
+    const isCutout = !!currentSettings.removeBackground && !!cameraSource?.matte;
+
     // Square and circle shapes maintain 1:1 aspect ratio
     const fixedAspectRatio = (currentShape === 'square' || currentShape === 'circle') ? 1 : null;
 
@@ -276,6 +279,7 @@ export const CameraEditor: React.FC<CameraEditorProps> = ({ cameraRef }) => {
                     onChange={handleChange}
                     onCommit={onCommit}
                     onDragStart={startInteraction}
+                    dashedOutline={isCutout}
                     // Corner radius editing (always linked, no toggle)
                     allowCornerEditing={showCornerEditing}
                     cornerRadii={cornerRadii}

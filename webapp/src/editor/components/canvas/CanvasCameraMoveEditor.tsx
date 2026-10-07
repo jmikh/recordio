@@ -86,6 +86,7 @@ export const CameraMoveEditor: React.FC<{
     const segmentBorderRadius = segment?.borderRadiusPx ?? 0;
     const segmentHidden = segment?.hidden ?? false;
     const segmentRemoveBackground = segment?.removeBackground;
+    const hasMatte = useProjectStore(s => !!s.project.cameraSource?.matte);
 
     const { batchAction, startInteraction, endInteraction } = useHistoryBatcher();
 
@@ -163,6 +164,8 @@ export const CameraMoveEditor: React.FC<{
     // Derived values
     const showCornerEditing = segmentShape !== 'circle';
     const fixedAspectRatio = (segmentShape === 'square' || segmentShape === 'circle') ? 1 : null;
+    // The cutout has no edge of its own (and only draws once the matte exists)
+    const isCutout = !!currentSettings.removeBackground && hasMatte;
 
     const cornerRadii: CornerRadii = (() => {
         const r = currentSettings.borderRadiusPx ?? 0;
@@ -227,6 +230,7 @@ export const CameraMoveEditor: React.FC<{
                     onChange={handleChange}
                     onCommit={onCommit}
                     onDragStart={startInteraction}
+                    dashedOutline={isCutout}
                     allowCornerEditing={showCornerEditing}
                     cornerRadii={cornerRadii}
                     cornersLinked={true}

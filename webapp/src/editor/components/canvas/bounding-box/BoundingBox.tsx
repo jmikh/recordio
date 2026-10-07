@@ -56,6 +56,8 @@ export interface BoundingBoxProps {
     hideLinkToggle?: boolean;
     /** Hide the rounded border preview on the bounding box outline */
     hideCornerPreview?: boolean;
+    /** Outline the box with a dashed frame only, for content with no visible edge (e.g. a background-removed camera) */
+    dashedOutline?: boolean;
     /** Callback when corner radii change during drag */
     onCornerRadiiChange?: (radii: CornerRadii) => void;
     /** Callback when corner radii editing is committed */
@@ -85,6 +87,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     cornersLinked: controlledLinked,
     hideLinkToggle = false,
     hideCornerPreview = false,
+    dashedOutline = false,
     onCornerRadiiChange,
     onCornerRadiiCommit,
     onCornersLinkedChange,
@@ -323,24 +326,28 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // STYLING
     // ------------------------------------------------------------------
 
+    // Without corner editing nothing edits the radii locally, so follow the prop directly —
+    // it can change mid-drag (e.g. a circle's radius tracks its size while resizing)
+    const previewRadii = allowCornerEditing ? localCornerRadii : cornerRadii;
+
     // Border radius CSS calculation
     const borderRadiusCss = useMemo(() => {
-        if (allowCornerEditing && localCornerRadii.some(r => r > 0)) {
+        if (previewRadii && previewRadii.some(r => r > 0)) {
             const smallerDimension = Math.min(rect.width, rect.height);
             const maxRadius = smallerDimension / 2;
 
             const clampedRadii: CornerRadii = [
-                Math.min(localCornerRadii[0], maxRadius),
-                Math.min(localCornerRadii[1], maxRadius),
-                Math.min(localCornerRadii[2], maxRadius),
-                Math.min(localCornerRadii[3], maxRadius)
+                Math.min(previewRadii[0], maxRadius),
+                Math.min(previewRadii[1], maxRadius),
+                Math.min(previewRadii[2], maxRadius),
+                Math.min(previewRadii[3], maxRadius)
             ];
             const displayRadii = displayMapper.outputToDisplayRadii(clampedRadii);
 
             return `${displayRadii[0]}px ${displayRadii[1]}px ${displayRadii[2]}px ${displayRadii[3]}px`;
         }
         return '0';
-    }, [allowCornerEditing, localCornerRadii, rect.width, rect.height, displayMapper]);
+    }, [previewRadii, rect.width, rect.height, displayMapper]);
 
     // Convert rect from output to display pixels
     // Use ref during drag for instant visual feedback (avoids 1-frame lag)
@@ -348,7 +355,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const displayRect = displayMapper.outputToDisplay(activeRect);
 
     const resolvedColor = 'var(--color-secondary)';
-    const showsRoundedCorners = !hideCornerPreview && borderRadiusCss !== '0';
+    const showsRoundedCorners = !hideCornerPreview && !dashedOutline && borderRadiusCss !== '0';
 
     const boxStyle: React.CSSProperties = {
         position: 'absolute',
@@ -360,15 +367,16 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
         borderRadius: showsRoundedCorners ? borderRadiusCss : '0',
         pointerEvents: 'auto',
         zIndex: Z_INDEX_BOUNDING_BOX,
-        outline: `${BOX_BORDER_WIDTH}px solid ${resolvedColor}`,
+        outline: dashedOutline ? 'none' : `${BOX_BORDER_WIDTH}px solid ${resolvedColor}`,
         outlineOffset: 0,
     };
 
-    // Dashed when the rounded outline is visible, so the square frame reads as secondary
+    // Dashed when the rounded outline is visible, so the square frame reads as secondary,
+    // or when the content has no edge of its own
     const straightLineStyle: React.CSSProperties = {
         position: 'absolute',
         inset: -1,
-        border: `${OVERLAY_BORDER_WIDTH}px ${showsRoundedCorners ? 'dashed' : 'solid'} ${resolvedColor}`,
+        border: `${OVERLAY_BORDER_WIDTH}px ${showsRoundedCorners || dashedOutline ? 'dashed' : 'solid'} ${resolvedColor}`,
         borderRadius: 0,
         pointerEvents: 'none',
     };

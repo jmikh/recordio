@@ -164,6 +164,11 @@ export const CanvasHoverLayer: React.FC = () => {
     const showCamera  = cameraActive && !!cameraDisplayRect;
     const showBlurs = visibleRegions.length > 0;
 
+    // The cutout has no edge of its own, so it gets only the dashed frame
+    const cameraIsCutout = (resolvedCamera?.cutoutAmount ?? 0) > 0 && !!cameraSource?.matte;
+    const showCameraSolidOutline = hoveredCameraId && !cameraIsCutout;
+    const showCameraDashedFrame = hoveredCameraId && (cameraIsCutout || (resolvedCamera?.borderRadiusPx ?? 0) > 0);
+
     // --- Cleanup lingering state ---
     // If the camera goes out of view or is paused out, clear its hover state.
     useEffect(() => {
@@ -208,7 +213,7 @@ export const CanvasHoverLayer: React.FC = () => {
                         height: cameraDisplayRect.height,
                         pointerEvents: 'auto',
                         cursor: 'pointer',
-                        border: hoveredCameraId
+                        border: showCameraSolidOutline
                             ? '2px solid var(--color-secondary)'
                             : '2px solid transparent',
                         borderRadius: resolvedCamera
@@ -219,7 +224,12 @@ export const CanvasHoverLayer: React.FC = () => {
                     onMouseEnter={() => setHoveredCameraId(true)}
                     onMouseLeave={() => setHoveredCameraId(false)}
                     onPointerDown={handleCameraPointerDown}
-                />
+                >
+                    {/* Dashed square frame around a rounded or cutout camera, matching the selected BoundingBox */}
+                    {showCameraDashedFrame && (
+                        <div className="absolute -inset-0.5 border border-dashed border-secondary pointer-events-none" />
+                    )}
+                </div>
             )}
         </div>
     );

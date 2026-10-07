@@ -107,6 +107,8 @@ export const CameraMoveInspector: React.FC<{ segment: CameraMoveSegment }> = ({ 
             heightPx: outputSize.height,
             shape: 'rect',
             borderRadiusPx: 0,
+            // Explicit false so the block doesn't inherit a global no-background cutout
+            removeBackground: false,
         });
     }, [segment.id, outputSize, updateCameraMove]);
 

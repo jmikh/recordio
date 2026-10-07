@@ -156,8 +156,8 @@ export const CameraSettings = () => {
                         {/* Shadow/Glow Toggle — no effect is an amount of 0 */}
                         <MultiToggle<StyleEffect>
                             options={[
-                                { value: 'shadow', label: 'Shadow', icon: <TbShadow className="icon-md" /> },
-                                { value: 'glow', label: 'Glow', icon: <LuSun className="icon-md" /> }
+                                { value: 'shadow', label: 'Shadow', icon: <TbShadow className="icon-md" />, tooltip: 'Better for lighter screens' },
+                                { value: 'glow', label: 'Glow', icon: <LuSun className="icon-md" />, tooltip: 'Better for darker screens' }
                             ]}
                             value={effect}
                             onChange={(val) => updateSettings({ camera: { ...cameraConfig, effect: val } })}
@@ -255,9 +255,8 @@ export const CameraSettings = () => {
                                 onPointerUp={endInteraction}
                                 onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, shrinkScale: val } }))}
                                 showTooltip
-                                units="%"
-                                decimals={0}
-                                valueTransform={(v) => v * 100}
+                                units="x"
+                                decimals={2}
                             />
                         )}
                     </div>
