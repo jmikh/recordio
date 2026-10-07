@@ -27,6 +27,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import fastifyMultipart from '@fastify/multipart';
 import { Type } from '@sinclair/typebox';
 import { randomUUID } from 'node:crypto';
+import { userAssetPath } from '../../services/storagePaths.js';
 
 const LIBRARY_LIMIT = 10; // per asset type per user
 
@@ -145,7 +146,7 @@ export const assetUploadRoutes: FastifyPluginAsyncTypebox = async (app) => {
             }
 
             const assetId = randomUUID();
-            const storagePath = `${userId}/assets/${assetId}.${ext}`;
+            const storagePath = userAssetPath(userId, assetId, ext);
 
             await app.deps.s3.putObject(storagePath, new Uint8Array(file), CONTENT_TYPE[ext]);
 

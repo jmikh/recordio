@@ -226,4 +226,69 @@ describe.runIf(hasTestDb())('POST /project-get (e2e, real Postgres)', () => {
         expect(res.statusCode).toBe(403);
         expect(res.json()).toEqual({ error: 'Not an editor of this project' });
     });
+
+    describe('media_urls (what the editor hydrates from)', () => {
+        /** project_data needs the id in its paths, so it's written after seeding */
+        async function setData(projectId: string, data: unknown) {
+            await pool.query('UPDATE projects SET project_data = $2::jsonb WHERE id = $1',
+                [projectId, JSON.stringify(data)]);
+        }
+
+        const url = (key: string) => `https://fake-s3/get/${key}`;
+
+        it('signs every media path inside the project namespace for a collaborator', async () => {
+            const project = await seed();
+            await seedProjectEditor(pool, { projectId: project.id, userId: SEEDED_USER_2_ID });
+            const screen = `${SEEDED_USER_ID}/${project.id}/screen.webm`;
+            // A collaborator's matte sits under their own prefix, still in this project
+            const matte = `${SEEDED_USER_2_ID}/${project.id}/cameraMatte.webm`;
+            const background = `${SEEDED_USER_ID}/${project.id}/assets/a-1.webp`;
+            await setData(project.id, {
+                screenSource: { storagePath: screen },
+                cameraSource: { storagePath: `${SEEDED_USER_ID}/${project.id}/camera.webm`, matte: { storagePath: matte } },
+                settings: { background: { storagePath: background } },
+            });
+
+            const { app } = testApp();
+            const res = await post(app, { projectId: project.id }, await userToken({ sub: SEEDED_USER_2_ID }));
+            expect(res.statusCode).toBe(200);
+            expect((res.json() as { media_urls: unknown }).media_urls).toEqual({
+                [screen]: url(screen),
+                [`${SEEDED_USER_ID}/${project.id}/camera.webm`]: url(`${SEEDED_USER_ID}/${project.id}/camera.webm`),
+                [matte]: url(matte),
+                [background]: url(background),
+            });
+        });
+
+        it('a path outside the namespace is signed only for its own prefix owner (pre-migration library refs)', async () => {
+            const project = await seed();
+            await seedProjectEditor(pool, { projectId: project.id, userId: SEEDED_USER_2_ID });
+            const library = `${SEEDED_USER_ID}/assets/a-1.webp`;
+            await setData(project.id, { settings: { background: { storagePath: library } } });
+
+            const { app } = testApp();
+            const asOwner = await post(app, { projectId: project.id }, await userToken({ sub: SEEDED_USER_ID }));
+            expect((asOwner.json() as { media_urls: unknown }).media_urls).toEqual({ [library]: url(library) });
+
+            const asCollaborator = await post(app, { projectId: project.id }, await userToken({ sub: SEEDED_USER_2_ID }));
+            expect((asCollaborator.json() as { media_urls: unknown }).media_urls).toEqual({});
+        });
+
+        it('pre-v5 projects get their recording paths backfilled under the creator, then signed', async () => {
+            const project = await seed();
+            await setData(project.id, { screenSource: { kind: 'display' }, microphoneSource: { kind: 'mic' } });
+
+            const { app } = testApp();
+            const res = await post(app, { projectId: project.id }, await userToken({ sub: SEEDED_USER_ID }));
+            const body = res.json() as {
+                project_data: { screenSource: { storagePath: string }; microphoneSource: { storagePath: string } };
+                media_urls: Record<string, string>;
+            };
+            const screen = `${SEEDED_USER_ID}/${project.id}/screen.webm`;
+            const mic = `${SEEDED_USER_ID}/${project.id}/mic.wav`;
+            expect(body.project_data.screenSource.storagePath).toBe(screen);
+            expect(body.project_data.microphoneSource.storagePath).toBe(mic);
+            expect(body.media_urls).toEqual({ [screen]: url(screen), [mic]: url(mic) });
+        });
+    });
 });

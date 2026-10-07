@@ -26,6 +26,29 @@ import { getDeviceFrame } from '@shared/utils/deviceFrames';
 import { DEFAULT_EFFECT_AMOUNT } from '@shared/painters/utils/outlineEffects';
 import { calculateAutoZooms, getAllFocusAreas } from '../zoom';
 import { calculateAutoSpotlights } from '../spotlight/autoSpotlight';
+import type { UserAsset } from '../../storage/userAssetService';
+
+/**
+ * Where a picked library asset lives for what the store holds, plus a blob
+ * URL for it. A real project gets its own copy (project-asset-attach) —
+ * projects only reference files inside their namespace, which is what lets
+ * every editor load them. The defaults template has no project and keeps
+ * the library path.
+ */
+async function resolvePickedAsset(
+    asset: UserAsset,
+    state: Pick<ProjectState, 'templateMode' | 'project'>,
+): Promise<{ storagePath: string; blobUrl: string }> {
+    if (state.templateMode) {
+        return { storagePath: asset.storagePath, blobUrl: await BlobCache.getBlobUrl(asset.storagePath, asset.downloadUrl) };
+    }
+    const { storagePath, downloadUrl } = await CloudStorage.attachAsset(state.project.id, asset.id);
+    // The library blob is almost always cached (pre-loaded with the
+    // library, or just uploaded): seed the copy's entry instead of downloading
+    const cached = await BlobCache.getBlobIfCached(asset.storagePath);
+    if (cached) await BlobCache.put(storagePath, cached);
+    return { storagePath, blobUrl: await BlobCache.getBlobUrl(storagePath, downloadUrl) };
+}
 
 
 export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSlice, SpotlightSlice, TranscriptionSlice, CameraMoveSlice, BlurSlice, CameraMatteSlice, CameraFaceSlice {
@@ -53,12 +76,12 @@ export interface ProjectState extends WindowSlice, SettingsSlice, ZoomSegmentSli
     unloadDefaultsTemplate: () => void;
 
     // Background/Music Actions
-    /** Select a library asset as the project's custom background */
-    selectBackground: (storagePath: string) => Promise<void>;
+    /** Select a library asset as the project's custom background (attaches a copy to a real project) */
+    selectBackground: (asset: UserAsset) => Promise<void>;
     /** Clear the current project's custom background */
     clearBackground: () => void;
-    /** Select a library asset as the project's custom music */
-    selectMusic: (storagePath: string) => Promise<void>;
+    /** Select a library asset as the project's custom music (attaches a copy to a real project) */
+    selectMusic: (asset: UserAsset) => Promise<void>;
     /** Clear the current project's custom music */
     clearMusic: () => void;
 
@@ -298,8 +321,8 @@ export const useProjectStore = create<ProjectState>()(
                     }
                 },
 
-                selectBackground: async (storagePath) => {
-                    const blobUrl = await BlobCache.getBlobUrl(storagePath);
+                selectBackground: async (asset) => {
+                    const { storagePath, blobUrl } = await resolvePickedAsset(asset, get());
                     useMediaUrlStore.getState().setUrl(storagePath, blobUrl);
 
                     get().updateSettings({
@@ -322,8 +345,8 @@ export const useProjectStore = create<ProjectState>()(
                     });
                 },
 
-                selectMusic: async (storagePath) => {
-                    const blobUrl = await BlobCache.getBlobUrl(storagePath);
+                selectMusic: async (asset) => {
+                    const { storagePath, blobUrl } = await resolvePickedAsset(asset, get());
                     useMediaUrlStore.getState().setUrl(storagePath, blobUrl);
 
                     get().updateSettings({

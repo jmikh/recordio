@@ -4,12 +4,16 @@
  * in the snake_case jsonb shape the client consumes. NO response schema
  * — screenshot_data is arbitrary and must not be stripped.
  *
+ * `source_url` is a presigned GET for the source image, authorized by the
+ * editor check above (paths here are all server-written columns).
+ *
  * Request:  { screenshotId } | { slug } (the /screenshot/{slug}/edit route loads by slug)
  * Response: the screenshot object (200) | 400 { error } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ScreenshotGetRequestSchema } from '@shared/api/screenshots';
 import { canEditScreenshot } from '../../services/screenshotAccess.js';
+import { DOWNLOAD_URL_TTL_SECONDS } from '../../services/downloadUrls.js';
 import { isImpersonating } from '../../plugins/auth.js';
 
 export const screenshotGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -90,7 +94,14 @@ export const screenshotGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 [screenshotId],
             );
 
-            return reply.send((rows[0] as { screenshot: unknown } | undefined)?.screenshot ?? null);
+            const screenshot = (rows[0] as { screenshot: Record<string, unknown> & { source_storage_path: string } } | undefined)
+                ?.screenshot;
+            if (!screenshot) return reply.send(null);
+
+            return reply.send({
+                ...screenshot,
+                source_url: await app.deps.s3.presignDownload(screenshot.source_storage_path, DOWNLOAD_URL_TTL_SECONDS),
+            });
         },
     );
 };

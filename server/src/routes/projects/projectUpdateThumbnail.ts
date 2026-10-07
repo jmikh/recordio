@@ -23,6 +23,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import fastifyMultipart from '@fastify/multipart';
 import { Type } from '@sinclair/typebox';
 import { getProjectIfEditor } from '../../services/projectAccess.js';
+import { projectThumbnailPath } from '../../services/storagePaths.js';
 
 /** Thumbnails should be small — same cap as the edge function */
 const MAX_THUMBNAIL_BYTES = 500 * 1024;
@@ -83,7 +84,9 @@ export const projectUpdateThumbnailRoutes: FastifyPluginAsyncTypebox = async (ap
                 return reply.code(404).send({ error: 'Project not found or access denied' });
             }
 
-            const storagePath = `${req.user!.id}/${projectId}/thumbnail.webp`;
+            // Under the creator's prefix whoever uploads, so it lives (and is
+            // purged) with the project's media
+            const storagePath = projectThumbnailPath(project.created_by, projectId);
             await app.deps.s3.putObject(storagePath, new Uint8Array(file), 'image/webp');
 
             await app.deps.db.query(

@@ -82,6 +82,8 @@ export interface CloudProject {
     owner_name: string | null;
     owner_email: string;
     editors: ProjectEditor[];
+    /** storagePath → presigned GET (1h) for the project's media; the editor hydrates from these */
+    media_urls: Record<string, string>;
 }
 
 // ── POST /project-list ───────────────────────────────────────────
@@ -99,6 +101,8 @@ export interface CloudProjectSummary {
     owner_id: string;
     workspace_id: string;
     thumbnail_storage_path: string | null;
+    /** Presigned GET (1h) for the thumbnail; null when there is none or the caller can't view the project */
+    thumbnail_url: string | null;
     last_accessed_at: string;
     updated_at: string;
     created_at: string;
@@ -166,6 +170,22 @@ export const ProjectUpdateResponseSchema = Type.Object({
     cloudVersion: Type.Union([Type.Integer(), Type.Null()]),
 });
 export type ProjectUpdateResponse = Static<typeof ProjectUpdateResponseSchema>;
+
+// ── POST /project-asset-attach ───────────────────────────────────
+
+/** Copies one of the caller's library assets into the project. */
+export const ProjectAssetAttachRequestSchema = Type.Object({
+    projectId: Type.String({ minLength: 1 }),
+    assetId: Type.String({ minLength: 1 }),
+});
+export type ProjectAssetAttachRequest = Static<typeof ProjectAssetAttachRequestSchema>;
+
+/** `storagePath` is the copy's key (what project_data stores); `downloadUrl` a presigned GET for it. */
+export const ProjectAssetAttachResponseSchema = Type.Object({
+    storagePath: Type.String(),
+    downloadUrl: Type.String(),
+});
+export type ProjectAssetAttachResponse = Static<typeof ProjectAssetAttachResponseSchema>;
 
 // ── POST /project-update-name + /project-rename (identical twins) ─
 

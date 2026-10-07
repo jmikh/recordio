@@ -19,6 +19,8 @@ import type { ProjectEditor } from '@shared/api/projects';
 export interface ProjectAccess {
     id: string;
     owner_id: string;
+    /** Storage prefix owner — every object of this project lives under projectStoragePrefix(created_by, id) */
+    created_by: string;
     /** Permanent share slug (NOT NULL + DB default since the share-access migration) */
     slug: string;
     workspace_id: string;
@@ -60,7 +62,7 @@ export async function getProjectIfEditor(
     userId: string,
 ): Promise<ProjectAccess | null> {
     const { rows } = await db.query(
-        `SELECT p.id, p.owner_id, p.slug, p.workspace_id
+        `SELECT p.id, p.owner_id, p.created_by, p.slug, p.workspace_id
          FROM projects p
          LEFT JOIN workspaces w ON w.id = p.workspace_id
          WHERE p.id = $1

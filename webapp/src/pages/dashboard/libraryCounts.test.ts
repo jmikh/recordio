@@ -4,7 +4,7 @@ import type { ProjectListItem } from '../../storage/cloudProjectService';
 
 function project(over: Partial<ProjectListItem>): ProjectListItem {
     return {
-        id: 'p', name: 'P', thumbnail: null, thumbnailStoragePath: null, updatedAt: '', createdAt: '',
+        id: 'p', name: 'P', thumbnail: null, thumbnailStoragePath: null, thumbnailDownloadUrl: null, updatedAt: '', createdAt: '',
         lastAccessedAt: null, ownerId: 'me', deletedAt: null, isShared: false, cloudVersion: 1,
         durationMs: null, shareSlug: 'slug', sharePolicy: 'private', workspaceAccess: null,
         isEditor: false, editorRole: null, uploadStatus: 'ready', mediaPaths: null,

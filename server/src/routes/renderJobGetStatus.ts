@@ -6,12 +6,17 @@
  * project. The job fields keep the snake_case names the poller consumes
  * (status/progress/error/render_storage_path).
  *
+ * A completed job also carries `render_url`, a presigned GET for the MP4
+ * (authorized by the editor check). The client asks for it right before
+ * downloading, so a retry after the 1h expiry just polls again.
+ *
  * Request:  { jobId }
  * Response: { job: {...} | null } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { RenderJobGetStatusRequestSchema } from '@shared/api/renderJobs';
+import { RenderJobGetStatusRequestSchema, type RenderJobStatus } from '@shared/api/renderJobs';
 import { canEditProject } from '../services/projectAccess.js';
+import { DOWNLOAD_URL_TTL_SECONDS } from '../services/downloadUrls.js';
 
 export const renderJobGetStatusRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -51,7 +56,13 @@ export const renderJobGetStatusRoutes: FastifyPluginAsyncTypebox = async (app) =
                 FROM render_jobs rj WHERE rj.id = $1`,
                 [jobId],
             );
-            return reply.send({ job: (rows[0] as { job: unknown } | undefined)?.job ?? null });
+            const job = (rows[0] as { job: Omit<RenderJobStatus, 'render_url'> } | undefined)?.job;
+            if (!job) return reply.send({ job: null });
+
+            const renderUrl = job.status === 'completed' && job.render_storage_path
+                ? await app.deps.s3.presignDownload(job.render_storage_path, DOWNLOAD_URL_TTL_SECONDS)
+                : null;
+            return reply.send({ job: { ...job, render_url: renderUrl } });
         },
     );
 };

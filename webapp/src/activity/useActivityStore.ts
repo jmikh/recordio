@@ -42,8 +42,8 @@ export interface RenderTask extends ActivityTaskBase {
     phase: Exclude<CloudRenderPhase, 'idle'>;
     quality: ExportQuality;
     fps: ExportFps;
-    /** Known once the job completes — lets the toast's Download re-fetch the file */
-    renderStoragePath: string | null;
+    /** Known once the job completes — lets the toast's Download ask for a fresh URL and re-fetch the file */
+    renderJobId: string | null;
 }
 
 export interface UploadTask extends ActivityTaskBase {

@@ -23,7 +23,8 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import fastifyMultipart from '@fastify/multipart';
 import { Type } from '@sinclair/typebox';
 import { ScreenshotRenderUploadResponseSchema } from '@shared/api/screenshots';
-import { getScreenshotIfEditor, screenshotStoragePrefix } from '../../services/screenshotAccess.js';
+import { getScreenshotIfEditor } from '../../services/screenshotAccess.js';
+import { screenshotRenderPath } from '../../services/storagePaths.js';
 
 /** Flattened PNGs of full-page captures can be large; 25 MB matches the asset upload cap. */
 export const MAX_RENDER_BYTES = 25 * 1024 * 1024;
@@ -90,8 +91,7 @@ export const screenshotRenderUploadRoutes: FastifyPluginAsyncTypebox = async (ap
                 return reply.code(409).send({ error: 'version_mismatch' });
             }
 
-            const storagePath =
-                `${screenshotStoragePrefix(screenshot.created_by, screenshotId)}renders/v${cloudVersion}.png`;
+            const storagePath = screenshotRenderPath(screenshot.created_by, screenshotId, cloudVersion);
             await app.deps.s3.putObject(storagePath, new Uint8Array(file), 'image/png');
 
             const { rowCount } = await app.deps.db.query(

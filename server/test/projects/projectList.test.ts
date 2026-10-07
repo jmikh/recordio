@@ -196,6 +196,35 @@ describe.runIf(hasTestDb())('POST /project-list (e2e, real Postgres)', () => {
         expect(byId.get(mine.id)).toMatchObject({ is_editor: false, editor_role: null });
     });
 
+    it('thumbnail_url is signed only for projects the caller can view', async () => {
+        const ws = await seedOwnWorkspace();
+        await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+        const ready = { workspaceId: ws.id, uploadStatus: 'ready' as const };
+        const mine = await seedProject(pool, { ...ready, sharePolicy: 'private' });
+        const theirsShared = await seedProject(pool, { ...ready, ownerId: SEEDED_USER_2_ID, sharePolicy: 'workspace' });
+        const theirsGranted = await seedProject(pool, { ...ready, ownerId: SEEDED_USER_2_ID, sharePolicy: 'private' });
+        const theirsPrivate = await seedProject(pool, { ...ready, ownerId: SEEDED_USER_2_ID, sharePolicy: 'private' });
+        const noThumbnail = await seedProject(pool, ready);
+        await seedProjectEditor(pool, { projectId: theirsGranted.id, userId: SEEDED_USER_ID, role: 'view' });
+        const thumb = (p: { id: string; ownerId: string }) => `${p.ownerId}/${p.id}/thumbnail.webp`;
+        for (const p of [mine, theirsShared, theirsGranted, theirsPrivate]) {
+            await pool.query('UPDATE projects SET thumbnail_storage_path = $2 WHERE id = $1', [p.id, thumb(p)]);
+        }
+
+        const { app } = testApp();
+        const res = await post(app, { workspaceId: ws.id }, await userToken({ sub: SEEDED_USER_ID }));
+        expect(res.statusCode).toBe(200);
+
+        const { projects } = res.json() as { projects: Array<Record<string, unknown>> };
+        const urlOf = (id: string) => projects.find((p) => p.id === id)!.thumbnail_url;
+        expect(urlOf(mine.id)).toBe(`https://fake-s3/get/${thumb(mine)}`);
+        expect(urlOf(theirsShared.id)).toBe(`https://fake-s3/get/${thumb(theirsShared)}`);
+        expect(urlOf(theirsGranted.id)).toBe(`https://fake-s3/get/${thumb(theirsGranted)}`);
+        // Listed (the dashboard filters it out) but never signed
+        expect(urlOf(theirsPrivate.id)).toBeNull();
+        expect(urlOf(noThumbnail.id)).toBeNull();
+    });
+
     it('returns { projects: [] } for an empty workspace', async () => {
         const ws = await seedOwnWorkspace();
         const { app } = testApp();

@@ -101,19 +101,18 @@ export const useAssetLibraryStore = create<AssetLibraryState>()((set, get) => ({
 
         let url: string;
         try {
-            url = await BlobCache.getBlobUrl(storagePath, undefined, findAsset()?.downloadUrl);
+            url = await BlobCache.getBlobUrl(storagePath, findAsset()?.downloadUrl);
         } catch (err) {
             // Likely an expired download URL (a cache miss resolved >1h
             // after listing): refresh the list once for fresh URLs and
-            // retry, then give up. The list is the only URL source — no
-            // fallback to /storage-download-urls for assets.
+            // retry, then give up. The list is the only URL source.
             const asset = findAsset();
             if (!asset) throw err;
             const fresh = await UserAssetService.listAssets(asset.assetType);
             set(asset.assetType === 'background' ? { backgrounds: fresh } : { music: fresh });
             const refreshed = fresh.find(a => a.storagePath === storagePath);
             if (!refreshed) throw err; // gone server-side
-            url = await BlobCache.getBlobUrl(storagePath, undefined, refreshed.downloadUrl);
+            url = await BlobCache.getBlobUrl(storagePath, refreshed.downloadUrl);
         }
         set(state => ({ blobUrls: { ...state.blobUrls, [storagePath]: url } }));
         return url;

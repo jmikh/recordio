@@ -25,6 +25,7 @@
 import type { ExportFps, ExportQuality } from '@shared/utils/exportQuality';
 import type { Deps } from '../deps.js';
 import { getProjectMediaPaths } from './projectMedia.js';
+import { projectRenderPath } from './storagePaths.js';
 
 interface JobResolution {
     job_id: string;
@@ -84,7 +85,7 @@ export async function getOrCreateRenderJob(
     // The path names every part of the cache key. Older rows keep the
     // path they were stored with (v{n}.mp4 / v{n}_{quality}.mp4): a cache
     // hit returns the row's own path, and only new/retried rows get this one.
-    const renderStoragePath = `${userId}/${projectId}/renders/v${cloudVersion}_${quality}_${fps}fps.mp4`;
+    const renderStoragePath = projectRenderPath(userId, projectId, { cloudVersion, quality, fps });
     const { rows: jobRows } = await deps.db.query(
         `WITH existing AS (
             SELECT id, status, render_storage_path

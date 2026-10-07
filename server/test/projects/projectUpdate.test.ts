@@ -179,4 +179,63 @@ describe.runIf(hasTestDb())('POST /project-update (e2e, real Postgres)', () => {
             await userToken({ sub: SEEDED_USER_ID }));
         expect(res.statusCode).toBe(403);
     });
+
+    describe('storage paths (project-get signs whatever project_data references)', () => {
+        const withBackground = (storagePath: string) => ({ settings: { background: { storagePath } } });
+
+        it.each([
+            ['another user\'s library', () => `${SEEDED_USER_2_ID}/assets/private.webp`],
+            ['another project', () => `${SEEDED_USER_2_ID}/00000000-0000-0000-0000-000000000000/screen.webm`],
+            ['a traversal out of this project', (id: string) => `${SEEDED_USER_ID}/${id}/../../${SEEDED_USER_2_ID}/x.webp`],
+        ])('400 for a new path into %s, row untouched', async (_name, pathFor) => {
+            const p = await seed({ projectData: { a: 1 }, cloudVersion: 3 });
+            const { app } = testApp();
+
+            const res = await post(app,
+                validBody(p.id, { projectData: withBackground(pathFor(p.id)), expectedVersion: 3 }),
+                await userToken({ sub: SEEDED_USER_ID }));
+
+            expect(res.statusCode).toBe(400);
+            expect(res.json()).toEqual({ error: 'invalid_storage_path' });
+            expect(await row(p.id)).toMatchObject({ project_data: { a: 1 }, cloud_version: 3 });
+        });
+
+        it('accepts paths inside the project namespace, whoever the first segment is', async () => {
+            const p = await seed({ projectData: { a: 1 }, cloudVersion: 3 });
+            const { app } = testApp();
+            const data = {
+                cameraSource: { matte: { storagePath: `${SEEDED_USER_2_ID}/${p.id}/cameraMatte.webm` } },
+                ...withBackground(`${SEEDED_USER_ID}/${p.id}/assets/a-1.webp`),
+            };
+
+            const res = await post(app, validBody(p.id, { projectData: data, expectedVersion: 3 }),
+                await userToken({ sub: SEEDED_USER_ID }));
+
+            expect(res.json()).toEqual({ cloudVersion: 4 });
+        });
+
+        it('a foreign path already in the stored version stays allowed (pre-migration data)', async () => {
+            const legacy = `${SEEDED_USER_ID}/assets/a-1.webp`;
+            const p = await seed({ projectData: withBackground(legacy), cloudVersion: 3 });
+            const { app } = testApp();
+
+            const res = await post(app,
+                validBody(p.id, { projectData: { ...withBackground(legacy), a: 2 }, expectedVersion: 3 }),
+                await userToken({ sub: SEEDED_USER_ID }));
+
+            expect(res.json()).toEqual({ cloudVersion: 4 });
+        });
+
+        it('a stale version is answered with the conflict, not the 400', async () => {
+            const p = await seed({ projectData: { a: 1 }, cloudVersion: 3 });
+            const { app } = testApp();
+
+            const res = await post(app,
+                validBody(p.id, { projectData: withBackground(`${SEEDED_USER_2_ID}/assets/x.webp`), expectedVersion: 2 }),
+                await userToken({ sub: SEEDED_USER_ID }));
+
+            expect(res.statusCode).toBe(200);
+            expect(res.json()).toEqual({ cloudVersion: null });
+        });
+    });
 });

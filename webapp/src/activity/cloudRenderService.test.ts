@@ -48,13 +48,17 @@ vi.stubGlobal('URL', { createObjectURL: () => 'blob:x', revokeObjectURL: vi.fn()
 const task = () => useActivityStore.getState().tasks[renderTaskId('p1')];
 const mockInvoke = vi.mocked(invokeFunction) as unknown as ReturnType<typeof vi.fn>;
 
-/** Queue responses in call order: render-job-create, then each status poll, then storage-download-urls */
+/** Queue responses in call order: render-job-create, then each status poll, then the download's status call */
 function respond(...responses: unknown[]) {
     for (const r of responses) mockInvoke.mockResolvedValueOnce({ data: r, error: null });
 }
 
 const job = (status: string, progress: number | null = null, extra: Record<string, unknown> = {}) =>
-    ({ job: { status, progress, error: null, render_storage_path: null, ...extra } });
+    ({ job: { status, progress, error: null, render_storage_path: null, render_url: null, ...extra } });
+
+/** What render-job-get-status returns for a finished job — the download reads render_url off it */
+const completed = () =>
+    job('completed', 1, { render_storage_path: 'u/p1/renders/v3.mp4', render_url: 'https://signed/v3.mp4' });
 
 beforeEach(() => {
     vi.useFakeTimers();
@@ -73,10 +77,10 @@ afterEach(() => {
 describe('CloudRenderService.start', () => {
     it('saves, creates the job, polls to completion and downloads — task ends completed', async () => {
         respond(
-            { jobId: 'j1', status: 'pending', renderStoragePath: null },
+            { jobId: 'j1', status: 'pending' },
             job('pending', 0.4),
-            job('completed', 1, { render_storage_path: 'u/p1/renders/v3.mp4' }),
-            { signedUrls: { 'u/p1/renders/v3.mp4': 'https://signed/v3.mp4' } },
+            completed(),
+            completed(),
         );
 
         await CloudRenderService.start('p1', 'My video', '1080p');
@@ -89,7 +93,8 @@ describe('CloudRenderService.start', () => {
         expect(task()).toMatchObject({ phase: 'rendering', progress: 0.4 });
 
         await vi.advanceTimersByTimeAsync(3000);
-        expect(task()).toMatchObject({ status: 'completed', phase: 'completed', progress: 1, renderStoragePath: 'u/p1/renders/v3.mp4' });
+        expect(task()).toMatchObject({ status: 'completed', phase: 'completed', progress: 1, renderJobId: 'j1' });
+        expect(fetch).toHaveBeenCalledWith('https://signed/v3.mp4');
         expect(anchorClick).toHaveBeenCalledOnce();
         expect(trackRenderInCloudCompleted).toHaveBeenCalledWith(expect.objectContaining({ project_id: 'p1', quality: '1080p', video_duration_s: 12 }));
 
@@ -101,8 +106,8 @@ describe('CloudRenderService.start', () => {
 
     it('a failed job marks the task failed with a retry and stops polling', async () => {
         respond(
-            { jobId: 'j1', status: 'pending', renderStoragePath: null },
-            { job: { status: 'failed', progress: 0.2, error: 'worker crashed', render_storage_path: null } },
+            { jobId: 'j1', status: 'pending' },
+            { job: { status: 'failed', progress: 0.2, error: 'worker crashed', render_storage_path: null, render_url: null } },
         );
 
         await CloudRenderService.start('p1', 'My video');
@@ -128,7 +133,7 @@ describe('CloudRenderService.start', () => {
     });
 
     it('is a no-op while a render for the project is active', async () => {
-        respond({ jobId: 'j1', status: 'pending', renderStoragePath: null });
+        respond({ jobId: 'j1', status: 'pending' });
         await CloudRenderService.start('p1', 'My video');
         const before = mockInvoke.mock.calls.length;
 
@@ -139,13 +144,11 @@ describe('CloudRenderService.start', () => {
     });
 
     it('a cache hit downloads straight away', async () => {
-        respond(
-            { jobId: 'j1', status: 'completed', renderStoragePath: 'u/p1/renders/v3.mp4' },
-            { signedUrls: { 'u/p1/renders/v3.mp4': 'https://signed/v3.mp4' } },
-        );
+        respond({ jobId: 'j1', status: 'completed' }, completed());
 
         await CloudRenderService.start('p1', 'My video');
 
+        expect(mockInvoke).toHaveBeenLastCalledWith('render-job-get-status', { jobId: 'j1' });
         expect(task()).toMatchObject({ status: 'completed', phase: 'completed' });
         expect(anchorClick).toHaveBeenCalledOnce();
     });
@@ -157,7 +160,7 @@ describe('CloudRenderService.retry', () => {
         await CloudRenderService.start('p1', 'My video', '4K', 60);
         expect(task().status).toBe('failed');
 
-        respond({ jobId: 'j2', status: 'pending', renderStoragePath: null });
+        respond({ jobId: 'j2', status: 'pending' });
         CloudRenderService.retry('p1');
         await vi.advanceTimersByTimeAsync(0);
 
@@ -165,19 +168,18 @@ describe('CloudRenderService.retry', () => {
         expect(task()).toMatchObject({ status: 'active', phase: 'queued' });
     });
 
-    it('only re-downloads when the render itself succeeded', async () => {
-        respond(
-            { jobId: 'j1', status: 'completed', renderStoragePath: 'u/p1/renders/v3.mp4' },
-            { error: 'expired' },
-        );
+    it('only re-downloads (with a fresh URL) when the render itself succeeded', async () => {
+        mockInvoke
+            .mockResolvedValueOnce({ data: { jobId: 'j1', status: 'completed' }, error: null })
+            .mockResolvedValueOnce({ data: null, error: new Error('offline') });
         await CloudRenderService.start('p1', 'My video');
-        expect(task()).toMatchObject({ status: 'failed', renderStoragePath: 'u/p1/renders/v3.mp4' });
+        expect(task()).toMatchObject({ status: 'failed', renderJobId: 'j1' });
 
-        respond({ signedUrls: { 'u/p1/renders/v3.mp4': 'https://signed/v3.mp4' } });
+        respond(completed());
         CloudRenderService.retry('p1');
         await vi.advanceTimersByTimeAsync(0);
 
-        expect(mockInvoke).toHaveBeenLastCalledWith('storage-download-urls', { storagePaths: ['u/p1/renders/v3.mp4'] });
+        expect(mockInvoke).toHaveBeenLastCalledWith('render-job-get-status', { jobId: 'j1' });
         expect(task().status).toBe('completed');
         expect(CloudProjectService.saveProject).toHaveBeenCalledOnce();
     });

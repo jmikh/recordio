@@ -7,7 +7,7 @@
  * upload_status='pending'. The client then uploads via Supabase
  * Storage's TUS endpoint (stays on Supabase until Part 4) and calls the
  * client-side `project_confirm_upload` RPC — neither is this route's
- * concern. No S3 involvement at all.
+ * concern. The only S3 work here is copying default assets (below).
  *
  * Billing revamp Step 4: the caller must be a member of the workspace
  * (verified missing before — any authed user could insert anywhere),
@@ -26,6 +26,14 @@
  * unknown properties otherwise, which would destroy project_data;
  * pinned by the round-trip test).
  *
+ * A project only references files inside its own namespace. A custom
+ * background/music coming in from the user's defaults points at their
+ * library (or at a project they promoted to defaults), so it is copied
+ * into the new project when it sits under the caller's own prefix. When
+ * it doesn't, or the copy fails (source gone), it is reset to the plain
+ * color / no-music state the editor's clear actions produce — a stale
+ * default must never fail an import.
+ *
  * Request:  { project, name?, workspaceId }
  * Response: { projectId, slug, bucket, uploads: [{ fileType, storagePath }] }
  *           | 403 { error, cap? }
@@ -35,14 +43,16 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { isWorkspaceMember } from '../../services/projectAccess.js';
 import { getWorkspaceEntitlements } from '../../services/entitlements.js';
+import {
+    isProjectPath,
+    isUserPath,
+    projectAssetPath,
+    projectMediaPath,
+    storageFileName,
+} from '../../services/storagePaths.js';
+import type { S3Port } from '../../ports/s3.js';
 
 const BUCKET = 'project-media' as const;
-
-const EXT_MAP = {
-    screen: 'webm',
-    camera: 'webm',
-    mic: 'wav',
-} as const;
 
 /** The slice of the arbitrary project struct this route reads/stamps. */
 interface ProjectStruct {
@@ -50,7 +60,36 @@ interface ProjectStruct {
     screenSource?: { storagePath?: string };
     cameraSource?: { storagePath?: string };
     microphoneSource?: { storagePath?: string };
+    settings?: {
+        background?: { type?: string; storagePath?: string };
+        audio?: { music?: { source?: string; enabled?: boolean; storagePath?: string } };
+    };
     timeline?: { durationMs?: number };
+}
+
+/**
+ * Copies `path` into the project when the caller owns it; null when it
+ * isn't theirs or the source is gone.
+ */
+async function copyIntoProject(
+    s3: S3Port,
+    path: string,
+    userId: string,
+    projectId: string,
+    warn: (obj: object, msg: string) => void,
+): Promise<string | null> {
+    if (!isUserPath(path, userId)) {
+        warn({ path }, 'project-create-v2: asset outside the caller prefix, reset');
+        return null;
+    }
+    const dest = projectAssetPath(userId, projectId, storageFileName(path));
+    try {
+        await s3.copyObject(path, dest);
+        return dest;
+    } catch (err) {
+        warn({ err, path }, 'project-create-v2: asset copy failed, reset');
+        return null;
+    }
 }
 
 export const projectCreateV2Routes: FastifyPluginAsyncTypebox = async (app) => {
@@ -131,9 +170,34 @@ export const projectCreateV2Routes: FastifyPluginAsyncTypebox = async (app) => {
             ] as const) {
                 const source = project[key];
                 if (source) {
-                    const storagePath = `${userId}/${projectId}/${fileType}.${EXT_MAP[fileType]}`;
+                    // userId becomes created_by in the upsert below
+                    const storagePath = projectMediaPath(userId, projectId, fileType);
                     source.storagePath = storagePath;
                     uploads.push({ fileType, storagePath });
+                }
+            }
+
+            // Custom background/music from defaults → copies inside the project (see header)
+            const warn = (obj: object, msg: string) => req.log.warn({ ...obj, 'project.id': projectId }, msg);
+            const background = project.settings?.background;
+            if (background?.storagePath && !isProjectPath(background.storagePath, projectId)) {
+                const copied = await copyIntoProject(app.deps.s3, background.storagePath, userId, projectId, warn);
+                if (copied) {
+                    background.storagePath = copied;
+                } else {
+                    background.type = 'color';
+                    delete background.storagePath;
+                }
+            }
+            const music = project.settings?.audio?.music;
+            if (music?.storagePath && !isProjectPath(music.storagePath, projectId)) {
+                const copied = await copyIntoProject(app.deps.s3, music.storagePath, userId, projectId, warn);
+                if (copied) {
+                    music.storagePath = copied;
+                } else {
+                    music.source = 'preset';
+                    music.enabled = false;
+                    delete music.storagePath;
                 }
             }
 

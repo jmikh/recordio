@@ -7,6 +7,14 @@
  * already consumes (snake_case; project_data is arbitrary), so NO
  * response schema — serialization must not strip anything.
  *
+ * The editor's media comes with it: `media_urls` holds a presigned GET
+ * per media path (the access check above is what authorizes them — there
+ * is no generic signing endpoint). Signed: paths inside the project's
+ * namespace, plus anything under the caller's own prefix (covers library
+ * references not yet copied in by scripts/projectAssetsLocalize.ts).
+ * Pre-v5 projects get their deterministic recording paths filled in
+ * first, so they sign like any other.
+ *
  * Request:  { projectId } | { slug } (share-access model: the editor
  *           route /video/{slug}/edit loads by slug)
  * Response: the project object (200) | 400 { error } | 403 { error }
@@ -14,7 +22,13 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ProjectGetRequestSchema } from '@shared/api/projects';
 import { canEditProject } from '../../services/projectAccess.js';
+import { backfillLegacyMediaPaths, getProjectMediaPaths } from '../../services/projectMedia.js';
+import { presignDownloads } from '../../services/downloadUrls.js';
+import { isProjectPath, isUserPath } from '../../services/storagePaths.js';
 import { isImpersonating } from '../../plugins/auth.js';
+
+/** The slice of the jsonb row this route post-processes; the rest passes through. */
+type ProjectRow = Record<string, unknown> & { created_by: string; project_data: unknown };
 
 export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -99,7 +113,20 @@ export const projectGetRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 [projectId],
             );
 
-            return reply.send((rows[0] as { project: unknown } | undefined)?.project ?? null);
+            const project = (rows[0] as { project: ProjectRow } | undefined)?.project;
+            if (!project) return reply.send(null);
+
+            backfillLegacyMediaPaths(project.project_data, project.created_by, projectId);
+            const paths = getProjectMediaPaths(project.project_data).map(e => e.storagePath);
+            const signable = paths.filter(p => isProjectPath(p, projectId) || isUserPath(p, req.user!.id));
+            if (signable.length < paths.length) {
+                req.log.warn(
+                    { 'project.id': projectId, unsigned: paths.filter(p => !signable.includes(p)) },
+                    'project-get: media paths outside the project namespace left unsigned',
+                );
+            }
+
+            return reply.send({ ...project, media_urls: await presignDownloads(app.deps.s3, signable) });
         },
     );
 };

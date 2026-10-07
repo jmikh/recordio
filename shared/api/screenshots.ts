@@ -86,6 +86,8 @@ export interface CloudScreenshot {
     workspace_id: string;
     screenshot_data: unknown;
     source_storage_path: string;
+    /** Presigned GET (1h) for the source image */
+    source_url: string;
     width_px: number;
     height_px: number;
     capture_mode: 'visible' | 'fullPage' | 'region';
@@ -122,6 +124,8 @@ export interface CloudScreenshotSummary {
     owner_id: string;
     workspace_id: string;
     thumbnail_storage_path: string | null;
+    /** Presigned GET (1h) for the thumbnail; null when there is none or the caller can't view the screenshot */
+    thumbnail_url: string | null;
     width_px: number;
     height_px: number;
     capture_mode: 'visible' | 'fullPage' | 'region';

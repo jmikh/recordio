@@ -72,6 +72,7 @@ export interface DomainLogFields {
     'stripe.interval'?: string;
     'stripe.dry_run'?: boolean;
     'asset.type'?: string;
+    'asset.id'?: string;
     'storage.path_count'?: number;
     'storage.bytes'?: number;
     'email.template'?: 'welcome' | 'workspace-invite';

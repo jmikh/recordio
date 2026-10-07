@@ -200,7 +200,7 @@ describe.runIf(hasTestDb())('POST /project-update-thumbnail (e2e, real Postgres)
         expect(await thumbnailPath(project.id)).toBe(expectedPath);
     });
 
-    it('explicit project_editors editor: 200, path is namespaced by the CALLER id (edge-fn parity)', async () => {
+    it('explicit project_editors editor: 200, path stays under the CREATOR prefix', async () => {
         const { app, deps } = testApp();
         const project = await seed({ ownerId: SEEDED_USER_2_ID });
         await seedProjectEditor(pool, { projectId: project.id, userId: SEEDED_USER_ID });
@@ -211,9 +211,9 @@ describe.runIf(hasTestDb())('POST /project-update-thumbnail (e2e, real Postgres)
             await ownerToken(),
         );
         expect(res.statusCode).toBe(200);
-        // Parity subtlety: the key uses the caller's id, not the owner's —
-        // an editor's upload lands under the editor's prefix
-        const expectedPath = `${SEEDED_USER_ID}/${project.id}/thumbnail.webp`;
+        // The thumbnail lives with the project's media (and is purged with
+        // it), not under the uploading editor's prefix
+        const expectedPath = `${SEEDED_USER_2_ID}/${project.id}/thumbnail.webp`;
         expect(res.json()).toEqual({ storagePath: expectedPath });
         expect(deps.s3.objects.has(expectedPath)).toBe(true);
         expect(await thumbnailPath(project.id)).toBe(expectedPath);

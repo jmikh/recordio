@@ -16,7 +16,7 @@
  * kill the batch.
  */
 import type { Deps } from '../deps.js';
-import { screenshotStoragePrefix } from '../services/screenshotAccess.js';
+import { screenshotStoragePrefix } from '../services/storagePaths.js';
 import type { JobLogger } from './types.js';
 
 export const SCREENSHOTS_PURGE_BATCH_LIMIT = 50;

@@ -3,15 +3,17 @@ import { BlobCache } from './blobCache';
 import { getProjectMediaPaths } from '@shared/utils/projectMedia';
 
 // Re-export shared utilities so existing imports don't break
-export { cloudStoragePath, getProjectMediaPaths } from '@shared/utils/projectMedia';
+export { getProjectMediaPaths } from '@shared/utils/projectMedia';
 export type { MediaEntry } from '@shared/utils/projectMedia';
 
 /**
  * Hydrate all media blob URLs into the provided setUrl callback.
- * Downloads all media in parallel from cloud on cache miss via BlobCache.
+ * Downloads cache misses in parallel from `downloadUrls` (project-get's
+ * presigned media URLs) via BlobCache.
  */
 export async function hydrateMediaUrls(
     project: Project,
+    downloadUrls: Record<string, string>,
     setUrl: (storagePath: string, url: string) => void,
     onStatus?: (status: string) => void,
 ): Promise<void> {
@@ -21,7 +23,7 @@ export async function hydrateMediaUrls(
     console.log(`[hydrate] loading ${entries.length} media files…`);
     const t0 = performance.now();
 
-    const blobUrls = await BlobCache.getBlobUrls(entries.map((e) => e.storagePath));
+    const blobUrls = await BlobCache.getBlobUrls(entries.map((e) => e.storagePath), downloadUrls);
 
     for (const [storagePath, blobUrl] of Object.entries(blobUrls)) {
         setUrl(storagePath, blobUrl);

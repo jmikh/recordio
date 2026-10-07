@@ -12,7 +12,7 @@ import { migrateProject } from '../core/migrateProject';
 import { ProjectImpl } from '../core/Project';
 import { adaptDefaultsToSources } from '../core/projectDefaults';
 import type { ProjectSettings } from '@shared/types/settings';
-import { cloudStoragePath, hydrateMediaUrls } from './projectBlobs';
+import { hydrateMediaUrls } from './projectBlobs';
 import { dataHash } from './dataHash';
 import { getImpersonation } from '../auth/impersonation';
 
@@ -26,6 +26,8 @@ export interface ProjectListItem {
     name: string;
     thumbnail: string | null;
     thumbnailStoragePath: string | null;
+    /** Presigned GET project-list returned for the thumbnail (null = none, or not viewable) */
+    thumbnailDownloadUrl: string | null;
     updatedAt: string;
     createdAt: string;
     lastAccessedAt: string | null;
@@ -474,30 +476,17 @@ export class CloudProjectService {
     // ─── Load ────────────────────────────────────────────────
 
     /**
-     * Load a project from cloud and hydrate blob URLs from cache
-     * (downloads from cloud on cache miss).
-     *
-     * Backfills storagePath on sources for pre-v5 projects using the
-     * deterministic path pattern. Blob URLs go to useMediaUrlStore.
-     */
-    static async loadProject(
-        ref: { projectId: string } | { slug: string },
-        onStatus?: (status: string) => void,
-    ): Promise<{ project: Project; name: string; meta: ProjectShareMeta } | null> {
-        const result = await this.fetchProject(ref, onStatus);
-        if (result) await this.hydrateProjectMedia(result.project, onStatus);
-        return result;
-    }
-
-    /**
-     * First half of loadProject: metadata, migration and storagePath
-     * backfill, without touching media. The editor uses it to mount the
-     * canvas (background, frame) while hydrateProjectMedia downloads.
+     * First half of loading a project: metadata and migration, without
+     * touching media. The editor uses it to mount the canvas (background,
+     * frame) while hydrateProjectMedia downloads. `mediaUrls` are the
+     * presigned GETs project-get returned for the project's media (it also
+     * backfills pre-v5 storage paths server-side) — hand them to
+     * hydrateProjectMedia right away; they expire after an hour.
      */
     static async fetchProject(
         ref: { projectId: string } | { slug: string },
         onStatus?: (status: string) => void,
-    ): Promise<{ project: Project; name: string; meta: ProjectShareMeta } | null> {
+    ): Promise<{ project: Project; name: string; meta: ProjectShareMeta; mediaUrls: Record<string, string> } | null> {
         onStatus?.('Loading project...');
         console.log('[CloudProjectService.loadProject] Loading project:', ref);
         const cloudProject = await CloudStorage.loadProjectMetadata(ref);
@@ -538,42 +527,32 @@ export class CloudProjectService {
 
         this.cloudVersions.set(projectId, cloudProject.cloud_version);
 
-        // Backfill storagePath on sources for pre-v5 projects. Media
-        // lives under the creator's prefix ({created_by}/{projectId}/…).
-        // (Was `cloudProject.user_id` — a field project-get never
-        // returned, so the backfill built "undefined/…" paths; the
-        // shared contract surfaced it.)
-        const userId = cloudProject.created_by;
-        if (!project.screenSource.storagePath) {
-            project.screenSource.storagePath = cloudStoragePath(userId, projectId, 'screen');
-        }
-        if (project.cameraSource && !project.cameraSource.storagePath) {
-            project.cameraSource.storagePath = cloudStoragePath(userId, projectId, 'camera');
-        }
-        if (project.microphoneSource && !project.microphoneSource.storagePath) {
-            project.microphoneSource.storagePath = cloudStoragePath(userId, projectId, 'mic');
-        }
-
         // Set baseline hash — before the caller can load the project into
         // the store, whose auto-save compares against it
         const hash = await this.projectDataHash(project);
         this.projectHashes.set(projectId, hash);
 
-        return { project, name: cloudProject.name, meta: toShareMeta(cloudProject) };
+        return {
+            project,
+            name: cloudProject.name,
+            meta: toShareMeta(cloudProject),
+            mediaUrls: cloudProject.media_urls ?? {},
+        };
     }
 
     /**
-     * Second half of loadProject: hydrate media URLs into the media URL
-     * store (download on cache miss). getProjectMediaPaths() includes
-     * background/music storagePaths, so custom assets are hydrated
-     * alongside screen/camera/mic.
+     * Second half of loading: hydrate media URLs into the media URL store,
+     * downloading cache misses from fetchProject's `mediaUrls`.
+     * getProjectMediaPaths() includes background/music storagePaths, so
+     * custom assets are hydrated alongside screen/camera/mic.
      */
     static async hydrateProjectMedia(
         project: Project,
+        mediaUrls: Record<string, string>,
         onStatus?: (status: string) => void,
     ): Promise<void> {
         const { setUrl } = useMediaUrlStore.getState();
-        await hydrateMediaUrls(project, setUrl, onStatus);
+        await hydrateMediaUrls(project, mediaUrls, setUrl, onStatus);
     }
 
     // ─── Save ────────────────────────────────────────────────
@@ -662,6 +641,7 @@ export class CloudProjectService {
             name: s.name,
             thumbnail: null,
             thumbnailStoragePath: s.thumbnail_storage_path,
+            thumbnailDownloadUrl: s.thumbnail_url ?? null,
             updatedAt: s.updated_at,
             createdAt: s.created_at,
             lastAccessedAt: s.last_accessed_at,
@@ -691,20 +671,22 @@ export class CloudProjectService {
     /**
      * Load thumbnails for a list of projects in the background.
      * Call this AFTER setting the projects in state to avoid race conditions.
-     * Batches all signed URL requests into a single edge function call.
+     * Cache misses download from the URLs project-list returned.
      */
     static loadThumbnails(
         items: ProjectListItem[],
         onThumbnailLoaded: (projectId: string, thumbnailUrl: string) => void,
     ): void {
+        // No download URL = no thumbnail, or a project the caller can't view
         const withThumbnails = items.filter(
-            (item) => item.thumbnailStoragePath && item.thumbnailStoragePath !== 'pending',
+            (item) => item.thumbnailStoragePath && item.thumbnailDownloadUrl,
         );
         if (withThumbnails.length === 0) return;
 
         const paths = withThumbnails.map((item) => item.thumbnailStoragePath!);
+        const urls = Object.fromEntries(withThumbnails.map((item) => [item.thumbnailStoragePath!, item.thumbnailDownloadUrl!]));
 
-        BlobCache.getBlobUrls(paths)
+        BlobCache.getBlobUrls(paths, urls)
             .then((blobUrls) => {
                 for (const item of withThumbnails) {
                     const url = blobUrls[item.thumbnailStoragePath!];
@@ -746,7 +728,8 @@ export class CloudProjectService {
      * Discard local edits and reload the cloud version.
      */
     static async resolveConflictReload(projectId: string): Promise<{ project: Project; name: string } | null> {
-        const result = await this.loadProject({ projectId });
+        const result = await this.fetchProject({ projectId });
+        if (result) await this.hydrateProjectMedia(result.project, result.mediaUrls);
         useSyncStatusStore.getState().clearConflict();
         return result;
     }
@@ -775,7 +758,8 @@ export class CloudProjectService {
     // ─── Thumbnails ──────────────────────────────────────────
 
     /**
-     * Save a thumbnail: cache locally + upload to cloud.
+     * Save a thumbnail: upload to cloud, then cache locally under the
+     * returned storage path for dashboard display.
      * Skips upload if the blob hash matches the last uploaded version.
      */
     static async saveThumbnail(projectId: string, blob: Blob): Promise<void> {
@@ -785,17 +769,17 @@ export class CloudProjectService {
 
         if (this.thumbnailHashes.get(projectId) === hash) return;
 
-        // Cache locally for dashboard display
-        const storagePath = `${projectId}/thumbnail.webp`;
-        await BlobCache.put(storagePath, blob);
-
-        // Read-only while impersonating: the local cache above is fine
-        // (this browser only), the upload would touch the user's project
+        // Read-only while impersonating: the upload would touch the user's project
         if (getImpersonation()) return;
 
-        // Upload to cloud (non-blocking)
+        // Upload to cloud (non-blocking). The server overwrites the same
+        // path, so the dashboard's cache-first read would keep serving the
+        // old blob — overwrite that entry with the new one.
         CloudStorage.uploadThumbnail(projectId, blob)
-            .then(() => { this.thumbnailHashes.set(projectId, hash); })
+            .then(storagePath => {
+                this.thumbnailHashes.set(projectId, hash);
+                return BlobCache.put(storagePath, blob);
+            })
             .catch(err => captureError(err, { flow: 'thumbnail_upload', projectId }));
     }
 

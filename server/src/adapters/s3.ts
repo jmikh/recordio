@@ -1,10 +1,11 @@
 /**
- * Real S3 adapter (AWS SDK v3) — first landed with storage-download-urls.
+ * Real S3 adapter (AWS SDK v3) — first landed with the (since removed)
+ * storage-download-urls route.
  *
  * Thin translation only (see server/README.md): the bucket is fixed here,
  * config comes in as plain values, and no method contains branching logic.
- * Matches the edge functions' client setup (_shared + storage-download-urls):
- * path-style addressing against an S3-compatible endpoint.
+ * Matches the edge functions' client setup: path-style addressing against
+ * an S3-compatible endpoint.
  */
 import {
     CopyObjectCommand,

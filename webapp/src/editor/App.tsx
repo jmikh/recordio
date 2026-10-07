@@ -132,7 +132,7 @@ function Editor() {
                     navigate(editorPath(result.meta.slug), { replace: true });
                 }
 
-                await CloudProjectService.hydrateProjectMedia(result.project, setLoadingStatus);
+                await CloudProjectService.hydrateProjectMedia(result.project, result.mediaUrls, setLoadingStatus);
                 if (cancelled) return;
                 setIsLoading(false);
                 // Compute the camera's background mask and find its face anchor

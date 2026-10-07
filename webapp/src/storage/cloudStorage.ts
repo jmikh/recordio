@@ -3,7 +3,7 @@ import { supabase } from '../auth/AuthManager';
 import { invokeFunction } from '../api/client';
 
 import type { Project } from '@shared/types';
-import type { CloudProject, CloudProjectSummary, ProjectGetRequest } from '@shared/api';
+import type { CloudProject, CloudProjectSummary, ProjectAssetAttachResponse, ProjectGetRequest } from '@shared/api';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
@@ -248,29 +248,14 @@ export class CloudStorage {
     }
 
     /**
-     * Request a signed download URL for a storage path.
+     * Copy one of the user's library assets into a project — projects only
+     * reference files inside their own namespace. Returns the copy's
+     * storage path and a presigned GET for it.
      */
-    static async requestDownloadUrl(storagePath: string): Promise<string> {
-        const urls = await this.requestDownloadUrls([storagePath]);
-        return urls[storagePath];
-    }
-
-    /**
-     * Request signed download URLs for multiple storage paths in a single call.
-     * Returns a map of storagePath → signedUrl.
-     */
-    static async requestDownloadUrls(storagePaths: string[]): Promise<Record<string, string>> {
-        if (!supabase) throw new Error('Supabase not configured');
-
-        const { data, error } = await invokeFunction<{ signedUrls: Record<string, string>; error?: string }>(
-            'storage-download-urls',
-            { storagePaths },
-        );
-
+    static async attachAsset(projectId: string, assetId: string): Promise<ProjectAssetAttachResponse> {
+        const { data, error } = await invokeFunction('project-asset-attach', { projectId, assetId });
         if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-
-        return data.signedUrls;
+        return data;
     }
 
     /**
@@ -304,20 +289,6 @@ export class CloudStorage {
             xhr.onerror = () => reject(new Error('Download failed: network error'));
             xhr.send();
         });
-    }
-
-    /**
-     * Full media download pipeline: request signed URL → download blob.
-     */
-    static async downloadMediaFile(
-        storagePath: string,
-        onProgress?: (fraction: number) => void,
-    ): Promise<Blob> {
-        const tag = storagePath.split('/').pop() ?? storagePath;
-        const t0 = performance.now();
-        const signedUrl = await this.requestDownloadUrl(storagePath);
-        console.log(`[CloudStorage] ${tag}: signed URL obtained in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
-        return this.downloadBlob(signedUrl, onProgress);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────

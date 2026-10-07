@@ -26,6 +26,7 @@
  */
 import type { Deps } from '../deps.js';
 import { purgeMuxVideo, type MuxVideoPurgeTarget } from '../services/muxPurge.js';
+import { projectStoragePrefix } from '../services/storagePaths.js';
 import type { JobLogger } from './types.js';
 
 export const PROJECTS_PURGE_BATCH_LIMIT = 20;
@@ -80,7 +81,7 @@ export async function projectsPurgeDeleted(
                 await purgeMuxVideo(deps, muxRow);
             }
 
-            const keys = await deps.s3.listObjects(`${project.created_by}/${project.id}/`);
+            const keys = await deps.s3.listObjects(projectStoragePrefix(project.created_by, project.id));
             await deps.s3.deleteObjects(keys);
 
             await deps.db.query('DELETE FROM projects WHERE id = $1', [project.id]);

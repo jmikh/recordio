@@ -16,10 +16,10 @@
  *     never enter this process);
  *   - the thumbnail, best-effort — a missing one is cosmetic.
  *
- * Why the paths must be rewritten and not just pointed at: storage
- * ownership is by path prefix (`${userId}/…`, enforced by
- * /storage-download-urls), so a clone still pointing at the original
- * owner's objects would 403 for the admin on load. Media lands under
+ * Why the paths must be rewritten and not just pointed at: a project only
+ * references files inside its own namespace (project-get signs those,
+ * project-update rejects others), so a clone still pointing at the
+ * original's objects would load nothing. Media lands under
  * `${adminId}/${newProjectId}/` — the same prefix the purge job deletes
  * when the clone is deleted, assets included, so the copy owns its bytes
  * and the original's deletion can't gut it.
@@ -40,6 +40,12 @@ import { ProjectCloneRequestSchema, ProjectCloneResponseSchema } from '@shared/a
 import { requireImpersonatingAdmin, type AdminRoutesOptions } from '../admin/requireAdmin.js';
 import { canViewProject } from '../../services/projectAccess.js';
 import { resolveDefaultWorkspaceId } from '../../services/defaultWorkspace.js';
+import {
+    projectAssetPath,
+    projectStoragePrefix,
+    projectThumbnailPath,
+    storageFileName,
+} from '../../services/storagePaths.js';
 
 /** The slice of the arbitrary project struct this route rewrites. */
 interface ProjectStruct {
@@ -72,11 +78,11 @@ interface ProjectRow {
  * library assets (background/music) keep their filename under an
  * `assets/` subfolder, so two of them can't collide.
  */
-function destinationPath(slot: MediaSlot, sourcePath: string, prefix: string): string {
-    const fileName = sourcePath.split('/').pop() ?? slot;
-    if (slot === 'background' || slot === 'music') return `${prefix}assets/${fileName}`;
+function destinationPath(slot: MediaSlot, sourcePath: string, adminId: string, projectId: string): string {
+    const fileName = storageFileName(sourcePath) || slot;
+    if (slot === 'background' || slot === 'music') return projectAssetPath(adminId, projectId, fileName);
     const ext = fileName.includes('.') ? fileName.split('.').pop()! : 'bin';
-    return `${prefix}${slot}.${ext}`;
+    return `${projectStoragePrefix(adminId, projectId)}${slot}.${ext}`;
 }
 
 export const projectCloneRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> =
@@ -136,7 +142,6 @@ export const projectCloneRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> =
                 }
 
                 const newProjectId = randomUUID();
-                const prefix = `${adminId}/${newProjectId}/`;
                 const data = source.project_data ?? {};
                 data.id = newProjectId;
 
@@ -156,7 +161,7 @@ export const projectCloneRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> =
                 try {
                     for (const { slot, path, set } of slots) {
                         if (!path) continue;
-                        const dest = destinationPath(slot, path, prefix);
+                        const dest = destinationPath(slot, path, adminId, newProjectId);
                         await app.deps.s3.copyObject(path, dest);
                         copied.push(dest);
                         set(dest);
@@ -171,7 +176,7 @@ export const projectCloneRoutes: FastifyPluginAsyncTypebox<AdminRoutesOptions> =
                 // never uploaded) still clones fine, just without a card image
                 let thumbnailPath: string | null = null;
                 if (source.thumbnail_storage_path) {
-                    const dest = `${prefix}thumbnail.webp`;
+                    const dest = projectThumbnailPath(adminId, newProjectId);
                     try {
                         await app.deps.s3.copyObject(source.thumbnail_storage_path, dest);
                         copied.push(dest);

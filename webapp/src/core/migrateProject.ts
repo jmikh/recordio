@@ -89,9 +89,8 @@ export function migrateProject(raw: any): any {
     }
 
     // v4 → v5: storagePath added to BaseSourceMetadata, BackgroundSettings, MusicSettings.
-    // storagePath is populated in CloudProjectService.loadProject() using the
-    // deterministic path pattern (userId/projectId/fileType.ext) because the
-    // migration function doesn't have access to userId.
+    // Recording storagePaths are backfilled server-side by project-get
+    // (backfillLegacyMediaPaths) — paths are never built on the client.
     if (version < 5) {
         // No structural changes needed — storagePath is backfilled on load.
     }

@@ -89,8 +89,23 @@ describe.runIf(hasTestDb())('POST /render-job-get-status (e2e, real Postgres)', 
                 progress: null,
                 error: null,
                 render_storage_path: `${SEEDED_USER_ID}/${p.id}/renders/v1.mp4`,
+                // Signed by this route's editor check — the download asks for it fresh
+                render_url: `https://fake-s3/get/${SEEDED_USER_ID}/${p.id}/renders/v1.mp4`,
             },
         });
+    });
+
+    it('render_url is null until the job is completed', async () => {
+        const p = await seedProject(pool, {});
+        createdProjects.push(p.id);
+        const jobId = await seedRenderJob(pool, { projectId: p.id, cloudVersion: 1 });
+
+        const { app } = testApp();
+        const res = await post(app, { jobId }, await userToken({ sub: SEEDED_USER_ID }));
+
+        expect(res.statusCode).toBe(200);
+        expect((res.json() as { job: { status: string; render_url: string | null } }).job)
+            .toMatchObject({ status: 'pending', render_url: null });
     });
 
     it('an explicit project editor can poll', async () => {

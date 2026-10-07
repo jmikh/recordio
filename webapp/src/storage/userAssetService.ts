@@ -16,6 +16,18 @@ export interface UserAsset {
     downloadUrl?: string;
 }
 
+/**
+ * Whether a background/music `storagePath` refers to this library asset.
+ * A project holds its own copy of a picked asset (project-asset-attach),
+ * which keeps the asset's file name (`<assetId>.<ext>`); the defaults
+ * template holds the library path itself. Either way the file names match.
+ */
+export function isSameAsset(storagePath: string | undefined, asset: UserAsset): boolean {
+    if (!storagePath) return false;
+    const fileName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
+    return fileName(storagePath) === fileName(asset.storagePath);
+}
+
 const LIBRARY_LIMIT = 10; // per asset type
 const MAX_DIMENSION = 1920; // 1080p cap
 

@@ -213,10 +213,13 @@ describe.runIf(hasTestDb())('POST /project-create-v2 (e2e, real Postgres)', () =
     it('round-trip: arbitrary unknown nested fields survive into project_data verbatim', async () => {
         const { app } = testApp();
         const ws = await seedWs();
+        const id = randomUUID();
         const project = projectStruct({
+            id,
             settings: {
-                background: { storagePath: 'u/bg.webp', blur: 0.5 },
-                audio: { music: { storagePath: 'u/song.mp3', volume: 0.8 } },
+                // Already inside the project's namespace, so kept as-is (no copy)
+                background: { storagePath: `${SEEDED_USER_ID}/${id}/assets/bg.webp`, blur: 0.5 },
+                audio: { music: { storagePath: `${SEEDED_USER_ID}/${id}/assets/song.mp3`, volume: 0.8 } },
             },
             userEvents: [{ t: 1, kind: 'click', pos: { x: 1, y: 2 } }],
             someFutureField: { deeply: { nested: ['a', 1, null, true] } },
@@ -232,6 +235,49 @@ describe.runIf(hasTestDb())('POST /project-create-v2 (e2e, real Postgres)', () =
         (expected.screenSource as { storagePath: string }).storagePath =
             `${SEEDED_USER_ID}/${project.id}/screen.webm`;
         expect((await projectRow(project.id))!.project_data).toEqual(expected);
+    });
+
+    it('a default asset under the caller prefix is copied into the project and the path rewritten', async () => {
+        const { app, deps } = testApp();
+        const ws = await seedWs();
+        const library = `${SEEDED_USER_ID}/assets/a-1.webp`;
+        deps.s3.objects.set(library, { body: new Uint8Array([1]), contentType: 'image/webp' });
+        const project = projectStruct({
+            settings: { background: { type: 'custom', storagePath: library } },
+        });
+
+        const res = await create(app, { project, workspaceId: ws.id });
+        expect(res.statusCode).toBe(200);
+
+        const copy = `${SEEDED_USER_ID}/${project.id}/assets/a-1.webp`;
+        expect(deps.s3.objects.has(copy)).toBe(true);
+        const data = (await projectRow(project.id))!.project_data as {
+            settings: { background: { type: string; storagePath: string } };
+        };
+        expect(data.settings.background).toEqual({ type: 'custom', storagePath: copy });
+    });
+
+    it('a default asset outside the caller prefix, or one whose copy fails, is reset — never fails the import', async () => {
+        const { app, deps } = testApp();
+        const ws = await seedWs();
+        const project = projectStruct({
+            settings: {
+                // Someone else's library: not copied
+                background: { type: 'custom', storagePath: `${SEEDED_USER_2_ID}/assets/x.webp`, color: '#123456' },
+                // The caller's own, but the object is gone: the copy fails
+                audio: { music: { source: 'custom', enabled: true, storagePath: `${SEEDED_USER_ID}/assets/gone.mp3`, volume: 0.5 } },
+            },
+        });
+
+        const res = await create(app, { project, workspaceId: ws.id });
+        expect(res.statusCode).toBe(200);
+
+        const data = (await projectRow(project.id))!.project_data as {
+            settings: { background: Record<string, unknown>; audio: { music: Record<string, unknown> } };
+        };
+        expect(data.settings.background).toEqual({ type: 'color', color: '#123456' });
+        expect(data.settings.audio.music).toEqual({ source: 'preset', enabled: false, volume: 0.5 });
+        expect([...deps.s3.objects.keys()]).toEqual([]);
     });
 
     it('expires_at is never written — the 14-day expiry is gone (Step 4)', async () => {

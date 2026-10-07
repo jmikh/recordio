@@ -34,7 +34,7 @@ function render(projectId: string, over: Partial<RenderTask> = {}): RenderTask {
         phase: 'queued',
         quality: '1080p',
         fps: 30,
-        renderStoragePath: null,
+        renderJobId: null,
         projectId,
         projectName: `Project ${projectId}`,
         projectSlug: null,

@@ -115,6 +115,7 @@ function makeSummary(over: Partial<CloudProjectSummary> = {}): CloudProjectSumma
         owner_id: 'user-1',
         workspace_id: 'workspace-1',
         thumbnail_storage_path: 'path/thumb.webp',
+        thumbnail_url: 'https://signed/thumb.webp',
         updated_at: '2024-01-01',
         created_at: '2024-01-01',
         last_accessed_at: '2024-01-01',
@@ -371,7 +372,7 @@ describe('CloudProjectService.resumePendingUploads', () => {
     it('restarts uploads for listed pending projects from BlobCache and skips the rest', async () => {
         vi.mocked(BlobCache.getBlobIfCached).mockResolvedValue(blob(4));
         vi.mocked(CloudStorage.uploadBlobResumable).mockResolvedValue(undefined);
-        const base = { name: 'X', thumbnail: null, thumbnailStoragePath: null, updatedAt: '', createdAt: '', lastAccessedAt: null,
+        const base = { name: 'X', thumbnail: null, thumbnailStoragePath: null, thumbnailDownloadUrl: null, updatedAt: '', createdAt: '', lastAccessedAt: null,
             ownerId: 'user-1', deletedAt: null, isShared: false, cloudVersion: 1, durationMs: null, shareSlug: 'slug',
             sharePolicy: null, workspaceAccess: null, isEditor: false, editorRole: null } as const;
 

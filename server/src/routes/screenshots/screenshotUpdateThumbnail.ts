@@ -15,7 +15,8 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import fastifyMultipart from '@fastify/multipart';
 import { Type } from '@sinclair/typebox';
 import { ScreenshotThumbnailResponseSchema } from '@shared/api/screenshots';
-import { getScreenshotIfEditor, screenshotStoragePrefix } from '../../services/screenshotAccess.js';
+import { getScreenshotIfEditor } from '../../services/screenshotAccess.js';
+import { screenshotThumbnailPath } from '../../services/storagePaths.js';
 
 /** Thumbnails should be small — same cap as the project route */
 const MAX_THUMBNAIL_BYTES = 500 * 1024;
@@ -73,7 +74,7 @@ export const screenshotUpdateThumbnailRoutes: FastifyPluginAsyncTypebox = async 
                 return reply.code(404).send({ error: 'Screenshot not found or access denied' });
             }
 
-            const storagePath = `${screenshotStoragePrefix(screenshot.created_by, screenshotId)}thumbnail.webp`;
+            const storagePath = screenshotThumbnailPath(screenshot.created_by, screenshotId);
             await app.deps.s3.putObject(storagePath, new Uint8Array(file), 'image/webp');
 
             await app.deps.db.query(

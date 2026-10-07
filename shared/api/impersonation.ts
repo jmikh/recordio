@@ -25,10 +25,9 @@
  * point of the feature.
  */
 export const IMPERSONATION_ALLOWED_ROUTES: ReadonlySet<string> = new Set([
-    // Projects — read + the editor's media
+    // Projects — read (project-get carries the editor's media URLs)
     'project-get',
     'project-list',
-    'storage-download-urls',
     'render-job-get-status',
     'asset-list',
     // Screenshots

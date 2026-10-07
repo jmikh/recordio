@@ -47,6 +47,8 @@ export interface ScreenshotListItem {
     slug: string;
     thumbnail: string | null;
     thumbnailStoragePath: string | null;
+    /** Presigned GET screenshot-list returned for the thumbnail (null = none, or not viewable) */
+    thumbnailDownloadUrl: string | null;
     widthPx: number;
     heightPx: number;
     captureMode: ScreenshotCaptureMode;
@@ -178,7 +180,7 @@ export class ScreenshotService {
         this.docHashes.set(row.id, await dataHash(doc));
 
         onStatus?.('Loading image...');
-        const imageUrl = await BlobCache.getBlobUrl(row.source_storage_path);
+        const imageUrl = await BlobCache.getBlobUrl(row.source_storage_path, row.source_url);
         return { doc, meta: toScreenshotMeta(row), imageUrl };
     }
 
@@ -286,6 +288,7 @@ export class ScreenshotService {
             slug: row.slug,
             thumbnail: null,
             thumbnailStoragePath: row.thumbnail_storage_path,
+            thumbnailDownloadUrl: row.thumbnail_url ?? null,
             widthPx: row.width_px,
             heightPx: row.height_px,
             captureMode: row.capture_mode,
@@ -302,15 +305,19 @@ export class ScreenshotService {
         }));
     }
 
-    /** Batch-resolves thumbnails (one signed-URL call for all cache misses). */
+    /** Batch-resolves thumbnails; cache misses download from screenshot-list's URLs. */
     static loadThumbnails(
         items: ScreenshotListItem[],
         onThumbnailLoaded: (screenshotId: string, thumbnailUrl: string) => void,
     ): void {
-        const withThumbnails = items.filter(item => item.thumbnailStoragePath);
+        // No download URL = no thumbnail, or a screenshot the caller can't view
+        const withThumbnails = items.filter(item => item.thumbnailStoragePath && item.thumbnailDownloadUrl);
         if (withThumbnails.length === 0) return;
 
-        BlobCache.getBlobUrls(withThumbnails.map(item => item.thumbnailStoragePath!))
+        BlobCache.getBlobUrls(
+            withThumbnails.map(item => item.thumbnailStoragePath!),
+            Object.fromEntries(withThumbnails.map(item => [item.thumbnailStoragePath!, item.thumbnailDownloadUrl!])),
+        )
             .then(blobUrls => {
                 for (const item of withThumbnails) {
                     const url = blobUrls[item.thumbnailStoragePath!];

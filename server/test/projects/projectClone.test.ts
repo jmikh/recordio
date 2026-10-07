@@ -182,8 +182,8 @@ describe.runIf(hasTestDb())('POST /project-clone (e2e, real Postgres)', () => {
         expect(row.duration_ms).toBe(4242);
 
         const prefix = `${admin.id}/${body.projectId}/`;
-        // Every path in the blob is rewritten under the ADMIN's prefix —
-        // /storage-download-urls authorizes by exactly that prefix
+        // Every path in the blob is rewritten into the clone's namespace,
+        // the only paths project-get signs and the purge job deletes
         expect(row.project_data.id).toBe(body.projectId);
         expect(row.project_data.screenSource.storagePath).toBe(`${prefix}screen.webm`);
         expect(row.project_data.microphoneSource.storagePath).toBe(`${prefix}mic.wav`);

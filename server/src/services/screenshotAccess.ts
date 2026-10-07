@@ -20,7 +20,7 @@ import type { Db } from '../deps.js';
 export interface ScreenshotAccess {
     id: string;
     owner_id: string;
-    /** Storage prefix owner — every object of this screenshot lives under `${created_by}/screenshots/${id}/` */
+    /** Storage prefix owner — every object of this screenshot lives under screenshotStoragePrefix(created_by, id) */
     created_by: string;
     slug: string;
     workspace_id: string;
@@ -106,9 +106,4 @@ export async function canViewScreenshot(
         [screenshotId, userId],
     );
     return rows.length > 0;
-}
-
-/** Storage prefix every object of a screenshot lives under (source, thumbnail, renders). */
-export function screenshotStoragePrefix(createdBy: string, screenshotId: string): string {
-    return `${createdBy}/screenshots/${screenshotId}/`;
 }

@@ -76,8 +76,7 @@ describe('resolveBlobUrl', () => {
         const url = await useAssetLibraryStore.getState().resolveBlobUrl(bg.storagePath);
 
         expect(url).toBe('blob:1');
-        expect(getBlobUrlMock).toHaveBeenCalledExactlyOnceWith(
-            bg.storagePath, undefined, bg.downloadUrl);
+        expect(getBlobUrlMock).toHaveBeenCalledExactlyOnceWith(bg.storagePath, bg.downloadUrl);
         expect(useAssetLibraryStore.getState().blobUrls[bg.storagePath]).toBe('blob:1');
     });
 
@@ -94,8 +93,7 @@ describe('resolveBlobUrl', () => {
 
         expect(url).toBe('blob:retried');
         expect(listAssetsMock).toHaveBeenCalledExactlyOnceWith('background');
-        expect(getBlobUrlMock).toHaveBeenNthCalledWith(2,
-            stale.storagePath, undefined, fresh.downloadUrl);
+        expect(getBlobUrlMock).toHaveBeenNthCalledWith(2, stale.storagePath, fresh.downloadUrl);
         // The refreshed list replaced the stale one
         expect(useAssetLibraryStore.getState().backgrounds).toEqual([fresh]);
     });

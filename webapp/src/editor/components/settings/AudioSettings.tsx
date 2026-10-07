@@ -3,7 +3,7 @@ import { useProjectStore, useProjectData } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useAssetLibraryStore } from '../../stores/useAssetLibraryStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { UserAssetService } from '../../../storage/userAssetService';
+import { UserAssetService, isSameAsset, type UserAsset } from '../../../storage/userAssetService';
 import { Toggle, Slider, CollapsibleCard, XButton } from '@shared/components';
 import type { PreviewItem } from '@shared/components';
 import { CDN_ORIGIN } from '@shared/types/bridge';
@@ -136,9 +136,9 @@ export const AudioSettingsPanel = () => {
         });
     };
 
-    const handleCustomSelect = async (storagePath: string) => {
+    const handleCustomSelect = async (asset: UserAsset) => {
         try {
-            await selectMusic(storagePath);
+            await selectMusic(asset);
         } catch (err) {
             captureError(err, { flow: 'music', phase: 'select', projectId: project.id });
         }
@@ -153,7 +153,7 @@ export const AudioSettingsPanel = () => {
         try {
             const asset = await UserAssetService.uploadAsset(file, 'music');
             addAsset(asset);
-            await selectMusic(asset.storagePath);
+            await selectMusic(asset);
         } catch (err: any) {
             captureError(err, {
                 flow: 'music',
@@ -445,7 +445,7 @@ export const AudioSettingsPanel = () => {
                                 {customLibrary.length > 0 ? (
                                     <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto scrollbar-thin">
                                         {customLibrary.map((entry) => {
-                                            const isActive = selectedCustomPath === entry.storagePath;
+                                            const isActive = isSameAsset(selectedCustomPath, entry);
                                             const entryBlobUrl = blobUrls[entry.storagePath];
                                             return (
                                                 <div
@@ -454,7 +454,7 @@ export const AudioSettingsPanel = () => {
                                                         ? 'bg-primary/15 text-primary'
                                                         : 'bg-transparent text-text-main hover:bg-state-hover'
                                                         }`}
-                                                    onClick={() => handleCustomSelect(entry.storagePath)}
+                                                    onClick={() => handleCustomSelect(entry)}
                                                 >
                                                     <button
                                                         className="flex-shrink-0 p-1 rounded-full hover:bg-white/10 transition-colors text-text-muted hover:text-text-highlighted"

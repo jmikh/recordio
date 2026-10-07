@@ -18,6 +18,11 @@
  * Ordering deliberately uses the column (the SQL fn text-compares the
  * rendered timestamp — same smell as asset_list, fixed on the live path).
  *
+ * Each row carries `thumbnail_url`, a presigned GET for its card image —
+ * but only where the caller can view the project (owner, any editor
+ * grant, or shared to the workspace/public: canViewProject for a
+ * workspace member). Other members' private projects list without one.
+ *
  * Request:  { workspaceId }
  * Response: { projects: [...] } | 403 { error }
  */
@@ -25,11 +30,17 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ProjectListRequestSchema } from '@shared/api/projects';
 import { isWorkspaceMember } from '../../services/projectAccess.js';
 import { getProjectMediaPaths } from '../../services/projectMedia.js';
+import { presignDownloads } from '../../services/downloadUrls.js';
 
 const RECORDING_MEDIA_TYPES = new Set(['screen', 'camera', 'mic']);
 
 interface ListRow {
-    project: Record<string, unknown> & { upload_status: string; project_data?: unknown };
+    project: Record<string, unknown> & {
+        upload_status: string;
+        project_data?: unknown;
+        thumbnail_storage_path: string | null;
+    };
+    can_view: boolean;
 }
 
 export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -77,7 +88,15 @@ export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
                         WHERE pe.project_id = p.id AND pe.user_id = $2
                     ),
                     'project_data',           CASE WHEN p.upload_status = 'pending' THEN p.project_data END
-                ) AS project
+                ) AS project,
+                (
+                    p.owner_id = $2
+                    OR p.share_policy IN ('public', 'workspace')
+                    OR EXISTS (
+                        SELECT 1 FROM project_editors pe
+                        WHERE pe.project_id = p.id AND pe.user_id = $2
+                    )
+                ) AS can_view
                 FROM projects p
                 WHERE p.workspace_id = $1
                   AND p.permanently_deleted = false
@@ -89,8 +108,19 @@ export const projectListRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 [workspaceId, req.user!.id],
             );
 
-            const projects = (rows as ListRow[]).map(({ project }) => {
-                const { project_data, ...summary } = project;
+            const listed = rows as ListRow[];
+            const thumbnailUrls = await presignDownloads(
+                app.deps.s3,
+                listed.flatMap(r => (r.can_view && r.project.thumbnail_storage_path ? [r.project.thumbnail_storage_path] : [])),
+            );
+
+            const projects = listed.map(({ project, can_view }) => {
+                const { project_data, ...rest } = project;
+                const thumbnailPath = project.thumbnail_storage_path;
+                const summary = {
+                    ...rest,
+                    thumbnail_url: can_view && thumbnailPath ? thumbnailUrls[thumbnailPath] : null,
+                };
                 if (project.upload_status !== 'pending') return summary;
                 return {
                     ...summary,

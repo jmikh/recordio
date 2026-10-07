@@ -11,13 +11,21 @@
  *  3. no expectedVersion → unconditional update of live projects, no
  *     version bump (SQL parity — only path 2 bumps).
  *
+ * Changed data is checked for storage paths before either write: every
+ * media path must be inside the project's namespace or already in the
+ * stored version (project-get signs what project_data references, so a
+ * foreign path would be a read of someone else's file). A stale
+ * expectedVersion is answered with the conflict first, so an editor
+ * holding outdated data gets the normal reload, not a 400.
+ *
  * Request:  { projectId, projectData, durationMs?, expectedVersion? }
- * Response: { cloudVersion: number | null } | 403 { error }
+ * Response: { cloudVersion: number | null } | 400 { error } | 403 { error }
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { ProjectUpdateRequestSchema, ProjectUpdateResponseSchema } from '@shared/api/projects';
 import { canEditProject } from '../../services/projectAccess.js';
+import { disallowedMediaPaths } from '../../services/projectMedia.js';
 
 export const projectUpdateRoutes: FastifyPluginAsyncTypebox = async (app) => {
     app.post(
@@ -30,6 +38,7 @@ export const projectUpdateRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 body: ProjectUpdateRequestSchema,
                 response: {
                     200: ProjectUpdateResponseSchema,
+                    400: Type.Object({ error: Type.String() }),
                     403: Type.Object({ error: Type.String() }),
                 },
             },
@@ -47,13 +56,28 @@ export const projectUpdateRoutes: FastifyPluginAsyncTypebox = async (app) => {
 
             const dataJson = JSON.stringify(projectData);
 
+            // `media` is just the subtrees getProjectMediaPaths reads — not
+            // the whole struct (userEvents makes project_data large)
             const { rows: hashRows } = await db.query(
-                `SELECT md5(project_data::text) = md5($2::jsonb::text) AS unchanged
+                `SELECT md5(project_data::text) = md5($2::jsonb::text) AS unchanged,
+                        cloud_version AS "cloudVersion",
+                        jsonb_build_object(
+                            'screenSource',     project_data->'screenSource',
+                            'cameraSource',     project_data->'cameraSource',
+                            'microphoneSource', project_data->'microphoneSource',
+                            'settings', jsonb_build_object(
+                                'background', project_data->'settings'->'background',
+                                'audio',      project_data->'settings'->'audio'
+                            )
+                        ) AS media
                  FROM projects WHERE id = $1`,
                 [projectId, dataJson],
             );
+            const stored = hashRows[0] as
+                | { unchanged: boolean; cloudVersion: number; media: unknown }
+                | undefined;
 
-            if ((hashRows[0] as { unchanged: boolean } | undefined)?.unchanged) {
+            if (stored?.unchanged) {
                 const { rows } = await db.query(
                     `UPDATE projects
                      SET duration_ms = $2, updated_at = NOW()
@@ -62,6 +86,18 @@ export const projectUpdateRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     [projectId, durationMs],
                 );
                 return { cloudVersion: (rows[0] as { cloudVersion: number }).cloudVersion };
+            }
+
+            // Conflict before validation (see header). The CAS below still
+            // guards the race; this only orders the two answers.
+            if (expectedVersion !== null && stored && stored.cloudVersion !== expectedVersion) {
+                return { cloudVersion: null };
+            }
+
+            const disallowed = disallowedMediaPaths(projectData, stored?.media, projectId);
+            if (disallowed.length > 0) {
+                req.log.warn({ 'project.id': projectId, paths: disallowed }, 'project-update: storage path outside the project');
+                return reply.code(400).send({ error: 'invalid_storage_path' });
             }
 
             const { rows } = expectedVersion !== null

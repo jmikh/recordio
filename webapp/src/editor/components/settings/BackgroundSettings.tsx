@@ -5,7 +5,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { useMediaUrlStore } from '../../../storage/useMediaUrlStore';
 import { useAssetLibraryStore } from '../../stores/useAssetLibraryStore';
 import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
-import { UserAssetService } from '../../../storage/userAssetService';
+import { UserAssetService, isSameAsset, type UserAsset } from '../../../storage/userAssetService';
 import { ColorSettings } from './ColorSettings';
 import { LuBlend, LuImage, LuWallpaper } from 'react-icons/lu';
 import { XButton, Slider, CollapsibleCard, Dropdown, type DropdownOption } from '@shared/components';
@@ -155,10 +155,10 @@ export const BackgroundSettings = () => {
         });
     };
 
-    const handleLibrarySelect = async (storagePath: string) => {
-        if (bgStoragePath === storagePath) return;
+    const handleLibrarySelect = async (asset: UserAsset) => {
+        if (isCustom && isSameAsset(bgStoragePath, asset)) return;
         try {
-            await selectBackground(storagePath);
+            await selectBackground(asset);
         } catch (err) {
             captureError(err, { flow: 'background', phase: 'select', projectId: project.id });
         }
@@ -185,7 +185,7 @@ export const BackgroundSettings = () => {
         try {
             const asset = await UserAssetService.uploadAsset(file, 'background');
             addAsset(asset);
-            await selectBackground(asset.storagePath);
+            await selectBackground(asset);
             addToast({ type: 'success', title: 'Background saved in your library' });
         } catch (err: any) {
             captureError(err, {
@@ -365,7 +365,7 @@ export const BackgroundSettings = () => {
                         <div className="flex flex-wrap justify-center gap-4">
                             {customLibrary.map(entry => {
                                 const url = libraryUrls[entry.storagePath];
-                                const isActive = bgStoragePath === entry.storagePath;
+                                const isActive = isCustom && isSameAsset(bgStoragePath, entry);
                                 return (
                                     <div
                                         key={entry.id}
@@ -375,7 +375,7 @@ export const BackgroundSettings = () => {
                                             className={`cursor-pointer w-14 h-14 rounded-full overflow-hidden relative transition-all hover:scale-110 ${isActive
                                                 ? 'outline outline-2 outline-offset-2 outline-primary'
                                                 : 'border border-transparent ring-1 ring-border hover:ring-border-hover'}`}
-                                            onClick={() => handleLibrarySelect(entry.storagePath)}
+                                            onClick={() => handleLibrarySelect(entry)}
                                             title={entry.name ?? 'Custom background'}
                                         >
                                             {url && <img src={url} alt={entry.name ?? 'Custom background'} className="w-full h-full object-cover" />}

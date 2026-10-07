@@ -8,12 +8,12 @@ import type { DestinationStream } from 'pino';
 import type { Deps } from './deps.js';
 import { createLogger, RequestLogContext } from './logging.js';
 import { authPlugin } from './plugins/auth.js';
-import { storageDownloadUrlsRoutes } from './routes/assets/storageDownloadUrls.js';
 import { sharedVideoGetRoutes } from './routes/sharedVideoGet.js';
 import { stripeCheckoutRoutes, type StripePriceIds } from './routes/billing/stripeCheckout.js';
 import { stripePortalRoutes } from './routes/billing/stripePortal.js';
 import { subscriptionChangeRoutes } from './routes/billing/subscriptionChange.js';
 import { projectUpdateThumbnailRoutes } from './routes/projects/projectUpdateThumbnail.js';
+import { projectAssetAttachRoutes } from './routes/projects/projectAssetAttach.js';
 import { assetUploadRoutes } from './routes/assets/assetUpload.js';
 import { projectCreateV2Routes } from './routes/projects/projectCreateV2.js';
 import { renderJobCreateRoutes } from './routes/renderJobCreate.js';
@@ -185,11 +185,11 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     });
 
     // Migrated edge-function routes (plan Step 4) — one module per function
-    app.register(storageDownloadUrlsRoutes);
     app.register(stripeCheckoutRoutes, { priceIds: opts.stripePriceIds });
     app.register(stripePortalRoutes);
     app.register(subscriptionChangeRoutes, { priceIds: opts.stripePriceIds });
     app.register(projectUpdateThumbnailRoutes);
+    app.register(projectAssetAttachRoutes);
     app.register(assetUploadRoutes);
     app.register(projectCreateV2Routes);
     app.register(transcribeRoutes);

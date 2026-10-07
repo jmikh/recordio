@@ -116,6 +116,8 @@ describe.runIf(hasTestDb())('screenshot routes (e2e, real Postgres)', () => {
                 workspace_id: s.workspaceId,
                 screenshot_data: {},
                 source_storage_path: `${SEEDED_USER_ID}/screenshots/${s.id}/source.png`,
+                // Signed by this route's editor check — the editor loads the image from it
+                source_url: `https://fake-s3/get/${SEEDED_USER_ID}/screenshots/${s.id}/source.png`,
                 width_px: 1280,
                 height_px: 720,
                 capture_mode: 'visible',
@@ -194,6 +196,28 @@ describe.runIf(hasTestDb())('screenshot routes (e2e, real Postgres)', () => {
             });
             expect(list[2].deleted_at).not.toBeNull();
             expect('screenshot_data' in list[0]).toBe(false);
+        });
+
+        it('thumbnail_url is signed only for screenshots the caller can view', async () => {
+            const ws = await workspace();
+            await seedWorkspaceMember(pool, { workspaceId: ws.id, userId: SEEDED_USER_2_ID });
+            const thumb = (owner: string, tag: string) => `${owner}/screenshots/${tag}/thumbnail.webp`;
+            const mine = await seed({ workspaceId: ws.id, sharePolicy: 'private', thumbnailStoragePath: thumb(SEEDED_USER_ID, 'mine') });
+            const theirsShared = await seed({
+                workspaceId: ws.id, ownerId: SEEDED_USER_2_ID, sharePolicy: 'workspace',
+                thumbnailStoragePath: thumb(SEEDED_USER_2_ID, 'shared'),
+            });
+            const theirsPrivate = await seed({
+                workspaceId: ws.id, ownerId: SEEDED_USER_2_ID, sharePolicy: 'private',
+                thumbnailStoragePath: thumb(SEEDED_USER_2_ID, 'private'),
+            });
+
+            const res = await post(app(), '/screenshot-list', { workspaceId: ws.id }, await owner());
+            const list = res.json().screenshots as Array<Record<string, unknown>>;
+            const urlOf = (id: string) => list.find((s) => s.id === id)!.thumbnail_url;
+            expect(urlOf(mine.id)).toBe(`https://fake-s3/get/${thumb(SEEDED_USER_ID, 'mine')}`);
+            expect(urlOf(theirsShared.id)).toBe(`https://fake-s3/get/${thumb(SEEDED_USER_2_ID, 'shared')}`);
+            expect(urlOf(theirsPrivate.id)).toBeNull();
         });
 
         it('403 for a non-member', async () => {

@@ -23,7 +23,7 @@ import { Type } from '@sinclair/typebox';
 import { ScreenshotCreateRequestSchema, ScreenshotCreateResponseSchema } from '@shared/api/screenshots';
 import { isWorkspaceMember } from '../../services/projectAccess.js';
 import { getWorkspaceEntitlements } from '../../services/entitlements.js';
-import { screenshotStoragePrefix } from '../../services/screenshotAccess.js';
+import { screenshotSourcePath } from '../../services/storagePaths.js';
 
 const BUCKET = 'project-media' as const;
 
@@ -77,7 +77,7 @@ export const screenshotCreateRoutes: FastifyPluginAsyncTypebox = async (app) => 
 
             // Stamp the storage path into the doc BEFORE the upsert so the
             // stored screenshot_data carries it (same as project-create-v2)
-            const storagePath = `${screenshotStoragePrefix(userId, screenshotId)}source.png`;
+            const storagePath = screenshotSourcePath(userId, screenshotId);
             const source = screenshot.source as typeof screenshot.source & { storagePath?: string };
             source.storagePath = storagePath;
 

@@ -6,8 +6,7 @@
  * Ports the asset_list SQL function inline (the deployed fn stays frozen
  * until the Part 2 decommission sweep). The enrichment is the point:
  * ownership is established by the WHERE user_id filter right here, so the
- * client never round-trips storage paths through /storage-download-urls —
- * presigning is local HMAC, no network.
+ * route that checks access is the one that signs (services/downloadUrls).
  *
  * Request:  { assetType: 'background' | 'music' }
  * Response: { assets: [{ id, assetType, storagePath, name, sizeBytes,
@@ -15,9 +14,7 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { AssetListRequestSchema, AssetListResponseSchema } from '@shared/api/assets';
-
-/** Same expiry as /storage-download-urls; late-miss refresh is client-side. */
-const DOWNLOAD_URL_EXPIRY_SECONDS = 3600;
+import { DOWNLOAD_URL_TTL_SECONDS } from '../../services/downloadUrls.js';
 
 interface AssetRow {
     id: string;
@@ -62,7 +59,7 @@ export const assetListRoutes: FastifyPluginAsyncTypebox = async (app) => {
                     ...row,
                     downloadUrl: await app.deps.s3.presignDownload(
                         row.storagePath,
-                        DOWNLOAD_URL_EXPIRY_SECONDS,
+                        DOWNLOAD_URL_TTL_SECONDS,
                     ),
                 })),
             );

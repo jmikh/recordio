@@ -107,7 +107,7 @@ export class CloudRenderService {
             phase: 'saving',
             quality,
             fps,
-            renderStoragePath: null,
+            renderJobId: null,
             projectId,
             projectName,
             projectSlug: slug,
@@ -142,7 +142,6 @@ export class CloudRenderService {
             const { data, error } = await invokeFunction<{
                 jobId: string;
                 status: string;
-                renderStoragePath: string | null;
                 error?: string;
                 message?: string;
             }>('render-job-create', { projectId, cloudVersion, quality, fps });
@@ -168,11 +167,11 @@ export class CloudRenderService {
                 return;
             }
 
-            const { jobId, status, renderStoragePath } = data;
+            const { jobId, status } = data;
 
             // Cache hit
-            if (status === 'completed' && renderStoragePath) {
-                await this.downloadFile(projectId, renderStoragePath, projectMeta);
+            if (status === 'completed') {
+                await this.downloadFile(projectId, jobId, projectMeta);
                 return;
             }
 
@@ -198,8 +197,7 @@ export class CloudRenderService {
                         fps,
                         ...projectMeta,
                     });
-                    // completed ⇒ the worker stored the render (path set)
-                    await this.downloadFile(projectId, job.render_storage_path!, projectMeta);
+                    await this.downloadFile(projectId, jobId, projectMeta);
                 } else if (job.status === 'failed' || job.status === 'canceled') {
                     const msg = job.error || `Render ${job.status}`;
                     if (job.status === 'failed') {
@@ -239,36 +237,36 @@ export class CloudRenderService {
 
     /**
      * Fetch the finished MP4 and hand it to the browser. Retry's path back in
-     * when the render itself succeeded — hence the stored storage path.
+     * when the render itself succeeded — hence the stored job id.
      */
     private static async download(projectId: string): Promise<void> {
         const task = this.task(projectId);
-        if (!task?.renderStoragePath) return;
-        await this.downloadFile(projectId, task.renderStoragePath, getProjectMetaSafe());
+        if (!task?.renderJobId) return;
+        await this.downloadFile(projectId, task.renderJobId, getProjectMetaSafe());
     }
 
     /** A failed download only needs the download again; anything else re-renders. */
     static retry(projectId: string): void {
         const task = this.task(projectId);
         if (!task || task.status !== 'failed') return;
-        if (task.renderStoragePath) {
+        if (task.renderJobId) {
             void this.download(projectId);
         } else {
             void this.start(projectId, task.projectName, task.quality, task.fps);
         }
     }
 
-    private static async downloadFile(projectId: string, storagePath: string, projectMeta: ProjectMeta): Promise<void> {
+    private static async downloadFile(projectId: string, jobId: string, projectMeta: ProjectMeta): Promise<void> {
         const task = this.task(projectId);
         const projectName = task?.projectName ?? '';
-        this.patch(projectId, { status: 'active', phase: 'downloading', progress: 1, error: null, renderStoragePath: storagePath });
+        this.patch(projectId, { status: 'active', phase: 'downloading', progress: 1, error: null, renderJobId: jobId });
         try {
-            const { data, error } = await invokeFunction<{ signedUrls: Record<string, string>; error?: string }>(
-                'storage-download-urls',
-                { storagePaths: [storagePath] },
-            );
-            if (error || data?.error) {
-                const msg = data?.error || error?.message || 'Unknown error';
+            // A fresh URL on every download: the status route signs it after
+            // its access check, so a retry past the 1h expiry just asks again
+            const { data, error } = await invokeFunction('render-job-get-status', { jobId });
+            const renderUrl = data?.job?.render_url;
+            if (error || !renderUrl) {
+                const msg = error?.message || 'Rendered file is not available';
                 captureError(error ?? new Error(msg), {
                     flow: 'render',
                     phase: 'downloading',
@@ -287,7 +285,7 @@ export class CloudRenderService {
                 this.fail(projectId, msg);
                 return;
             }
-            const resp = await fetch(data.signedUrls[storagePath]);
+            const resp = await fetch(renderUrl);
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

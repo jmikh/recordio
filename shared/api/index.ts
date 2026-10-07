@@ -18,6 +18,8 @@ import type {
 } from './assets';
 import type {
     CloudProject,
+    ProjectAssetAttachRequest,
+    ProjectAssetAttachResponse,
     ProjectCloneRequest,
     ProjectCloneResponse,
     ProjectConfirmUploadResponse,
@@ -131,6 +133,7 @@ export interface ApiRoutes {
     'project-restore': { request: ProjectIdRequest; response: ProjectRestoreResponse };
     'project-confirm-upload': { request: ProjectIdRequest; response: ProjectConfirmUploadResponse };
     'project-clone': { request: ProjectCloneRequest; response: ProjectCloneResponse };
+    'project-asset-attach': { request: ProjectAssetAttachRequest; response: ProjectAssetAttachResponse };
     'shared-video-get': { request: SharedVideoGetRequest; response: SharedVideoGetResponse };
     'render-job-get-status': { request: RenderJobGetStatusRequest; response: RenderJobGetStatusResponse };
     'screenshot-create': { request: ScreenshotCreateRequest; response: ScreenshotCreateResponse };

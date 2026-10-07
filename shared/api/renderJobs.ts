@@ -23,6 +23,8 @@ export interface RenderJobStatus {
     progress: number | null;
     error: string | null;
     render_storage_path: string | null;
+    /** Presigned GET (1h) for the finished MP4 — set only once status is 'completed' */
+    render_url: string | null;
 }
 
 export interface RenderJobGetStatusResponse {
