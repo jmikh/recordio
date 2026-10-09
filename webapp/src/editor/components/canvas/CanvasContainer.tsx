@@ -332,9 +332,12 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                     }
                 });
 
-                // Thumbnail capture — only in playback mode, scaled to 480px webp.
-                // The canvas mounts before media hydrates, so hold the capture
-                // until the screen video has painted a real frame.
+                // Thumbnail capture — only in playback mode, long edge capped at
+                // 1200px webp: big enough to stay sharp as a 2× link-preview
+                // card (plans/share-link-previews-oneshot.md), under the
+                // server's 500 KB upload cap. The canvas mounts before media
+                // hydrates, so hold the capture until the screen video has
+                // painted a real frame.
                 const screenVideo = internalVideoRefs.current[project.screenSource.storagePath];
                 const hasScreenFrame = !!screenVideo
                     && screenVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
@@ -342,8 +345,8 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                 if (pendingThumbnailCaptureRef.current && canvasMode === CanvasMode.Preview && hasScreenFrame) {
                     pendingThumbnailCaptureRef.current = false;
                     lastCapturedBgRef.current = { ...project.settings.background };
-                    const thumbMaxW = 480;
-                    const scale = Math.min(thumbMaxW / canvas.width, 1);
+                    const thumbMaxEdge = 1200;
+                    const scale = Math.min(thumbMaxEdge / Math.max(canvas.width, canvas.height), 1);
                     const thumbW = Math.round(canvas.width * scale);
                     const thumbH = Math.round(canvas.height * scale);
                     const offscreen = document.createElement('canvas');

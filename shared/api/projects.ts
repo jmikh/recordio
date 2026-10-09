@@ -330,3 +330,21 @@ export const SharedVideoGetResponseSchema = Type.Object({
     ),
 });
 export type SharedVideoGetResponse = Static<typeof SharedVideoGetResponseSchema>;
+
+/**
+ * shared-video-preview — the link-unfurl metadata the Cloudflare Pages
+ * Function (functions/video/[slug].ts) injects as og:/twitter: tags.
+ * PUBLIC shares only: anything else is the same 404 as a missing slug.
+ */
+export const SharedVideoPreviewRequestSchema = Type.Object({
+    slug: Type.String({ minLength: 1 }),
+});
+export type SharedVideoPreviewRequest = Static<typeof SharedVideoPreviewRequestSchema>;
+
+export const SharedVideoPreviewResponseSchema = Type.Object({
+    name: Type.String(),
+    ownerName: Type.String(),
+    /** Output duration from the live timeline; absent when it has no usable windows */
+    durationMs: Type.Optional(Type.Number({ minimum: 0 })),
+});
+export type SharedVideoPreviewResponse = Static<typeof SharedVideoPreviewResponseSchema>;

@@ -30,7 +30,9 @@ export type ErrorType =
     | 'StripeSignatureInvalid'
     | 'MuxSignatureInvalid'
     | 'RenderWorkerTimeout'
-    | 'SupabaseApiUnavailable';
+    | 'SupabaseApiUnavailable'
+    /** A public video's link-preview image fell back to the generic card (thumbnail unreadable) */
+    | 'PreviewImageFailed';
 
 /**
  * Known domain fields — the typed surface handlers can contribute to the
@@ -67,6 +69,8 @@ export interface DomainLogFields {
      * for that version is in flight — the watch page is offering an update.
      */
     'mux.newer_version_rendering'?: boolean;
+    /** Which link-preview image /shared-video-preview-image served */
+    'preview.card'?: 'video' | 'generic';
     'stripe.event_type'?: string;
     'stripe.plan'?: string;
     'stripe.interval'?: string;

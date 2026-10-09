@@ -36,6 +36,20 @@ function isWindow(value: unknown): value is OutputWindow {
     return Boolean(w) && typeof w!.startMs === 'number' && typeof w!.endMs === 'number';
 }
 
+/**
+ * The rendered video's length from the live timeline (cuts and speed
+ * applied); undefined when the timeline has no usable windows. Same
+ * drift caveat as the transcript: edits after publishing aren't in the
+ * rendered video yet.
+ */
+export function getOutputDurationMs(timeline: ProjectTimelineShape | null | undefined): number | undefined {
+    const windows = Array.isArray(timeline?.outputWindows)
+        ? timeline.outputWindows.filter(isWindow)
+        : [];
+    if (windows.length === 0) return undefined;
+    return Math.round(new TimeMapper(windows).getOutputDuration());
+}
+
 /** Output-time transcript lines, sorted; empty when the project has no usable captions. */
 export function getOutputCaptions(timeline: ProjectTimelineShape | null | undefined): SharedVideoCaption[] {
     const segments = Array.isArray(timeline?.captionSegments)

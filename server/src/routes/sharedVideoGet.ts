@@ -66,6 +66,7 @@ import { Type } from '@sinclair/typebox';
 import { SharedVideoGetRequestSchema, SharedVideoGetResponseSchema } from '@shared/api/projects';
 import { canViewProject, getProjectIfEditor } from '../services/projectAccess.js';
 import { getOutputCaptions, type ProjectTimelineShape } from '../services/projectCaptions.js';
+import { ownerDisplayName } from '../services/ownerDisplayName.js';
 import { MUX_RENDER_QUALITY, MUX_RENDER_FPS } from '../services/muxUpload.js';
 import {
     canAttemptPublish,
@@ -344,11 +345,9 @@ export const sharedVideoGetRoutes: FastifyPluginAsyncTypebox<SharedVideoGetRoute
                 req.user ? getProjectIfEditor(app.deps.db, project.id, req.user.id) : null,
             ]);
 
-            const meta = owner?.userMetadata ?? {};
-            const userName = String(meta.full_name ?? meta.name ?? owner?.email ?? 'Unknown');
             const base = {
                 name: project.name,
-                userName,
+                userName: ownerDisplayName(owner),
                 // Key omitted (not false) for viewers without edit access
                 ...(editorAccess && { canEdit: true as const }),
             };

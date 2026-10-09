@@ -22,6 +22,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { SharedScreenshotGetRequestSchema, SharedScreenshotGetResponseSchema } from '@shared/api/screenshots';
 import { canViewScreenshot } from '../services/screenshotAccess.js';
+import { ownerDisplayName } from '../services/ownerDisplayName.js';
 
 const RATE_LIMIT_PER_MINUTE = 60;
 const IMAGE_URL_TTL_SECONDS = 3600;
@@ -92,8 +93,7 @@ export const sharedScreenshotGetRoutes: FastifyPluginAsyncTypebox = async (app) 
                     : Promise.resolve(null),
             ]);
 
-            const meta = owner?.userMetadata ?? {};
-            const userName = String(meta.full_name ?? meta.name ?? owner?.email ?? 'Unknown');
+            const userName = ownerDisplayName(owner);
             const stale = screenshot.render_storage_path !== null
                 && screenshot.render_cloud_version !== screenshot.cloud_version;
 

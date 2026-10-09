@@ -9,6 +9,8 @@ import type { Deps } from './deps.js';
 import { createLogger, RequestLogContext } from './logging.js';
 import { authPlugin } from './plugins/auth.js';
 import { sharedVideoGetRoutes } from './routes/sharedVideoGet.js';
+import { sharedVideoPreviewRoutes } from './routes/sharedVideoPreview.js';
+import { sharedVideoPreviewImageRoutes } from './routes/sharedVideoPreviewImage.js';
 import { stripeCheckoutRoutes, type StripePriceIds } from './routes/billing/stripeCheckout.js';
 import { stripePortalRoutes } from './routes/billing/stripePortal.js';
 import { subscriptionChangeRoutes } from './routes/billing/subscriptionChange.js';
@@ -206,6 +208,10 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     // is missing by dispatching the render itself. `env` gates the
     // dev-only failure reason on its response.
     app.register(sharedVideoGetRoutes, { statusCallbackUrl, env: opts.env });
+    // Link-unfurl metadata + og:image for shared videos — read-only, never
+    // dispatch (plans/share-link-previews-oneshot.md)
+    app.register(sharedVideoPreviewRoutes);
+    app.register(sharedVideoPreviewImageRoutes);
     app.register(renderJobWebhookRoutes, { renderSecret: opts.renderSecret });
     app.register(muxVideoWebhookRoutes);
     app.register(stripeWebhooksRoutes);
