@@ -27,6 +27,7 @@ export const PREVIEW_HEIGHT = 675;
 const BRAND = '#4B36B8';
 const PURPLE = '#7D5EE0';
 const CREAM = '#F8F6EB';
+const PLAY_BUTTON_OPACITY = 0.8;
 const FONT_RELATIVE_PATH = join('assets', 'fonts', 'Manrope-ExtraBold.ttf');
 
 /** Logo mark paths from shared/assets/logo.svg (628×628 viewBox, y-flipped) */
@@ -113,8 +114,10 @@ export async function renderVideoPreviewCard(opts: {
     const wordmarkX = chipX + 15 + logoSize + 18;
     const chipW = wordmarkX - chipX + textWidth('Recordio', 36) + 30;
 
-    // Play button: 192px disc with a 9px white ring; the triangle sits
-    // 6px right of centre so it reads optically centred
+    // Play button: 192px disc with a 9px white ring, translucent so the
+    // frame shows through — group opacity, so the ring/fill overlap
+    // doesn't darken. The triangle stays solid and sits 6px right of
+    // centre so it reads optically centred.
     const cx = PREVIEW_WIDTH / 2;
     const cy = PREVIEW_HEIGHT / 2;
     const triangle = `M${cx - 21} ${cy - 28.5} L${cx + 33} ${cy} L${cx - 21} ${cy + 28.5} Z`;
@@ -133,7 +136,7 @@ export async function renderVideoPreviewCard(opts: {
 
     const overlay = svgLayer(
         `<rect width="${PREVIEW_WIDTH}" height="${PREVIEW_HEIGHT}" fill="rgba(20,12,40,0.22)"/>`
-        + `<circle cx="${cx}" cy="${cy}" r="${96 - 4.5}" fill="${PURPLE}" stroke="#FFFFFF" stroke-width="9"/>`
+        + `<g opacity="${PLAY_BUTTON_OPACITY}"><circle cx="${cx}" cy="${cy}" r="${96 - 4.5}" fill="${PURPLE}" stroke="#FFFFFF" stroke-width="9"/></g>`
         + `<path d="${triangle}" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>`
         + `<rect x="${chipX}" y="${chipY}" width="${chipW}" height="${chipH}" rx="${chipH / 2}" fill="rgba(20,16,35,0.78)"/>`
         + logoSvg(chipX + 15, chipY + (chipH - logoSize) / 2, logoSize, PURPLE, CREAM)

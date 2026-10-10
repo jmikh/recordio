@@ -65,7 +65,8 @@ import type { Deps } from '../deps.js';
 import { Type } from '@sinclair/typebox';
 import { SharedVideoGetRequestSchema, SharedVideoGetResponseSchema } from '@shared/api/projects';
 import { canViewProject, getProjectIfEditor } from '../services/projectAccess.js';
-import { getOutputCaptions, type ProjectTimelineShape } from '../services/projectCaptions.js';
+import { getOutputCaptions } from '../services/projectCaptions.js';
+import type { ProjectTimelineShape } from '../services/projectTimeline.js';
 import { ownerDisplayName } from '../services/ownerDisplayName.js';
 import { MUX_RENDER_QUALITY, MUX_RENDER_FPS } from '../services/muxUpload.js';
 import {

@@ -295,7 +295,7 @@ export function getResolvedCameraStateAtTime(
     // Helper: compute auto-shrunk position/size at a specific time
     const getAutoShrunkRect = (timeMs: number, rect: { x: number; y: number; w: number; h: number }) => {
         if (!cameraSettings.autoShrink) return rect;
-        const state = getCameraStateAtTime(zoomSegments, timeMs, outputSize, cameraSettings.shrinkScale ?? 0.5, zoomSettings);
+        const state = getCameraStateAtTime(zoomSegments, timeMs, outputSize, cameraSettings.shrinkScale ?? 0.7, zoomSettings);
         if (state.sizeScale >= 1.0) return rect;
         const anchor = getCameraAnchor({ xPx: rect.x, yPx: rect.y, widthPx: rect.w, heightPx: rect.h }, outputSize);
         const scaled = scaleCameraSettings({ xPx: rect.x, yPx: rect.y, widthPx: rect.w, heightPx: rect.h }, state.sizeScale, anchor);

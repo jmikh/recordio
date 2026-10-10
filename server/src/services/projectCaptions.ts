@@ -10,18 +10,14 @@
  * after cuts and speed changes. Segments that fall entirely inside a cut
  * are dropped, as are hidden words.
  *
- * project_data is the arbitrary editor struct (typed loosely on purpose,
- * as in projectMedia.ts); malformed timelines yield an empty transcript.
+ * Malformed timelines yield an empty transcript (window parsing lives in
+ * projectTimeline.ts).
  */
 import type { SharedVideoCaption } from '@shared/api/projects';
 import { TimeMapper, recomputeOutputTimes } from '@shared/mappers/timeMapper';
-import type { CaptionSegment, OutputWindow } from '@shared/types/timeline';
+import type { CaptionSegment } from '@shared/types/timeline';
 import { getSegmentText } from '@shared/utils/captionUtils';
-
-export interface ProjectTimelineShape {
-    captionSegments?: unknown;
-    outputWindows?: unknown;
-}
+import { getOutputWindows, type ProjectTimelineShape } from './projectTimeline.js';
 
 function isSegment(value: unknown): value is CaptionSegment {
     const s = value as Partial<CaptionSegment> | null;
@@ -31,33 +27,12 @@ function isSegment(value: unknown): value is CaptionSegment {
         && Array.isArray(s!.words);
 }
 
-function isWindow(value: unknown): value is OutputWindow {
-    const w = value as Partial<OutputWindow> | null;
-    return Boolean(w) && typeof w!.startMs === 'number' && typeof w!.endMs === 'number';
-}
-
-/**
- * The rendered video's length from the live timeline (cuts and speed
- * applied); undefined when the timeline has no usable windows. Same
- * drift caveat as the transcript: edits after publishing aren't in the
- * rendered video yet.
- */
-export function getOutputDurationMs(timeline: ProjectTimelineShape | null | undefined): number | undefined {
-    const windows = Array.isArray(timeline?.outputWindows)
-        ? timeline.outputWindows.filter(isWindow)
-        : [];
-    if (windows.length === 0) return undefined;
-    return Math.round(new TimeMapper(windows).getOutputDuration());
-}
-
 /** Output-time transcript lines, sorted; empty when the project has no usable captions. */
 export function getOutputCaptions(timeline: ProjectTimelineShape | null | undefined): SharedVideoCaption[] {
     const segments = Array.isArray(timeline?.captionSegments)
         ? timeline.captionSegments.filter(isSegment)
         : [];
-    const windows = Array.isArray(timeline?.outputWindows)
-        ? timeline.outputWindows.filter(isWindow)
-        : [];
+    const windows = getOutputWindows(timeline);
     if (segments.length === 0 || windows.length === 0) return [];
 
     const mapper = new TimeMapper(windows);

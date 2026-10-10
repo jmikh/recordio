@@ -23,7 +23,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
 import { SharedVideoPreviewRequestSchema, SharedVideoPreviewResponseSchema } from '@shared/api/projects';
-import { getOutputDurationMs, type ProjectTimelineShape } from '../services/projectCaptions.js';
+import { getOutputDurationMs, type ProjectTimelineShape } from '../services/projectTimeline.js';
 import { ownerDisplayName } from '../services/ownerDisplayName.js';
 
 const RATE_LIMIT_PER_MINUTE = 300;

@@ -63,7 +63,7 @@ export const CameraSettings = () => {
         effectAmount = DEFAULT_EFFECT_AMOUNT,
         cropZoom = 1,
         autoShrink = false,
-        shrinkScale = 0.5,
+        shrinkScale = 0.7,
         mirrored = false,
         removeBackground = false
     } = cameraConfig;

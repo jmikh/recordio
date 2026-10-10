@@ -139,7 +139,7 @@ export const createDefaultSettings = (): ProjectSettings => ({
         effectAmount: 0.7,
         cropZoom: 1,
         autoShrink: true,
-        shrinkScale: 0.5,
+        shrinkScale: 0.7,
         mirrored: false,
     },
 

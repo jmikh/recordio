@@ -17,7 +17,7 @@
  */
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { Type } from '@sinclair/typebox';
-import { getOutputDurationMs, type ProjectTimelineShape } from '../services/projectCaptions.js';
+import { getOutputDurationMs, type ProjectTimelineShape } from '../services/projectTimeline.js';
 import { renderGenericPreviewCard, renderVideoPreviewCard } from '../services/sharePreviewImage.js';
 
 const RATE_LIMIT_PER_MINUTE = 60;

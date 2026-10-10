@@ -19,7 +19,8 @@ import { projectsPurgeDeleted, PROJECTS_PURGE_BATCH_LIMIT } from './projectsPurg
 import { projectsExpireStalePending, PROJECTS_EXPIRE_STALE_PENDING_BATCH_LIMIT } from './projectsExpireStalePending.js';
 import { muxVideosPurgeSuperseded, MUX_PURGE_BATCH_LIMIT } from './muxVideosPurgeSuperseded.js';
 import { renderJobsPurgeSuperseded, RENDER_PURGE_BATCH_LIMIT } from './renderJobsPurgeSuperseded.js';
-import { userProfilesSendWelcome, WELCOME_SEND_BATCH_LIMIT } from './userProfilesSendWelcome.js';
+// PAUSED 2026-10-10 — see the commented-out entry below
+// import { userProfilesSendWelcome, WELCOME_SEND_BATCH_LIMIT } from './userProfilesSendWelcome.js';
 import { screenshotsPurgeDeleted, SCREENSHOTS_PURGE_BATCH_LIMIT } from './screenshotsPurgeDeleted.js';
 
 export interface JobDefinition {
@@ -85,21 +86,24 @@ export const jobs: JobDefinition[] = [
             };
         },
     },
-    {
-        name: 'user_profiles.send-welcome',
-        period: 'daily',
-        // 13:00 UTC = 8:00 EST (9:00 EDT) — a morning send, not the
-        // post-midnight tick the purge jobs run on
-        notBeforeUtcHour: 13,
-        async run(deps, log) {
-            const r = await userProfilesSendWelcome(deps, log);
-            return {
-                itemsProcessed: r.processed,
-                itemsFailed: r.failed,
-                batchFull: r.processed >= WELCOME_SEND_BATCH_LIMIT,
-            };
-        },
-    },
+    // PAUSED 2026-10-10 — welcome email off for now. To resume, restore
+    // this entry and its import. Signups older than the job's 72h window
+    // at resume time won't be emailed (no backfill).
+    // {
+    //     name: 'user_profiles.send-welcome',
+    //     period: 'daily',
+    //     // 13:00 UTC = 8:00 EST (9:00 EDT) — a morning send, not the
+    //     // post-midnight tick the purge jobs run on
+    //     notBeforeUtcHour: 13,
+    //     async run(deps, log) {
+    //         const r = await userProfilesSendWelcome(deps, log);
+    //         return {
+    //             itemsProcessed: r.processed,
+    //             itemsFailed: r.failed,
+    //             batchFull: r.processed >= WELCOME_SEND_BATCH_LIMIT,
+    //         };
+    //     },
+    // },
     {
         name: 'render_jobs.purge-superseded',
         period: 'daily',
