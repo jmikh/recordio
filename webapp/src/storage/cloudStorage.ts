@@ -119,6 +119,17 @@ export class CloudStorage {
         return data.restored ?? false;
     }
 
+    /**
+     * Permanently delete a trashed project (marks it; the purge job
+     * removes its media). Can't be restored afterwards.
+     */
+    static async permanentlyDeleteProject(projectId: string): Promise<boolean> {
+        const { data, error } = await invokeFunction('project-delete-permanent', { projectId });
+
+        if (error) throw error;
+        return data.deleted;
+    }
+
     // ─── Rename ────────────────────────────────────────────────────
 
     static async renameProject(projectId: string, name: string): Promise<void> {

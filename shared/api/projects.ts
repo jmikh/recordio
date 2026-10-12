@@ -34,8 +34,9 @@ export const AccessRoleSchema = Type.Union([
 export type AccessRole = Static<typeof AccessRoleSchema>;
 
 /**
- * Shared request body of project-get / project-delete / project-restore /
- * project-confirm-upload (identical inline objects before this file).
+ * Shared request body of project-get / project-delete /
+ * project-delete-permanent / project-restore / project-confirm-upload
+ * (identical inline objects before this file).
  */
 export const ProjectIdRequestSchema = Type.Object({
     projectId: Type.String({ minLength: 1 }),
@@ -243,8 +244,9 @@ export const ProjectEditorsResponseSchema = Type.Object({
 });
 export type ProjectEditorsResponse = Static<typeof ProjectEditorsResponseSchema>;
 
-// ── POST /project-delete / -restore / -confirm-upload ────────────
+// ── POST /project-delete / -delete-permanent / -restore / -confirm-upload ──
 
+/** Shared by /project-delete and /project-delete-permanent */
 export const ProjectDeleteResponseSchema = Type.Object({
     deleted: Type.Boolean(),
 });

@@ -10,10 +10,11 @@ export const CardCheckbox = ({ selectMode, selected, onSelect }: CardCheckboxPro
         onSelect();
     };
 
+    // z-20: above the card's z-10 hover layers (the Trash action overlay)
     return (
         <div
             className={`
-                absolute top-1.5 left-1.5 z-10 transition-opacity duration-150
+                absolute top-1.5 left-1.5 z-20 transition-opacity duration-150
                 ${selectMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
             `}
             onClick={handleClick}

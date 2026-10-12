@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LuClockAlert, LuEllipsis, LuGlobe, LuLock, LuPencil, LuRotateCcw, LuShare2, LuTrash2, LuUsers } from 'react-icons/lu';
 import { CardCheckbox } from './CardCheckbox';
-import { CopyLinkButton, Tooltip } from '@shared/components';
+import { Button, CopyLinkButton, Tooltip } from '@shared/components';
 import { timeAgo } from './timeAgo';
 import { videoUrl } from '../../lib/videoUrls';
 import { useToast } from '../../components/Toast';
@@ -38,6 +38,8 @@ interface ProjectCardProps {
     selected?: boolean;
     onSelect?: () => void;
     onRestore?: () => void;
+    /** Trashed cards only — the host confirms before deleting */
+    onDeleteForever?: () => void;
     onRename?: (id: string, newName: string) => void;
     onDelete?: (id: string) => void;
     /** Opens share settings — pass only for projects the viewer owns */
@@ -84,6 +86,7 @@ export const ProjectCard = ({
     selected = false,
     onSelect,
     onRestore,
+    onDeleteForever,
     onRename,
     onDelete,
     onShare,
@@ -218,17 +221,25 @@ export const ProjectCard = ({
                     </div>
                 )}
 
-                {/* Restore overlay for trashed projects — always pressable;
-                    the free-tier press opens the upgrade modal upstream */}
-                {isTrashed && onRestore && (
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onRestore(); }}
-                        className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
-                    >
-                        <LuRotateCcw className="icon-md text-white" />
-                        <span className="text-white text-sm">Restore</span>
-                    </button>
+                {/* Trash actions — Restore is always pressable (the free-tier
+                    press opens the upgrade modal upstream); Delete forever
+                    confirms upstream. Wraps on narrow cards. Hidden while
+                    selecting — the floating bar carries the actions then. */}
+                {isTrashed && !selectMode && (onRestore || onDeleteForever) && (
+                    <div className="absolute inset-0 z-10 flex flex-wrap items-center content-center justify-center gap-2 p-3 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                        {onRestore && (
+                            /* base has no fill of its own — give it an opaque
+                               surface so it reads over dark thumbnails */
+                            <Button icon={LuRotateCcw} className="bg-surface-raised shadow-sm" onClick={(e) => { e.stopPropagation(); onRestore(); }}>
+                                Restore
+                            </Button>
+                        )}
+                        {onDeleteForever && (
+                            <Button variant="destructive" icon={LuTrash2} onClick={(e) => { e.stopPropagation(); onDeleteForever(); }}>
+                                Delete forever
+                            </Button>
+                        )}
+                    </div>
                 )}
 
                 {/* Duration Badge (or the host's replacement) — one container so

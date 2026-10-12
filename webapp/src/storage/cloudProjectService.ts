@@ -722,6 +722,13 @@ export class CloudProjectService {
         }
     }
 
+    // ─── Delete forever ──────────────────────────────────────
+
+    /** Throws on failure — the Trash shows the error toast */
+    static async permanentlyDeleteProject(projectId: string): Promise<boolean> {
+        return CloudStorage.permanentlyDeleteProject(projectId);
+    }
+
     // ─── Conflict Resolution ─────────────────────────────────
 
     /**

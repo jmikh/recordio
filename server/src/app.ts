@@ -36,6 +36,7 @@ import { projectShareRoutes } from './routes/projects/projectShare.js';
 import { projectEditorSetRoutes } from './routes/projects/projectEditorSet.js';
 import { projectEditorRemoveRoutes } from './routes/projects/projectEditorRemove.js';
 import { projectDeleteRoutes } from './routes/projects/projectDelete.js';
+import { projectDeletePermanentRoutes } from './routes/projects/projectDeletePermanent.js';
 import { projectRestoreRoutes } from './routes/projects/projectRestore.js';
 import { projectConfirmUploadRoutes } from './routes/projects/projectConfirmUpload.js';
 import { projectCloneRoutes } from './routes/projects/projectClone.js';
@@ -230,6 +231,7 @@ export function buildApp(deps: Deps, opts: AppOptions = {}) {
     app.register(projectEditorSetRoutes);
     app.register(projectEditorRemoveRoutes);
     app.register(projectDeleteRoutes);
+    app.register(projectDeletePermanentRoutes);
     app.register(projectRestoreRoutes);
     app.register(projectConfirmUploadRoutes);
     app.register(renderJobGetStatusRoutes);

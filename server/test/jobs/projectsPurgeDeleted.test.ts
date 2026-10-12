@@ -2,11 +2,13 @@
  * Job `projects.purge-deleted` — e2e against the real local Postgres,
  * fakes for S3/Mux; the job function is called directly (no scheduler).
  *
- * LOCAL-DATA SAFETY: the job matches globally (`deleted_at < now-30d`)
- * and this pool points at the shared, long-lived local dev DB. The
- * fake clock is pinned to 2000-01-01, so the cutoff (1999-12-02)
- * predates the product — no real row can ever match; only this
- * suite's 1999-dated seeds do. Do not move the clock forward.
+ * LOCAL-DATA SAFETY: the job matches globally (`deleted_at < now-30d`,
+ * or marked `permanently_deleted` with `deleted_at < now`) and this
+ * pool points at the shared, long-lived local dev DB. The fake clock
+ * is pinned to 2000-01-01, so both bounds predate the product — no real
+ * row can ever match, even one marked by "Delete forever" in local
+ * testing; only this suite's 1999-dated seeds do. Do not move the
+ * clock forward.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type pg from 'pg';
@@ -19,6 +21,7 @@ import {
     SEEDED_USER_ID,
     seedMuxVideo,
     seedProject,
+    seedRenderJob,
 } from '../helpers/db.js';
 
 const CLOCK_START = new Date('2000-01-01T00:00:00.000Z');
@@ -52,8 +55,8 @@ describe.runIf(hasTestDb())('jobs/projectsPurgeDeleted (e2e, real Postgres)', ()
         return deps;
     }
 
-    async function seed(deletedAt: string | null) {
-        const project = await seedProject(pool, { deletedAt });
+    async function seed(deletedAt: string | null, permanentlyDeleted = false) {
+        const project = await seedProject(pool, { deletedAt, permanentlyDeleted });
         createdProjects.push(project.id);
         return project;
     }
@@ -119,6 +122,44 @@ describe.runIf(hasTestDb())('jobs/projectsPurgeDeleted (e2e, real Postgres)', ()
         const deps = testDeps();
         const project = await seed(OLD_DELETED_AT);
         await pool.query('UPDATE projects SET permanently_deleted = true WHERE id = $1', [project.id]);
+
+        const result = await projectsPurgeDeleted(deps, log);
+
+        expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
+        expect(await projectRow(project.id)).toBeUndefined();
+    });
+
+    it('purges a recently-trashed project marked by "Delete forever" — no 30-day wait', async () => {
+        const deps = testDeps();
+        const project = await seed(RECENT_DELETED_AT, true);
+        const prefix = `${SEEDED_USER_ID}/${project.id}`;
+        deps.s3.objects.set(`${prefix}/screen.webm`, { body: new Uint8Array(1), contentType: 'video/webm' });
+
+        const result = await projectsPurgeDeleted(deps, log);
+
+        expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0 });
+        expect(deps.s3.deletedKeys).toEqual([`${prefix}/screen.webm`]);
+        expect(await projectRow(project.id)).toBeUndefined();
+    });
+
+    it('skips a project with a pending render until it settles (the worker would orphan its MP4)', async () => {
+        const deps = testDeps();
+        const marked = await seed(RECENT_DELETED_AT, true);
+        const old = await seed(OLD_DELETED_AT);
+        await seedRenderJob(pool, { projectId: marked.id, cloudVersion: 1, status: 'pending' });
+        await seedRenderJob(pool, { projectId: old.id, cloudVersion: 1, status: 'pending' });
+
+        const result = await projectsPurgeDeleted(deps, log);
+
+        expect(result).toEqual({ processed: 0, succeeded: 0, failed: 0 });
+        expect(await projectRow(marked.id)).toMatchObject({ permanently_deleted: true });
+        expect(await projectRow(old.id)).toMatchObject({ permanently_deleted: false });
+    });
+
+    it('a settled render does not block the purge', async () => {
+        const deps = testDeps();
+        const project = await seed(RECENT_DELETED_AT, true);
+        await seedRenderJob(pool, { projectId: project.id, cloudVersion: 1, status: 'completed' });
 
         const result = await projectsPurgeDeleted(deps, log);
 

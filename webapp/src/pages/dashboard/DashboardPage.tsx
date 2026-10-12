@@ -83,6 +83,9 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
             navigate('/settings/personal');
             return;
         }
+        // A selection belongs to the view it was made in — Trash's bar acts
+        // on trashed projects, the others' on live ones
+        setSelectedIds(new Set());
         setActiveView(view);
         if (showSettings) navigate('/');
     };
@@ -183,6 +186,10 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
     const selectMode = selectedIds.size > 0;
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+    const [isBulkRestoring, setIsBulkRestoring] = useState(false);
+    /** Trashed projects awaiting "Delete forever" confirmation (one card or the selection) */
+    const [deleteForeverIds, setDeleteForeverIds] = useState<string[] | null>(null);
+    const [isDeletingForever, setIsDeletingForever] = useState(false);
 
     const handleRecord = () => {
         trackNewRecordingClicked(workspaceId);
@@ -524,19 +531,32 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
         }
     };
 
-    // Restore from trash — the button always presses; free tier gets the
-    // upgrade modal instead (server enforces canRestore regardless)
-    const handleRestore = async (projectId: string) => {
+    // Restore from trash (one card or the selection) — the button always
+    // presses; free tier gets the upgrade modal instead (server enforces
+    // canRestore regardless)
+    const handleRestore = async (ids: string[]) => {
         if (!entitlements.canRestore) {
             setShowRestoreUpgradeModal(true);
             return;
         }
-        const ok = await CloudProjectService.restoreProject(projectId);
-        if (ok) {
-            setAllProjects(prev => prev.map(p =>
-                p.id === projectId ? { ...p, deletedAt: null } : p
-            ));
-            addToast({ type: 'success', title: 'Project restored' });
+        setIsBulkRestoring(true);
+        const restored = new Set<string>();
+        for (const id of ids) {
+            // restoreProject reports its own failures to Sentry
+            if (await CloudProjectService.restoreProject(id)) restored.add(id);
+        }
+        setAllProjects(prev => prev.map(p =>
+            restored.has(p.id) ? { ...p, deletedAt: null } : p
+        ));
+        // Failed ones stay selected so the bar can retry them
+        setSelectedIds(prev => new Set([...prev].filter(id => !restored.has(id))));
+        setIsBulkRestoring(false);
+
+        const failed = ids.length - restored.size;
+        if (failed > 0) {
+            addToast({ type: 'error', title: failed === ids.length ? 'Failed to restore' : `Failed to restore ${failed} of ${ids.length}` });
+        } else {
+            addToast({ type: 'success', title: ids.length === 1 ? 'Project restored' : `${ids.length} projects restored` });
         }
     };
 
@@ -582,6 +602,40 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 is_offline: !navigator.onLine,
             });
             addToast({ type: 'error', title: 'Failed to delete project' });
+        }
+    };
+
+    // Delete forever (Trash only; one card or the selection) — the server
+    // marks each project and the daily purge job removes its media; they
+    // leave the list right away
+    const handleDeleteForever = async () => {
+        const ids = deleteForeverIds;
+        if (!ids) return;
+        setIsDeletingForever(true);
+        const deleted = new Set<string>();
+        for (const id of ids) {
+            try {
+                // false = not the owner's trashed project anymore (e.g. restored in another tab)
+                if (!(await CloudProjectService.permanentlyDeleteProject(id))) {
+                    throw new Error('project-delete-permanent matched no row');
+                }
+                deleted.add(id);
+                dropFinishedTasks(id);
+            } catch (err) {
+                captureError(err, { flow: 'project', phase: 'delete_forever', projectId: id });
+            }
+        }
+        setAllProjects(prev => prev.filter(p => !deleted.has(p.id)));
+        // Failed ones stay selected so the bar can retry them
+        setSelectedIds(prev => new Set([...prev].filter(id => !deleted.has(id))));
+        setDeleteForeverIds(null);
+        setIsDeletingForever(false);
+
+        const failed = ids.length - deleted.size;
+        if (failed > 0) {
+            addToast({ type: 'error', title: failed === ids.length ? 'Failed to delete' : `Failed to delete ${failed} of ${ids.length}` });
+        } else {
+            addToast({ type: 'success', title: ids.length === 1 ? 'Permanently deleted' : `${ids.length} projects permanently deleted` });
         }
     };
 
@@ -673,7 +727,11 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 deletedAt: item.deletedAt,
             }}
             onOpen={() => {}}
-            onRestore={() => handleRestore(item.id)}
+            selectMode={selectMode}
+            selected={selectedIds.has(item.id)}
+            onSelect={() => toggleSelect(item.id)}
+            onRestore={() => handleRestore([item.id])}
+            onDeleteForever={() => setDeleteForeverIds([item.id])}
         />
     );
 
@@ -889,13 +947,31 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                         >
                             {selectedIds.size === sortedProjects.length ? 'Deselect All' : 'Select All'}
                         </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={() => setShowBulkDeleteModal(true)}
-                            disabled={isBulkDeleting}
-                        >
-                            Delete
-                        </Button>
+                        {isTrash ? (
+                            <>
+                                <Button
+                                    onClick={() => handleRestore([...selectedIds])}
+                                    disabled={isBulkRestoring}
+                                >
+                                    {isBulkRestoring ? 'Restoring...' : 'Restore'}
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={() => setDeleteForeverIds([...selectedIds])}
+                                    disabled={isBulkRestoring}
+                                >
+                                    Delete forever
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                variant="destructive"
+                                onClick={() => setShowBulkDeleteModal(true)}
+                                disabled={isBulkDeleting}
+                            >
+                                Delete
+                            </Button>
+                        )}
                         <Button
                             onClick={exitSelectMode}
                         >
@@ -906,6 +982,30 @@ export function DashboardPage({ settingsPage }: { settingsPage?: 'workspace' | '
                 document.body
             )}
 
+            <Modal
+                isOpen={!!deleteForeverIds}
+                onClose={() => { if (!isDeletingForever) setDeleteForeverIds(null); }}
+                maxWidth="max-w-[420px]"
+                ariaLabel="Delete forever"
+            >
+                <h2 className="heading-2 mb-2">Delete forever?</h2>
+                <p className="text-sm text-text-main mb-6">
+                    <span className="text-text-highlighted">
+                        {deleteForeverIds?.length === 1
+                            ? allProjects.find(p => p.id === deleteForeverIds[0])?.name
+                            : `${deleteForeverIds?.length} projects`}
+                    </span>{' '}
+                    will be permanently deleted. This can’t be undone.
+                </p>
+                <div className="flex justify-end gap-2">
+                    <Button variant="base" onClick={() => setDeleteForeverIds(null)} disabled={isDeletingForever}>
+                        Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={handleDeleteForever} disabled={isDeletingForever}>
+                        {isDeletingForever ? 'Deleting...' : 'Delete forever'}
+                    </Button>
+                </div>
+            </Modal>
             <ProUpgradeModal
                 isOpen={showRestoreUpgradeModal}
                 onClose={() => setShowRestoreUpgradeModal(false)}

@@ -3,14 +3,23 @@
  * edge function (Wave C, parity loosened per plan).
  *
  * Permanently deletes projects soft-deleted for more than 30 days
- * (the edge fn's header said "3 days" — its code said 30; the code wins).
+ * (the edge fn's header said "3 days" — its code said 30; the code wins),
+ * plus any trashed project already marked `permanently_deleted` — set by
+ * POST /project-delete-permanent ("Delete forever"), or by a previous
+ * run that failed partway. Those skip the 30-day wait.
+ *
+ * A project with a pending render job is skipped until the render
+ * settles: the worker ignores the webhook's 404 once the row is gone and
+ * still uploads its MP4 under the project prefix, which would orphan it.
+ * Stale pending jobs are failed by the stale-job cron, so this can't
+ * block a purge forever.
  *
  * Per-project pipeline, order load-bearing:
  *   1. mark `permanently_deleted` (skip if already true — resume of a
  *      previous failed run; user can no longer restore)
  *   2. purge ALL of the project's mux_videos via purgeMuxVideo — ANY
- *      status including pending (a 30-day-deleted project has no
- *      legitimate in-flight work). BUG FIX vs the edge fn: it
+ *      status including pending (a trashed project with no pending
+ *      render has no legitimate in-flight work). BUG FIX vs the edge fn: it
  *      hard-deleted the row and let the FK cascade drop mux_videos
  *      WITHOUT deleting their Mux assets — a permanent leak, since the
  *      cascaded row held the only copy of the asset id.
@@ -49,15 +58,23 @@ export async function projectsPurgeDeleted(
     deps: Pick<Deps, 'db' | 's3' | 'mux' | 'clock'>,
     log: JobLogger,
 ): Promise<ProjectsPurgeDeletedResult> {
-    const cutoff = new Date(deps.clock.now().getTime() - THIRTY_DAYS_MS).toISOString();
+    const now = deps.clock.now();
+    const cutoff = new Date(now.getTime() - THIRTY_DAYS_MS).toISOString();
 
-    // Oldest first (the edge fn had no ORDER BY — nondeterministic batch)
+    // Oldest first (the edge fn had no ORDER BY — nondeterministic batch).
+    // `deleted_at < $2` (now) is always true in prod; it keeps the test
+    // suite's pinned 2000-01-01 clock from matching real dev-DB rows.
     const { rows } = await deps.db.query(
-        `SELECT id, created_by, permanently_deleted FROM projects
-         WHERE deleted_at IS NOT NULL AND deleted_at < $1
-         ORDER BY deleted_at
+        `SELECT p.id, p.created_by, p.permanently_deleted FROM projects p
+         WHERE p.deleted_at IS NOT NULL
+           AND (p.deleted_at < $1 OR (p.permanently_deleted AND p.deleted_at < $2))
+           AND NOT EXISTS (
+               SELECT 1 FROM render_jobs rj
+               WHERE rj.project_id = p.id AND rj.status = 'pending'
+           )
+         ORDER BY p.deleted_at
          LIMIT ${PROJECTS_PURGE_BATCH_LIMIT}`,
-        [cutoff],
+        [cutoff, now.toISOString()],
     );
     const projects = rows as CandidateProject[];
 

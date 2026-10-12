@@ -1,6 +1,7 @@
 /**
- * POST /project-delete + /project-restore + /project-confirm-upload —
- * Part 2 Batch 2. The three owner-gated boolean routes share their
+ * POST /project-delete + /project-delete-permanent + /project-restore +
+ * /project-confirm-upload — Part 2 Batch 2 (delete-permanent added
+ * later for "Delete forever"). The owner-gated boolean routes share their
  * shape (owner check IS the WHERE clause; false for non-owner /
  * not-found / wrong-state alike, no error), so one file covers them.
  *
@@ -35,7 +36,7 @@ async function post(app: App, url: string, body: unknown, token?: string) {
 }
 
 describe.each([
-    '/project-delete', '/project-restore', '/project-confirm-upload',
+    '/project-delete', '/project-delete-permanent', '/project-restore', '/project-confirm-upload',
 ])('POST %s (auth + validation, no db)', (url) => {
     function validationApp(): { app: App; deps: FakeDeps } {
         const deps = createFakeDeps();
@@ -88,8 +89,8 @@ describe.runIf(hasTestDb())('project lifecycle routes (e2e, real Postgres)', () 
 
     async function row(id: string) {
         const { rows } = await pool.query(
-            'SELECT deleted_at, upload_status FROM projects WHERE id = $1', [id]);
-        return rows[0] as { deleted_at: string | null; upload_status: string };
+            'SELECT deleted_at, upload_status, permanently_deleted FROM projects WHERE id = $1', [id]);
+        return rows[0] as { deleted_at: string | null; upload_status: string; permanently_deleted: boolean };
     }
 
     describe('/project-delete', () => {
@@ -115,6 +116,43 @@ describe.runIf(hasTestDb())('project lifecycle routes (e2e, real Postgres)', () 
             const p = await seed({ deletedAt: new Date().toISOString() });
             const { app } = testApp();
             const res = await post(app, '/project-delete', { projectId: p.id },
+                await userToken({ sub: SEEDED_USER_ID }));
+            expect(res.json()).toEqual({ deleted: false });
+        });
+    });
+
+    describe('/project-delete-permanent', () => {
+        it('owner marks a trashed project; the row stays for the purge job', async () => {
+            const p = await seed({ deletedAt: new Date().toISOString() });
+            const { app } = testApp();
+            const res = await post(app, '/project-delete-permanent', { projectId: p.id },
+                await userToken({ sub: SEEDED_USER_ID }));
+            expect(res.json()).toEqual({ deleted: true });
+            expect((await row(p.id)).permanently_deleted).toBe(true);
+        });
+
+        it('false for a non-owner, row untouched', async () => {
+            const p = await seed({ deletedAt: new Date().toISOString() });
+            const { app } = testApp();
+            const res = await post(app, '/project-delete-permanent', { projectId: p.id },
+                await userToken({ sub: SEEDED_USER_2_ID }));
+            expect(res.json()).toEqual({ deleted: false });
+            expect((await row(p.id)).permanently_deleted).toBe(false);
+        });
+
+        it('false for a live project — it must be trashed first', async () => {
+            const p = await seed();
+            const { app } = testApp();
+            const res = await post(app, '/project-delete-permanent', { projectId: p.id },
+                await userToken({ sub: SEEDED_USER_ID }));
+            expect(res.json()).toEqual({ deleted: false });
+            expect((await row(p.id)).permanently_deleted).toBe(false);
+        });
+
+        it('false when already marked', async () => {
+            const p = await seed({ deletedAt: new Date().toISOString(), permanentlyDeleted: true });
+            const { app } = testApp();
+            const res = await post(app, '/project-delete-permanent', { projectId: p.id },
                 await userToken({ sub: SEEDED_USER_ID }));
             expect(res.json()).toEqual({ deleted: false });
         });

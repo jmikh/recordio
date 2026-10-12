@@ -130,6 +130,7 @@ export interface ApiRoutes {
     'project-editor-set': { request: ProjectEditorSetRequest; response: ProjectEditorsResponse };
     'project-editor-remove': { request: ProjectEditorRemoveRequest; response: ProjectEditorsResponse };
     'project-delete': { request: ProjectIdRequest; response: ProjectDeleteResponse };
+    'project-delete-permanent': { request: ProjectIdRequest; response: ProjectDeleteResponse };
     'project-restore': { request: ProjectIdRequest; response: ProjectRestoreResponse };
     'project-confirm-upload': { request: ProjectIdRequest; response: ProjectConfirmUploadResponse };
     'project-clone': { request: ProjectCloneRequest; response: ProjectCloneResponse };
