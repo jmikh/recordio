@@ -317,21 +317,8 @@ export function VideoPage() {
                                     streamType="on-demand"
                                     onTimeUpdate={() => setCurrentTimeMs((playerRef.current?.currentTime ?? 0) * 1000)}
                                     onSeeked={() => setCurrentTimeMs((playerRef.current?.currentTime ?? 0) * 1000)}
-                                    // mux-player is a web component, so its box
-                                    // is styled inline rather than by class.
-                                    // aspectRatio is load-bearing: with only a
-                                    // width the element has no height until Mux
-                                    // reads the media's metadata, so the player
-                                    // renders as a squat strip for a frame and
-                                    // then snaps to full height. 16/9 matches
-                                    // PlayerPlaceholder, so the box is the same
-                                    // size before and after the video attaches.
-                                    style={{
-                                        width: '100%',
-                                        aspectRatio: '16 / 9',
-                                        borderRadius: '0.75rem',
-                                        overflow: 'hidden',
-                                    }}
+                                    // Box + Recordio theming live in index.css
+                                    className="recordio-player"
                                 />
                             ) : data.status === 'failed' ? (
                                 <PlayerPlaceholder>

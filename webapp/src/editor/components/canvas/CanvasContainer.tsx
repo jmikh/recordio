@@ -337,7 +337,8 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                 // card (plans/share-link-previews-oneshot.md), under the
                 // server's 500 KB upload cap. The canvas mounts before media
                 // hydrates, so hold the capture until the screen video has
-                // painted a real frame.
+                // painted a real frame. 'high' smoothing keeps downscaled text
+                // from speckling (default bilinear skips most source pixels).
                 const screenVideo = internalVideoRefs.current[project.screenSource.storagePath];
                 const hasScreenFrame = !!screenVideo
                     && screenVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
@@ -352,12 +353,14 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                     const offscreen = document.createElement('canvas');
                     offscreen.width = thumbW;
                     offscreen.height = thumbH;
-                    offscreen.getContext('2d')!.drawImage(canvas, 0, 0, thumbW, thumbH);
+                    const thumbCtx = offscreen.getContext('2d')!;
+                    thumbCtx.imageSmoothingQuality = 'high';
+                    thumbCtx.drawImage(canvas, 0, 0, thumbW, thumbH);
                     offscreen.toBlob((blob) => {
                         if (blob) CloudProjectService.saveThumbnail(project.id, blob).catch(err =>
                             captureError(err, { flow: 'thumbnail_save', projectId: project.id })
                         );
-                    }, 'image/webp', 0.8);
+                    }, 'image/webp', 0.9);
                 }
             };
         };

@@ -11,13 +11,15 @@
  *  - Playwright renders are serialized via a queue (one at a time on the GPU)
  */
 
+import './instrument.js';
+import * as Sentry from '@sentry/node';
 import Fastify from 'fastify';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
-import { renderViaPlaywright, warmBrowser, RENDER_PAGE_DIST, getMimeType } from './playwrightRender.js';
+import { renderViaPlaywright, warmBrowser, RENDER_PAGE_DIST, getMimeType, type RenderStep } from './playwrightRender.js';
 
 // ── Per-job media directories (for direct HTTP serving) ──────
 // Registered when a job starts, removed on cleanup. Keyed by jobId.
@@ -89,6 +91,8 @@ export function createApp() {
                 : undefined,
         },
     });
+
+    Sentry.setupFastifyErrorHandler(app);
 
     // ── Health check ──────────────────────────────────────────────
 
@@ -242,6 +246,8 @@ process.on('uncaughtException', async (err) => {
             });
         } catch { /* best effort */ }
     }
+    // Sentry's own handler already captured the exception — deliver it before exiting
+    await Sentry.flush(2000);
     process.exit(1);
 });
 
@@ -284,6 +290,8 @@ async function _runRender(
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-'));
     console.log(`[Render] Job ${jobId}: starting in ${tmpDir}`);
     activeJob = { jobId, statusCallbackUrl };
+
+    let step: RenderStep = 'download';
 
     // Heartbeat — sends progress immediately on milestones, plus every 5s.
     let canceled = false;
@@ -348,6 +356,7 @@ async function _runRender(
         activeMediaDirs.set(jobId, tmpDir);
 
         // 2. Wait for render slot (only one Playwright render at a time)
+        step = 'queue';
         console.log(`[Render] Job ${jobId}: waiting for render slot (queue: ${renderQueue.length})`);
         await acquireRenderSlot();
         console.log(`[Render] Job ${jobId}: rendering`);
@@ -372,6 +381,7 @@ async function _runRender(
                     }
                 },
                 onRenderDone: () => resolveRenderDone(),
+                onStep: (s) => { step = s; },
             });
 
             // Upload happened inside renderViaPlaywright — subtract it from render time
@@ -386,6 +396,7 @@ async function _runRender(
         if (canceled) throw new CancelError();
 
         // 3. Done — 100%
+        step = 'complete';
         clearTimeout(heartbeatTimer);
         await updateJob(statusCallbackUrl, jobId, {
             status: 'completed',
@@ -401,7 +412,11 @@ async function _runRender(
             console.log(`[Render] Job ${jobId}: aborted (canceled)`);
         } else {
             const message = err instanceof Error ? err.message : String(err);
-            console.error(`[Render] Job ${jobId}: failed —`, message);
+            console.error(`[Render] Job ${jobId}: failed at ${step} —`, message);
+            Sentry.captureException(err, {
+                tags: { step, job_id: jobId, quality, fps },
+                extra: { durations },
+            });
             await updateJob(statusCallbackUrl, jobId, { status: 'failed', error: message }).catch(() => {});
         }
     } finally {
@@ -439,6 +454,13 @@ export async function updateJob(
 
     if (!resp.ok) {
         console.error(`[Render] Status callback failed: ${resp.status}`);
+        // Heartbeats retry every 5s, but a lost status change leaves the job stuck
+        if (fields.status) {
+            Sentry.captureMessage(`Status callback failed (${fields.status}): HTTP ${resp.status}`, {
+                level: 'error',
+                tags: { job_id: jobId, status: fields.status },
+            });
+        }
         return false;
     }
 

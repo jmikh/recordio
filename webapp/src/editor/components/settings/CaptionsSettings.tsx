@@ -658,7 +658,7 @@ export function CaptionsSettings() {
                         onPointerUp={endInteraction}
                         onChange={(value) => batchAction(() => updateSettings({ captions: { ...settings, captionSize: value } }))}
                         min={0.5}
-                        max={2}
+                        max={1.5}
                         label="Size"
                         units="×"
                         showTooltip={true}
@@ -670,7 +670,7 @@ export function CaptionsSettings() {
                         onPointerDown={startInteraction}
                         onPointerUp={endInteraction}
                         onChange={(value) => batchAction(() => updateSettings({ captions: { ...settings, width: value } }))}
-                        min={30}
+                        min={50}
                         max={100}
                         label="Width"
                         units="%"

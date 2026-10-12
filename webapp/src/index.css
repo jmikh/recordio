@@ -7,3 +7,54 @@
 @import "@shared/theme/index.css";
 
 /* Webapp-specific styles */
+
+/* Mux Player (watch page) in Recordio tokens. Custom properties inherit
+   through the player's shadow root, so these resolve against :root/.dark.
+   mux-player is a web component, hence a stylesheet rather than classes. */
+mux-player.recordio-player {
+  /* Box. aspect-ratio is load-bearing: with only a width the element has
+     no height until Mux reads the media's metadata, so the player renders
+     as a squat strip for a frame and then snaps to full height. 16/9
+     matches VideoPage's PlayerPlaceholder, so the box is the same size
+     before and after the video attaches. */
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface-media);
+
+  /* Colors — the same vars the accentColor/primaryColor/secondaryColor props set */
+  --media-accent-color: var(--primary);
+  --media-primary-color: var(--text-on-media);
+  --media-secondary-color: transparent;
+
+  --media-font-family: var(--font-sans);
+  --media-font-weight: 500;
+
+  --media-range-track-height: 4px;
+  --media-range-track-border-radius: 9999px;
+  --media-range-thumb-width: 12px;
+  --media-range-thumb-height: 12px;
+  --media-time-range-buffered-color: color-mix(in oklch, var(--text-on-media) 30%, transparent);
+
+  /* Floating UI stays on the media surface (dark in both themes): the
+     theme draws its text in --media-primary-color, white on raised light */
+  --media-tooltip-background-color: var(--surface-media);
+  --media-tooltip-border-radius: var(--radius-sm);
+  --media-menu-background: var(--surface-media);
+  --media-menu-border-radius: var(--radius-md);
+  --media-preview-border-radius: var(--radius-md);
+
+  --seek-backward-button: none;
+  --seek-forward-button: none;
+  --cast-button: none;
+  --airplay-button: none;
+}
+
+/* The editor's play button: an outlined primary ring (TimelineToolbar) */
+mux-player.recordio-player::part(center play button) {
+  border: 2px solid var(--primary);
+  border-radius: 9999px;
+  color: var(--primary);
+  background: color-mix(in oklch, var(--surface-media) 60%, transparent);
+}

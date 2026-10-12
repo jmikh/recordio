@@ -21,7 +21,7 @@ export interface RenderScreenshotOptions {
     extraItem?: OverlayItem | null;
 }
 
-export const THUMBNAIL_WIDTH = 480;
+export const THUMBNAIL_WIDTH = 960;
 
 /** Whether ctx.filter (canvas blur) works here — Safari < 18 lacks it. */
 export function supportsCanvasFilter(): boolean {
@@ -87,7 +87,11 @@ export async function renderToPngBlob(image: CanvasImageSource, doc: ScreenshotD
     return canvasToBlob(renderToCanvas(image, doc), 'image/png');
 }
 
-/** 480 px wide webp of the top 16:9 band of the rendered view (dashboard card). */
+/**
+ * 960 px wide webp (2× a dashboard card) of the top 16:9 band of the
+ * rendered view. 'high' smoothing averages every source pixel instead of
+ * bilinear's 4-pixel sample, which leaves text speckled at large reductions.
+ */
 export async function renderThumbnail(image: CanvasImageSource, doc: ScreenshotDoc): Promise<Blob> {
     const full = renderToCanvas(image, doc);
     const band = thumbnailRect({ width: full.width, height: full.height });
@@ -96,6 +100,7 @@ export async function renderThumbnail(image: CanvasImageSource, doc: ScreenshotD
     out.height = Math.round(THUMBNAIL_WIDTH * band.height / band.width);
     const ctx = out.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context unavailable');
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(full, band.x, band.y, band.width, band.height, 0, 0, out.width, out.height);
-    return canvasToBlob(out, 'image/webp', 0.8);
+    return canvasToBlob(out, 'image/webp', 0.9);
 }

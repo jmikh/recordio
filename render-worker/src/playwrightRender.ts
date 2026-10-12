@@ -13,13 +13,18 @@
  * bypass CDP serialization limits (see CLAUDE.md).
  */
 
+import * as Sentry from '@sentry/node';
 import { chromium, type Browser, type Page } from 'playwright';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { MediaFileNames } from './downloadMedia.js';
+import { finalizeMp4 } from './finalizeMp4.js';
 // GPU diagnostics available but not called at startup — enable for debugging:
 // import { logGpuDiagnostics, logBrowserGpuInfo } from './gpuDiagnostics.js';
+
+/** Job steps, in order. Tagged on Sentry events so a failure shows where it happened. */
+export type RenderStep = 'download' | 'queue' | 'load_page' | 'export' | 'receive_result' | 'finalize' | 'upload' | 'complete';
 
 export interface PlaywrightRenderConfig {
     jobId: string;
@@ -44,6 +49,8 @@ export interface PlaywrightRenderConfig {
     onProgress?: (progress: number) => void;
     /** Called when the render is complete (before upload). Used to release the HTTP connection. */
     onRenderDone?: () => void;
+    /** Called as each step starts */
+    onStep?: (step: RenderStep) => void;
 }
 
 export interface RenderResult {
@@ -135,8 +142,9 @@ async function getBrowser(): Promise<Browser> {
 // ── Render function ──────────────────────────────────────────
 
 export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promise<RenderResult> {
-    const { project, projectName, quality, fps, mediaFileNames, mediaBaseUrl, renderPageUrl, resultUrl, uploadUrl, resultReady, onProgress, onRenderDone } = config;
+    const { jobId, project, projectName, quality, fps, mediaFileNames, mediaBaseUrl, renderPageUrl, resultUrl, uploadUrl, resultReady, onProgress, onRenderDone, onStep } = config;
     const reportProgress = onProgress ?? (() => {});
+    const step = onStep ?? (() => {});
     const startTime = Date.now();
 
     const browser = await getBrowser();
@@ -202,6 +210,7 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             (window as any).__RENDER_JOB__ = job;
         }, renderJob);
 
+        step('load_page');
         console.log('[Render] Navigating to render page...');
         await page.goto(renderPageUrl, {
             waitUntil: 'networkidle',
@@ -212,6 +221,7 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
             throw new Error(`Render page failed to load resources:\n${failedRequests.join('\n')}`);
         }
 
+        step('export');
         console.log('[Render] Render page loaded, waiting for export...');
 
         // --- Wait for render to finish with stale progress detection ---
@@ -277,20 +287,37 @@ export async function renderViaPlaywright(config: PlaywrightRenderConfig): Promi
         // Wait for the render page to POST the result MP4 to Fastify.
         // This bypasses CDP entirely — the browser sends directly to localhost.
         reportProgress(0.95);
+        step('receive_result');
         console.log('[Render] Waiting for result from browser...');
         const resultFilePath = await resultReady;
-        const stat = fs.statSync(resultFilePath);
-        console.log(`[Render] Result received: ${(stat.size / 1024 / 1024).toFixed(1)} MB`);
+        console.log(`[Render] Result received: ${(fs.statSync(resultFilePath).size / 1024 / 1024).toFixed(1)} MB`);
+
+        // Opus → AAC + faststart (see finalizeMp4.ts). Non-fatal: the original
+        // still plays in browsers, so upload it rather than failing the job.
+        step('finalize');
+        let uploadFilePath = resultFilePath;
+        try {
+            const finalized = await finalizeMp4(resultFilePath);
+            uploadFilePath = finalized.filePath;
+            console.log(`[Render] Finalized in ${(finalized.durationMs / 1000).toFixed(1)}s: ` +
+                `video=${finalized.codecs.video} (copied), audio=${finalized.codecs.audio}` +
+                (finalized.audioTranscoded ? ' → aac' : ' (copied)'));
+        } catch (err) {
+            console.error('[Render] Finalize failed, uploading original:', err instanceof Error ? err.message : err);
+            Sentry.captureException(err, { tags: { step: 'finalize', job_id: jobId, quality, fps } });
+        }
+        const stat = fs.statSync(uploadFilePath);
 
         // Render done — signal before upload so the HTTP connection can close
         onRenderDone?.();
 
         // Upload from disk to signed storage URL (Node-side, no CDP)
+        step('upload');
         console.log('[Render] Uploading MP4 to storage...');
         const uploadStart = Date.now();
         const resp = await fetch(uploadUrl, {
             method: 'PUT',
-            body: fs.createReadStream(resultFilePath),
+            body: fs.createReadStream(uploadFilePath),
             headers: {
                 'Content-Type': 'video/mp4',
                 'Content-Length': String(stat.size),

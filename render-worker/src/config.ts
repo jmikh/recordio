@@ -3,6 +3,8 @@ import { z } from 'zod';
 const envSchema = z.object({
     PORT: z.coerce.number().default(8080),
     RENDER_SECRET: z.string().min(1),
+    /** Read by instrument.ts before this runs; validated here so a missing DSN fails the deploy. */
+    SENTRY_DSN: z.string().min(1),
 });
 
 function loadConfig() {

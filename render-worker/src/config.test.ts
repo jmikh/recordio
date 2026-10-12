@@ -8,6 +8,7 @@ describe('config', () => {
 
     it('parses valid config with defaults', async () => {
         vi.stubEnv('RENDER_SECRET', 'test-secret-123');
+        vi.stubEnv('SENTRY_DSN', 'https://key@sentry.example/1');
         // PORT not set — should use default 8080
         delete process.env.PORT;
 
@@ -18,6 +19,7 @@ describe('config', () => {
 
     it('parses PORT from env', async () => {
         vi.stubEnv('RENDER_SECRET', 'secret');
+        vi.stubEnv('SENTRY_DSN', 'https://key@sentry.example/1');
         vi.stubEnv('PORT', '3000');
 
         const { config } = await import('./config');
@@ -26,6 +28,17 @@ describe('config', () => {
 
     it('exits on missing RENDER_SECRET', async () => {
         delete process.env.RENDER_SECRET;
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+            throw new Error('process.exit called');
+        });
+
+        await expect(import('./config')).rejects.toThrow('process.exit called');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('exits on missing SENTRY_DSN', async () => {
+        vi.stubEnv('RENDER_SECRET', 'secret');
+        delete process.env.SENTRY_DSN;
         const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
             throw new Error('process.exit called');
         });
