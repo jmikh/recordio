@@ -77,6 +77,37 @@ export const InlineTextEditor: React.FC<{
             .join('');
     }, [backgroundColor, liveText, widthPx, fontSizePx, fontFamily, fontWeight, pad, scale, displayBgRadius]);
 
+    // TEMP [TextWidthDbg]: DOM line widths vs the canvas painter's, both in display px
+    useEffect(() => {
+        const el = textRef.current;
+        const ctx = getTextMeasureContext();
+        if (!el || !ctx) return;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const domLines = new Map<number, number>();
+        for (const r of Array.from(range.getClientRects())) {
+            const top = Math.round(r.top);
+            domLines.set(top, (domLines.get(top) ?? 0) + r.width);
+        }
+        const canvas = measureTextLines(ctx, { text: item.text, widthPx, fontSizePx, fontFamily, fontWeight });
+        const probe = 'The quick brown fox';
+        ctx.font = `${fontSizePx}px ${fontFamily}, monospace`;
+        const withFamily = ctx.measureText(probe).width;
+        ctx.font = `${fontSizePx}px monospace`;
+        const familyResolves = withFamily !== ctx.measureText(probe).width;
+        const cs = getComputedStyle(el);
+        console.log('[TextWidthDbg]', {
+            isEditing, fontSizePx, scale, dpr: window.devicePixelRatio, textScale, familyResolves,
+            displayFontSize, computedFontSize: cs.fontSize,
+            letterSpacing: cs.letterSpacing, wordSpacing: cs.wordSpacing, fontStretch: cs.fontStretch,
+            fontOpticalSizing: cs.getPropertyValue('font-optical-sizing'), fontVariationSettings: cs.fontVariationSettings,
+            contentWidth: widthPx * scale,
+            domLineWidths: [...domLines.values()].map(w => +w.toFixed(1)),
+            canvasLineWidths: canvas.widths.map(w => +(w * scale).toFixed(1)),
+            canvasLines: canvas.lines,
+        });
+    }, [isEditing, item.text, widthPx, fontSizePx, fontFamily, fontWeight, scale, textScale, displayFontSize]);
+
     // Focus and select text when entering edit mode
     useEffect(() => {
         if (isEditing && textRef.current) {

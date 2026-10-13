@@ -174,11 +174,7 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
 
     // Use refs for window event handlers to avoid stale closures
     const handleWindowPointerMove = useCallback((e: PointerEvent) => {
-        if (!dragRef.current || !boxRef.current) {
-            console.log('[DragHandoff] move ignored', { hasDrag: !!dragRef.current, hasBox: !!boxRef.current });
-            return;
-        }
-        console.log('[DragHandoff] move', { dx: e.clientX - dragRef.current.startX, dy: e.clientY - dragRef.current.startY });
+        if (!dragRef.current || !boxRef.current) return;
 
         const { type, initialRect, startX, startY } = dragRef.current;
 
@@ -219,7 +215,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     const [isDragging, setIsDragging] = useState(false);
 
     React.useEffect(() => {
-        console.log('[DragHandoff] drag listeners effect', { isDragging, hasDrag: !!dragRef.current });
         if (isDragging) {
             window.addEventListener('pointermove', handleWindowPointerMove);
             window.addEventListener('pointerup', handleWindowPointerUp);
@@ -255,7 +250,6 @@ export const BoundingBox: React.FC<BoundingBoxProps> = ({
     // continue that press as a move-drag (see dragHandoff.ts)
     React.useEffect(() => {
         const handoff = takeDragHandoff();
-        console.log('[DragHandoff] box mount', { handoff: !!handoff, hasBox: !!boxRef.current });
         if (!handoff || !boxRef.current) return;
 
         lockInteraction();

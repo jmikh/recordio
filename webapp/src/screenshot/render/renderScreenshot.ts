@@ -34,8 +34,6 @@ export interface RenderScreenshotOptions {
      * px — the editor's on-screen window. Default: the whole frame at 1:1.
      */
     visible?: { rect: Rect; scale: number };
-    /** TEMP [ScreenshotPerf]: when passed, filled with ms spent per paint phase */
-    perf?: Record<string, number>;
 }
 export const THUMBNAIL_WIDTH = 960;
 
@@ -88,23 +86,11 @@ export function renderScreenshot(
         ctx.clip();
     };
 
-    // TEMP [ScreenshotPerf]: accumulates ms since the previous lap under `phase`
-    const perf = options.perf;
-    let lapStart = perf ? performance.now() : 0;
-    const lap = (phase: string) => {
-        if (!perf) return;
-        const now = performance.now();
-        perf[phase] = (perf[phase] ?? 0) + now - lapStart;
-        lapStart = now;
-    };
-
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
-    lap('clear');
     // Frame px → canvas px from here on
     ctx.setTransform(s, 0, 0, s, -win.x * s, -win.y * s);
     if (frame.hasBackground) drawBackground(ctx, toBackgroundSettings(doc.background), 0, frame.size, null);
-    lap('background');
     // Only the slice of the image inside the painted window
     const dst = intersectRects({ x: frame.paddingPx, y: frame.paddingPx, width: view.width, height: view.height }, win);
     if (dst) {
@@ -117,13 +103,11 @@ export function renderScreenshot(
         ctx.drawImage(image, sx, sy, dst.width, dst.height, dst.x, dst.y, dst.width, dst.height);
         ctx.restore();
     }
-    lap('image');
 
     if (!options.bare) {
         const spotlight = options.spotlight !== undefined ? options.spotlight : doc.spotlight;
         if (spotlight) paintSpotlight(ctx, spotlight, frame, win, s, paint.effectScale, canvasSize);
     }
-    lap('spotlight');
 
     ctx.save();
     ctx.translate(-frame.origin.x, -frame.origin.y);
@@ -138,10 +122,8 @@ export function renderScreenshot(
         }
         drawOverlayItem(ctx, item, paint);
         if (clip) ctx.restore();
-        lap(item.type === 'blur' ? `blur:${item.mode ?? 'blur'}` : item.type);
     }
     if (options.extraItem) drawOverlayItem(ctx, options.extraItem, paint);
-    lap('draft');
     ctx.restore();
 }
 

@@ -120,47 +120,6 @@ function visibleInBox(box: HTMLElement, scroller: HTMLElement | null): Rect | nu
     return vis && { ...vis, x: vis.x - b.left, y: vis.y - b.top };
 }
 
-// ---- TEMP [ScreenshotPerf] instrumentation — remove once the perf work lands ----
-
-let gpuMaxTextureSize: number | null | undefined;
-
-/** Source size and the GPU's max texture side (canvases/images above it can't be GPU-backed whole). */
-function logPerfEnvironment(image: HTMLImageElement | ImageBitmap): void {
-    if (gpuMaxTextureSize === undefined) {
-        const gl = document.createElement('canvas').getContext('webgl');
-        gpuMaxTextureSize = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : null;
-        gl?.getExtension('WEBGL_lose_context')?.loseContext();
-    }
-    const w = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
-    const h = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
-    console.log(
-        `[ScreenshotPerf] source ${w}×${h} (${(w * h / 1e6).toFixed(1)} MP), GPU max texture ${gpuMaxTextureSize ?? 'unknown'}`
-        + (gpuMaxTextureSize && Math.max(w, h) > gpuMaxTextureSize ? ' — source EXCEEDS it' : ''),
-        `devicePixelRatio ${window.devicePixelRatio}`,
-    );
-}
-
-/**
- * One line per draw: synchronous ms per paint phase, plus the time until the
- * next animation frame — GPU canvases defer rasterising, so that gap is where
- * deferred work and compositing the big canvas show up.
- */
-function logDrawPerf(width: number, height: number, t0: number, perf: Record<string, number>): void {
-    const sync = performance.now() - t0;
-    requestAnimationFrame(() => {
-        const nextFrame = performance.now() - t0;
-        const phases = Object.entries(perf)
-            .filter(([, ms]) => ms >= 0.05)
-            .map(([phase, ms]) => `${phase} ${ms.toFixed(1)}`)
-            .join(' · ');
-        const over = gpuMaxTextureSize && Math.max(width, height) > gpuMaxTextureSize ? ' EXCEEDS GPU max texture' : '';
-        console.log(
-            `[ScreenshotPerf] draw ${width}×${height} (${(width * height / 1e6).toFixed(1)} MP)${over}`
-            + ` | sync ${sync.toFixed(1)}ms → next frame ${nextFrame.toFixed(1)}ms | ${phases}`,
-        );
-    });
-}
-
 /** Per-event wheel zoom sensitivity (pinch deltas are a few px; a mouse notch ~100). */
 const WHEEL_ZOOM_SENSITIVITY = 0.01;
 const WHEEL_ZOOM_MAX_STEP = 1.4;
@@ -257,9 +216,6 @@ export function ScreenshotCanvas({ image, scrollContainerRef }: ScreenshotCanvas
         const canvas = canvasRef.current;
         const box = boxRef.current;
         if (!canvas || !box || !doc) return;
-        // TEMP [ScreenshotPerf]
-        const perf: Record<string, number> = {};
-        const t0 = performance.now();
         const dpr = window.devicePixelRatio || 1;
         const visible = visibleInBox(box, scrollContainerRef?.current ?? null);
         const win = visible && canvasWindow(visible, { width: displayWidth, height: displayHeight }, scale, dpr, CANVAS_OVERSCAN);
@@ -273,7 +229,6 @@ export function ScreenshotCanvas({ image, scrollContainerRef }: ScreenshotCanvas
         canvas.style.height = `${win.display.height}px`;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        perf.resize = performance.now() - t0;
         renderScreenshot(ctx, image, doc, {
             view,
             bare,
@@ -282,13 +237,8 @@ export function ScreenshotCanvas({ image, scrollContainerRef }: ScreenshotCanvas
             extraItem: draft,
             spotlight: spotlightDraft ?? previewSpotlightRef.current ?? undefined,
             visible: { rect: win.frameRect, scale: win.scale },
-            perf,
         });
-        logDrawPerf(win.pixelSize.width, win.pixelSize.height, t0, perf);
     };
-
-    // TEMP [ScreenshotPerf]
-    useEffect(() => { logPerfEnvironment(image); }, [image]);
 
     useEffect(() => {
         scheduleRedraw();

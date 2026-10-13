@@ -363,13 +363,10 @@ function Editor() {
                                     style={{ position: 'relative', ...renderedStyle }}
                                 >
                                     <CanvasContainer>
-                                        {/* Media still hydrating: dim whatever the canvas
-                                            has painted so far, with the mark on top. */}
+                                        {/* Media still hydrating: the canvas already paints
+                                            the project background; dim only behind the mark. */}
                                         {isLoading && (
-                                            <LoadingLogo
-                                                text={loadingStatus}
-                                                className="bg-surface-media/70"
-                                            />
+                                            <LoadingLogo text={loadingStatus} panel />
                                         )}
                                     </CanvasContainer>
                                 </div>

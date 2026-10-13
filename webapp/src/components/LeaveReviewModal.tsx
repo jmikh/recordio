@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Modal, Button } from '@shared/components';
 import { CHROME_EXTENSION_URL } from '@shared/urls';
 import { invokeFunction } from '../api/client';
+import { getImpersonation } from '../auth/impersonation';
 import { LocalPreferences } from '../lib/localPreferences';
 import {
     trackReviewModalViewed,
@@ -47,6 +48,9 @@ export const useLeaveReviewModal = create<{
  * failures just skip the ask.
  */
 export async function maybeOpenLeaveReviewModal(trigger: ReviewModalTrigger): Promise<void> {
+    // The ask is for the user, not an admin exporting on their behalf —
+    // and it would spend this device's caps on the wrong person
+    if (getImpersonation()) return;
     if (LocalPreferences.getReviewShownCount() >= MAX_REVIEW_PROMPTS) return;
     if (LocalPreferences.hasShownReviewToday()) return;
 

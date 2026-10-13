@@ -111,6 +111,8 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
             supabaseJwtSecret: TEST_JWT_SECRET,
             logLevel: 'silent',
             adminEmails: ADMIN_EMAIL,
+            // render-job-create needs its callback URL (cloud export test)
+            publicUrl: 'http://127.0.0.1:8090',
         });
     }
 
@@ -425,6 +427,40 @@ describe.runIf(hasTestDb())('admin routes (e2e, real Postgres)', () => {
         expect(rows[0].name).toBe(project.name);
         expect(rows[0].deleted_at).toBeNull();
         expect(rows[0].project_data).toEqual({});
+    });
+
+    it('allows a cloud export: render-job-create renders the saved version as the target', async () => {
+        const target = await seedAuthUser(pool, { name: 'Exported', keepBootstrapWorkspace: true });
+        createdUsers.push(target.id);
+        const { rows: wsRows } = await pool.query('SELECT id FROM workspaces WHERE owner_id = $1', [target.id]);
+        // Cloud export is trial/Pro — the TARGET's entitlements gate it
+        await seedSubscription(pool, {
+            workspaceId: (wsRows[0] as { id: string }).id,
+            userId: target.id,
+            status: 'active',
+        });
+        const project = await seedProject(pool, { ownerId: target.id, uploadStatus: 'ready' });
+        createdProjects.push(project.id);
+
+        const app = testApp();
+        const { token } = (await post(
+            app,
+            '/admin-impersonate',
+            await userToken({ sub: 'admin-user-id', email: ADMIN_EMAIL }),
+            { userId: target.id },
+        )).json() as { token: string };
+
+        const res = await post(app, '/render-job-create', token, { projectId: project.id, cloudVersion: 1 });
+        expect(res.statusCode).toBe(200);
+        const { jobId } = res.json() as { jobId: string };
+
+        // Attributed to the target, like any render of their project
+        const { rows } = await pool.query('SELECT user_id FROM render_jobs WHERE id = $1', [jobId]);
+        expect(rows[0].user_id).toBe(target.id);
+
+        // …and the poller that follows it is allowed too
+        const status = await post(app, '/render-job-get-status', token, { jobId });
+        expect(status.statusCode).toBe(200);
     });
 
     it('leaves no trace: project-get does not bump last_accessed_at', async () => {

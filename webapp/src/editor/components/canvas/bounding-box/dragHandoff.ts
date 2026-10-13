@@ -22,10 +22,8 @@ let pending: PendingDrag | null = null;
 /** Called from the pointerdown that selects an item with a BoundingBox editor. */
 export function beginDragHandoff(e: { pointerId: number; clientX: number; clientY: number; shiftKey: boolean }): void {
     pending = { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey };
-    console.log('[DragHandoff] begin', { pointerId: e.pointerId, t: performance.now().toFixed(1) });
 
     const clear = (ev: PointerEvent) => {
-        console.log('[DragHandoff] clear on', ev.type, { pointerId: ev.pointerId, stillPending: !!pending, t: performance.now().toFixed(1) });
         if (pending?.pointerId === ev.pointerId) pending = null;
         window.removeEventListener('pointerup', clear, true);
         window.removeEventListener('pointercancel', clear, true);
@@ -38,6 +36,5 @@ export function beginDragHandoff(e: { pointerId: number; clientX: number; client
 export function takeDragHandoff(): PendingDrag | null {
     const p = pending;
     pending = null;
-    console.log('[DragHandoff] take', { found: !!p, t: performance.now().toFixed(1) });
     return p;
 }

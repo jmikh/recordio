@@ -20,9 +20,14 @@
  * incidental writes count too (`last_accessed_at` bumps and the like are
  * skipped inside those routes via `isImpersonating`).
  *
- * `project-clone` is the one write on the list, and it writes only to the
- * ADMIN's own account — copying the target's project out is the whole
- * point of the feature.
+ * Two writes are on the list on purpose:
+ * - `project-clone` writes only to the ADMIN's own account — copying the
+ *   target's project out is the whole point of the feature.
+ * - `render-job-create` (cloud export) writes a render cache entry: a
+ *   render_jobs row plus an MP4 for the project's SAVED cloud version
+ *   (impersonation drops saves, so local edits never reach it). Nothing
+ *   the user sees changes, and their own identical export later becomes
+ *   a cache hit. The target's entitlements still gate it.
  */
 export const IMPERSONATION_ALLOWED_ROUTES: ReadonlySet<string> = new Set([
     // Projects — read (project-get carries the editor's media URLs)
@@ -43,8 +48,9 @@ export const IMPERSONATION_ALLOWED_ROUTES: ReadonlySet<string> = new Set([
     'user-profile-get',
     'user-project-defaults-get',
     'subscription-get',
-    // The sanctioned write: copies INTO the admin's own workspace
+    // The sanctioned writes (see above)
     'project-clone',
+    'render-job-create',
 ]);
 
 /** True when an impersonation token may call this route (see above). */
