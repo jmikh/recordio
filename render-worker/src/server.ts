@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import { config } from './config.js';
 import { downloadMedia, type MediaUrls } from './downloadMedia.js';
 import { renderViaPlaywright, warmBrowser, RENDER_PAGE_DIST, getMimeType, type RenderStep } from './playwrightRender.js';
+import { writeAtPosition } from './resultFile.js';
 
 // ── Per-job media directories (for direct HTTP serving) ──────
 // Registered when a job starts, removed on cleanup. Keyed by jobId.
@@ -157,39 +158,53 @@ export function createApp() {
     });
 
     // ── Receive rendered MP4 from browser (bypasses CDP pipe) ─────
-    // Stream directly to disk — skip Fastify body parsing to avoid
-    // buffering the entire file in memory (crashes on >512MB).
+    // The render page streams muxer output in positioned chunks while it
+    // encodes, then calls /complete. It never holds the whole MP4 — a single
+    // browser ArrayBuffer can't exceed ~2 GiB, which long renders do.
+    // Skip Fastify body parsing so each chunk streams straight to disk.
 
     app.addContentTypeParser('video/mp4', (_req, _body, done) => {
         // Tell Fastify we handled it — body stays as the raw stream
         done(null, undefined);
     });
 
-    app.put('/result/:jobId', async (request, reply) => {
+    /** Result file for a job that is waiting on its render, or null. */
+    function pendingResultPath(jobId: string): string | null {
+        const mediaDir = activeMediaDirs.get(jobId);
+        if (!pendingResults.has(jobId) || !mediaDir) return null;
+        return path.join(mediaDir, 'result.mp4');
+    }
+
+    app.put('/result/:jobId/chunk', async (request, reply) => {
         const { jobId } = request.params as { jobId: string };
-        console.log(`[Render] PUT /result/${jobId} — pending=${pendingResults.has(jobId)} mediaDir=${activeMediaDirs.has(jobId)}`);
-        const pending = pendingResults.get(jobId);
-        if (!pending) {
+        const position = Number((request.query as { position?: string }).position);
+        if (!Number.isSafeInteger(position) || position < 0) {
+            return reply.code(400).send({ error: 'position must be a non-negative integer' });
+        }
+
+        const filePath = pendingResultPath(jobId);
+        if (!filePath) {
             return reply.code(404).send({ error: 'No pending result for job' });
         }
 
-        const mediaDir = activeMediaDirs.get(jobId);
-        if (!mediaDir) {
-            return reply.code(404).send({ error: 'Unknown job' });
+        await writeAtPosition(filePath, position, request.raw);
+        return reply.send({ ok: true });
+    });
+
+    app.post('/result/:jobId/complete', async (request, reply) => {
+        const { jobId } = request.params as { jobId: string };
+        const filePath = pendingResultPath(jobId);
+        if (!filePath) {
+            return reply.code(404).send({ error: 'No pending result for job' });
         }
-
-        const filePath = path.join(mediaDir, 'result.mp4');
-
-        // Stream the raw request body to disk
-        console.log(`[Render] Job ${jobId}: streaming result to disk...`);
-        const { pipeline } = await import('node:stream/promises');
-        await pipeline(request.raw, fs.createWriteStream(filePath));
-        console.log(`[Render] Job ${jobId}: pipeline complete`);
+        if (!fs.existsSync(filePath)) {
+            return reply.code(400).send({ error: 'No result chunks received' });
+        }
 
         const stat = fs.statSync(filePath);
         console.log(`[Render] Job ${jobId}: received result (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
 
-        pending.resolve(filePath);
+        pendingResults.get(jobId)!.resolve(filePath);
         pendingResults.delete(jobId);
         return reply.send({ ok: true });
     });

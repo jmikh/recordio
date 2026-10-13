@@ -7,6 +7,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 /** storagePath → signed download URL */
 export type MediaUrls = Record<string, string>;
@@ -34,9 +36,8 @@ export async function downloadMedia(
         console.log(`[Render] Downloading preset music from CDN: ${musicUrl}`);
         const resp = await fetch(musicUrl);
         if (resp.ok) {
-            const buffer = Buffer.from(await resp.arrayBuffer());
-            fs.writeFileSync(path.join(tmpDir, `music${getExt(musicUrl)}`), buffer);
-            console.log(`[Render] ✓ Music downloaded (${(buffer.length / 1024).toFixed(0)} KB)`);
+            const bytes = await writeResponseToFile(resp, path.join(tmpDir, `music${getExt(musicUrl)}`));
+            console.log(`[Render] ✓ Music downloaded (${(bytes / 1024).toFixed(0)} KB)`);
         } else {
             console.warn(`[Render] Failed to download music: ${resp.status}`);
         }
@@ -50,9 +51,8 @@ export async function downloadMedia(
             throw new Error(`Failed to download ${dl.storagePath}: ${resp.status} ${resp.statusText}`);
         }
 
-        const buffer = Buffer.from(await resp.arrayBuffer());
-        fs.writeFileSync(path.join(tmpDir, dl.localName), buffer);
-        console.log(`[Render] ✓ ${dl.localName} downloaded (${(buffer.length / 1024 / 1024).toFixed(1)} MB)`);
+        const bytes = await writeResponseToFile(resp, path.join(tmpDir, dl.localName));
+        console.log(`[Render] ✓ ${dl.localName} downloaded (${(bytes / 1024 / 1024).toFixed(1)} MB)`);
     }));
 
     const fileNames: MediaFileNames = {};
@@ -60,6 +60,19 @@ export async function downloadMedia(
         fileNames[dl.storagePath] = dl.localName;
     }
     return fileNames;
+}
+
+/**
+ * Stream a response body to disk without buffering it in memory.
+ * Recordings can exceed 2 GiB, which a single fs write (and Buffer) can't handle.
+ * Returns the number of bytes written.
+ */
+async function writeResponseToFile(resp: Response, filePath: string): Promise<number> {
+    if (!resp.body) {
+        throw new Error(`Empty response body for ${filePath}`);
+    }
+    await pipeline(Readable.fromWeb(resp.body), fs.createWriteStream(filePath));
+    return fs.statSync(filePath).size;
 }
 
 function getExt(urlOrPath: string): string {

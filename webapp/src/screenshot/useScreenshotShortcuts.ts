@@ -10,7 +10,7 @@ import { useScreenshotUIStore, type ScreenshotTool } from './store/useScreenshot
 import { applyCrop, cancelCrop, chooseTool, deleteSelected } from './actions';
 
 const TOOL_KEYS: Record<string, ScreenshotTool> = {
-    v: 'select', t: 'text', a: 'arrow', l: 'line', r: 'rect', o: 'ellipse', b: 'blur', c: 'crop',
+    v: 'select', t: 'text', a: 'arrow', l: 'line', r: 'rect', o: 'ellipse', b: 'blur', s: 'spotlight', c: 'crop',
 };
 
 function isTypingTarget(): boolean {

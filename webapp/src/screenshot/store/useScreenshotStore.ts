@@ -8,7 +8,7 @@ import { create, useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type TemporalState } from 'zundo';
 import type { Rect } from '@shared/types';
-import type { AnnotationDefaults, ScreenshotDoc } from '@shared/types/screenshot';
+import type { AnnotationDefaults, ScreenshotBackground, ScreenshotDoc, ScreenshotSpotlight } from '@shared/types/screenshot';
 import type { OverlayItem } from '@shared/types/overlay';
 import { createHistoryBatcher } from '../../editor/hooks/useHistoryBatcher';
 import { ScreenshotService } from '../screenshotService';
@@ -28,6 +28,10 @@ interface ScreenshotState {
     moveAnnotation: (id: string, move: ZOrderMove) => void;
     setCrop: (crop: Rect | null) => void;
     updateDefaults: (defaults: Partial<AnnotationDefaults>) => void;
+    updateBackground: (updates: Partial<ScreenshotBackground>) => void;
+    /** Replaces the spotlight (there is at most one); null removes it */
+    setSpotlight: (spotlight: ScreenshotSpotlight | null) => void;
+    updateSpotlight: (updates: Partial<ScreenshotSpotlight>) => void;
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 2000;
@@ -79,6 +83,16 @@ export const useScreenshotStore = create<ScreenshotState>()(
                 updateDefaults: (defaults) => set(state => withDoc(state, doc => ({
                     annotationDefaults: { ...doc.annotationDefaults, ...defaults },
                 }))),
+
+                updateBackground: (updates) => set(state => withDoc(state, doc => ({
+                    background: { ...doc.background, ...updates },
+                }))),
+
+                setSpotlight: (spotlight) => set(state => withDoc(state, () => ({ spotlight }))),
+
+                updateSpotlight: (updates) => set(state => withDoc(state, doc => (
+                    doc.spotlight ? { spotlight: { ...doc.spotlight, ...updates } } : {}
+                ))),
             }),
             {
                 partialize: (state) => ({ doc: state.doc }),

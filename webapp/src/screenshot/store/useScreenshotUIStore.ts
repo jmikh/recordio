@@ -14,7 +14,7 @@ export const ZOOM_STEP = 1.25;
 
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
-export type ScreenshotTool = 'select' | 'text' | 'arrow' | 'line' | 'rect' | 'ellipse' | 'blur' | 'crop';
+export type ScreenshotTool = 'select' | 'text' | 'arrow' | 'line' | 'rect' | 'ellipse' | 'blur' | 'spotlight' | 'crop';
 
 interface ScreenshotUIState {
     tool: ScreenshotTool;

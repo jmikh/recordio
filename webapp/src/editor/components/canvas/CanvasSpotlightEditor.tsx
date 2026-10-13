@@ -9,7 +9,6 @@ import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 import { ViewMapper } from '@shared/mappers/viewMapper';
 import { getDeviceFrame } from '@shared/utils/deviceFrames';
-import { getZoomBoundsForRange } from '../../utils/zoomBounds';
 import { DEFAULT_SPOTLIGHT_FEATHER_PX } from '@shared/animators/spotlightAnimator';
 
 import { type RenderResources } from '@shared/export/PlaybackRenderer';
@@ -117,8 +116,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
     }, [editingSpotlightId]);
 
     // Derived State
-    const outputSize = project.settings.outputSize;
-
     const spotlight = editingSpotlightId
         ? project.timeline.spotlightSegments.find(s => s.id === editingSpotlightId)
         : null;
@@ -226,36 +223,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onDelete, onCancel]);
 
-    // ── Zoom Bounds ────────────────────────────────────────────────
-    // Compute intersection of all zoom viewports during this spotlight.
-    // All rects here are in OUTPUT coordinates.
-    const zoomEnabled = project.settings.zoom.enabled ?? true;
-    const effectiveZoomSegments = zoomEnabled ? project.timeline.zoomSegments : [];
-    const zoomBoundsRect = useMemo(() => {
-        if (!spotlight) return null;
-        return getZoomBoundsForRange(
-            effectiveZoomSegments,
-            spotlight.outputStartTimeMs,
-            spotlight.outputEndTimeMs,
-            outputSize,
-            project.settings.zoom,
-        );
-    }, [
-        spotlight?.outputStartTimeMs,
-        spotlight?.outputEndTimeMs,
-        effectiveZoomSegments,
-        outputSize,
-        project.settings.zoom,
-    ]);
-
-    // If zoom bounds are smaller than 1.2× the minimum spotlight size,
-    // they're too tight to be useful — show a warning banner instead.
-    const minSpotlightSize = Math.min(outputSize.width, outputSize.height) / 5;
-    const zoomBoundsTooSmall = zoomBoundsRect != null && (
-        zoomBoundsRect.width < minSpotlightSize * 1.2 ||
-        zoomBoundsRect.height < minSpotlightSize * 1.2
-    );
-
     if (!initialOutputRect || !editingSpotlightId || !screenContentBounds) return null;
 
     return (
@@ -269,30 +236,6 @@ export const SpotlightEditor: React.FC<{ previewRectRef?: React.MutableRefObject
                 opacity={spotlight?.dimOpacity ?? project.settings.spotlight.dimOpacity}
                 featherPx={project.settings.spotlight.featherPx ?? DEFAULT_SPOTLIGHT_FEATHER_PX}
             />
-
-            {/* Zoom Bounds: too-small warning banner */}
-            {zoomBoundsTooSmall && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 8,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        background: 'var(--surface-raised)',
-                        border: '1px solid var(--destructive)',
-                        color: 'var(--destructive)',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                    }}
-                >
-                    ⚠ Spotlight may not display well — multiple zooms target different parts of the screen during this timeframe
-                </div>
-            )}
 
             <BoundingBox
                 rect={currentOutputRect}

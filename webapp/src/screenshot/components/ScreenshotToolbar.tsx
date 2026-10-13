@@ -1,9 +1,9 @@
 /**
- * Vertical tool rail. Shortcuts (V T A L R O B C) are wired in
+ * Vertical tool rail. Shortcuts (V T A L R O B S C) are wired in
  * useScreenshotShortcuts; the titles advertise them.
  */
 import type { ComponentType } from 'react';
-import { LuArrowUpRight, LuCircle, LuCrop, LuMinus, LuMousePointer2, LuSquare, LuType } from 'react-icons/lu';
+import { LuArrowUpRight, LuCircle, LuCrop, LuLightbulb, LuMinus, LuMousePointer2, LuSquare, LuType } from 'react-icons/lu';
 import { TbBlur } from 'react-icons/tb';
 import { Button } from '@shared/components';
 import { useScreenshotUIStore, type ScreenshotTool } from '../store/useScreenshotUIStore';
@@ -24,6 +24,7 @@ const TOOLS: ToolDef[] = [
     { tool: 'rect', label: 'Rectangle', key: 'R', icon: LuSquare },
     { tool: 'ellipse', label: 'Ellipse', key: 'O', icon: LuCircle },
     { tool: 'blur', label: 'Blur', key: 'B', icon: TbBlur },
+    { tool: 'spotlight', label: 'Spotlight', key: 'S', icon: LuLightbulb },
     { tool: 'crop', label: 'Crop', key: 'C', icon: LuCrop },
 ];
 

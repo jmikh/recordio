@@ -47,6 +47,31 @@ test('a tool click creates an annotation and the change autosaves', async ({ pag
     await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
 });
 
+test('background frame and the single spotlight autosave', async ({ page }) => {
+    await openEditor(page);
+    const inspector = page.getByRole('complementary', { name: 'Inspector' });
+    const spotlightTool = page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Spotlight' });
+
+    await inspector.getByRole('switch', { name: 'Show background' }).click();
+    await expect(inspector.getByText('Padding')).toBeVisible();
+
+    // A click with the spotlight tool places one and selects it
+    const saved = page.waitForResponse(r => r.url().endsWith('/screenshot-update') && r.ok(), { timeout: 15_000 });
+    await spotlightTool.click();
+    await page.getByTestId('screenshot-canvas').click();
+    await expect(inspector.getByText('Feather')).toBeVisible();
+
+    // Only one: with a spotlight present the tool reselects it instead of drawing
+    await page.keyboard.press('Escape');
+    await expect(inspector.getByText('Feather')).toBeHidden();
+    await spotlightTool.click();
+    await expect(spotlightTool).toHaveAttribute('aria-pressed', 'false');
+    await expect(inspector.getByText('Feather')).toBeVisible();
+
+    await saved;
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+});
+
 test('share dialog shows the owner controls and publishes to the public page', async ({ page, browser }) => {
     await openEditor(page);
 

@@ -64,6 +64,35 @@ export interface ScreenMetadata extends BaseSourceMetadata {
     size: Size;
     /** Actual negotiated frame rate from MediaRecorder (fps) */
     frameRate?: number;
+    /** Size of the recorded screen file (video + screen audio + container) as uploaded */
+    sizeBytes?: number;
+    /** Encoder setup and outcome, for comparing file size across encoder changes. Absent before it was recorded (those used VP9 variable 16 Mbps). */
+    encoder?: ScreenEncoderInfo;
+}
+
+/**
+ * How the screen video was encoded (extension/src/shared/screenEncoder.ts).
+ */
+export interface ScreenEncoderInfo {
+    /** Stable label for grouping recordings by encoder setup, e.g. 'vp9-q32-cap16m' */
+    preset: string;
+    codec: string;
+    bitrateMode: 'quantizer' | 'variable';
+    keyframeIntervalSec: number;
+    /** Total encoded video bytes (excludes container and audio) */
+    encodedBytes: number;
+    /** variable mode: target bitrate */
+    bitrate?: number;
+    /** quantizer mode: base per-frame VP9 quantizer (0–63, lower = better) */
+    quantizer?: number;
+    /** quantizer mode: quantizer used for keyframes */
+    keyframeQuantizer?: number;
+    /** quantizer mode: sustained-bitrate ceiling above which the quantizer is raised */
+    bitrateCapBps?: number;
+    /** quantizer mode: highest quantizer the cap pushed to (equals `quantizer` if it never engaged) */
+    maxQuantizer?: number;
+    /** quantizer mode: time spent above the base quantizer because of the cap */
+    cappedMs?: number;
 }
 
 /**
@@ -75,6 +104,22 @@ export interface CameraMetadata extends BaseSourceMetadata {
     frameRate?: number;
     /** Background-removal matte, computed once in the editor the first time it's switched on */
     matte?: CameraMatteMetadata;
+    /** Size of the recorded camera file as uploaded */
+    sizeBytes?: number;
+    /** Recorder setup, for comparing file size across changes. Absent before it was recorded (those used Chrome's default, ~2.5 Mbps). */
+    encoder?: CameraEncoderInfo;
+}
+
+/**
+ * How the camera video was recorded (MediaRecorder in extension/src/shared/videoRecorder.ts).
+ */
+export interface CameraEncoderInfo {
+    /** Stable label for grouping recordings by recorder setup, e.g. 'mediarecorder-1.5m' */
+    preset: string;
+    /** MediaRecorder mimeType actually used, e.g. 'video/webm;codecs=vp9' */
+    mimeType: string;
+    /** Requested videoBitsPerSecond */
+    videoBitsPerSecond: number;
 }
 
 /**

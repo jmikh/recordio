@@ -1,11 +1,12 @@
 /**
  * ScreenshotDoc factory (plans/screenshots). The document is a plain
- * struct: source metadata, an optional crop, the annotation list and the
- * per-type defaults new annotations start from.
+ * struct: source metadata, an optional crop, the annotation list, the
+ * per-type defaults new annotations start from, the background frame and
+ * the optional spotlight.
  */
-import type { AnnotationDefaults, RawScreenshot, ScreenshotDoc, ScreenshotSource } from '@shared/types';
+import type { AnnotationDefaults, RawScreenshot, ScreenshotBackground, ScreenshotDoc, ScreenshotSource } from '@shared/types';
 
-export const SCREENSHOT_SCHEMA_VERSION = 1;
+export const SCREENSHOT_SCHEMA_VERSION = 2;
 
 /** Longest side Chrome/Safari canvases handle comfortably; taller captures are downscaled on import. */
 export const MAX_SOURCE_SIDE_PX = 16384;
@@ -17,6 +18,21 @@ export const DEFAULT_ANNOTATION_DEFAULTS: AnnotationDefaults = {
     borderDefaults: { color: '#7B61FF', borderWidthPx: 4 },
 };
 
+/** Off until switched on; the colours match the video editor's default background. */
+export const DEFAULT_BACKGROUND: ScreenshotBackground = {
+    enabled: false,
+    colorMode: 'gradient',
+    color: '#6078c4ff',
+    gradientColors: ['#60bfffff', '#2e39ffff'],
+    gradientDirection: 135,
+    padding: 0.06,
+    borderRadiusPx: 20,
+};
+
+/** New spotlights start at the video editor's defaults. */
+export const DEFAULT_SPOTLIGHT_DIM_OPACITY = 0.5;
+export const DEFAULT_SPOTLIGHT_FEATHER_PX = 60;
+
 export function createScreenshotDoc(id: string, source: ScreenshotSource): ScreenshotDoc {
     return {
         id,
@@ -25,6 +41,8 @@ export function createScreenshotDoc(id: string, source: ScreenshotSource): Scree
         cropPx: null,
         annotations: [],
         annotationDefaults: { ...DEFAULT_ANNOTATION_DEFAULTS },
+        background: { ...DEFAULT_BACKGROUND },
+        spotlight: null,
     };
 }
 

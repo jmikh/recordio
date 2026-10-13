@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { HexColorPicker, HexAlphaColorPicker } from 'react-colorful';
 import { MultiToggle } from '@shared/components';
 import { usePaletteStore } from '../../stores/usePaletteStore';
-import { useHistoryBatcher } from '../../hooks/useHistoryBatcher';
+import { useHistoryBatcher, type HistoryBatcher } from '../../hooks/useHistoryBatcher';
 
 interface GradientSettings {
     colors: [string, string];
@@ -23,6 +23,8 @@ interface ColorSettingsProps {
     solidOnly?: boolean;
     /** If true, shows an opacity/alpha slider on the color picker */
     showAlpha?: boolean;
+    /** History batcher for the direction dial's drags; default: the video editor's */
+    batcher?: HistoryBatcher;
 }
 
 export const ColorSettings = ({
@@ -35,7 +37,8 @@ export const ColorSettings = ({
     onGradientColorChange,
     onDirectionChange,
     solidOnly = false,
-    showAlpha = false
+    showAlpha = false,
+    batcher
 }: ColorSettingsProps) => {
     // Global palette store
     const { palette, updatePaletteColor, resetPalette } = usePaletteStore();
@@ -135,6 +138,7 @@ export const ColorSettings = ({
                         angle={safeGradient.direction}
                         gradient={`linear-gradient(${safeGradient.direction}deg, ${safeGradient.colors[0]} -1%, ${safeGradient.colors[1]} 101%)`}
                         onAngleChange={onDirectionChange}
+                        batcher={batcher}
                     />
 
                     {/* End Color */}
@@ -247,10 +251,12 @@ interface DirectionDialProps {
     angle: number;
     gradient: string;
     onAngleChange: (angle: number) => void;
+    batcher?: HistoryBatcher;
 }
 
-function DirectionDial({ angle, gradient, onAngleChange }: DirectionDialProps) {
-    const { startInteraction, endInteraction, batchAction } = useHistoryBatcher();
+function DirectionDial({ angle, gradient, onAngleChange, batcher }: DirectionDialProps) {
+    const videoBatcher = useHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = batcher ?? videoBatcher;
     const [isDragging, setIsDragging] = useState(false);
     const dialRef = useRef<HTMLDivElement>(null);
 

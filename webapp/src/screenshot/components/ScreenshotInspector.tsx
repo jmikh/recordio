@@ -1,12 +1,15 @@
 /**
  * Right panel: crop actions while cropping, the selected annotation's
  * settings (shared OverlayItemSettings + the screenshot-only variant
- * toggles, z-order and delete), or image info when nothing is selected.
+ * toggles, z-order and delete), the selected spotlight's settings, or
+ * image info + the background frame when nothing is selected.
  */
 import { LuBringToFront, LuSendToBack, LuTrash2 } from 'react-icons/lu';
-import { Button, CollapsibleCard, MultiToggle } from '@shared/components';
+import { Button, CollapsibleCard, MultiToggle, Slider, Toggle } from '@shared/components';
 import type { ArrowOverlayItem, BlurOverlayItem, BorderOverlayItem, OverlayItem } from '@shared/types/overlay';
+import type { ScreenshotBackground, ScreenshotSpotlight } from '@shared/types/screenshot';
 import { OverlayItemSettings } from '../../editor/components/settings/OverlayItemSettings';
+import { ColorButton } from '../../editor/components/settings/ColorButton';
 import { useScreenshotDoc, useScreenshotHistoryBatcher, useScreenshotStore } from '../store/useScreenshotStore';
 import { useScreenshotUIStore } from '../store/useScreenshotUIStore';
 import { applyCrop, cancelCrop, deleteSelected, resetCrop } from '../actions';
@@ -123,6 +126,122 @@ function SelectionPanel({ item }: { item: OverlayItem }) {
     );
 }
 
+function SpotlightPanel({ spotlight }: { spotlight: ScreenshotSpotlight }) {
+    const updateSpotlight = useScreenshotStore(s => s.updateSpotlight);
+    const { startInteraction, endInteraction, batchAction } = useScreenshotHistoryBatcher();
+
+    return (
+        <div className="flex flex-col gap-2">
+            <CollapsibleCard title="Spotlight" notCollapsible>
+                <div className="flex flex-col gap-4">
+                    <Slider
+                        label="Dim"
+                        min={0.1}
+                        max={0.9}
+                        value={spotlight.dimOpacity}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={dimOpacity => batchAction(() => updateSpotlight({ dimOpacity }))}
+                        showTooltip
+                        units="%"
+                        decimals={0}
+                        valueTransform={v => v * 100}
+                    />
+                    <Slider
+                        label="Feather"
+                        min={0}
+                        max={200}
+                        value={spotlight.featherPx}
+                        onPointerDown={startInteraction}
+                        onPointerUp={endInteraction}
+                        onChange={v => batchAction(() => updateSpotlight({ featherPx: Math.round(v) }))}
+                        showTooltip
+                        units="px"
+                        decimals={0}
+                    />
+                </div>
+            </CollapsibleCard>
+
+            <div className="px-1">
+                <Button variant="destructive" fullWidth icon={LuTrash2} onClick={deleteSelected}>
+                    Delete
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function BackgroundPanel() {
+    const doc = useScreenshotDoc();
+    const updateBackground = useScreenshotStore(s => s.updateBackground);
+    const batcher = useScreenshotHistoryBatcher();
+    const { startInteraction, endInteraction, batchAction } = batcher;
+    if (!doc) return null;
+
+    const bg = doc.background;
+    const update = (updates: Partial<ScreenshotBackground>) => batchAction(() => updateBackground(updates));
+    const updateGradientColor = (index: 0 | 1, color: string) => {
+        // Read the store, not the render closure: picker drags fire faster than renders
+        const current = useScreenshotStore.getState().doc?.background.gradientColors ?? bg.gradientColors;
+        const gradientColors: [string, string] = [...current];
+        gradientColors[index] = color;
+        update({ gradientColors });
+    };
+
+    return (
+        <CollapsibleCard title="Background" notCollapsible>
+            <div className="flex flex-col gap-4">
+                <Toggle label="Show background" value={bg.enabled} onChange={enabled => updateBackground({ enabled })} />
+                {bg.enabled && (
+                    <>
+                        <ColorButton
+                            title="Color"
+                            color={bg.color}
+                            onChange={color => update({ color })}
+                            onPopoverOpen={startInteraction}
+                            onPopoverClose={endInteraction}
+                            batcher={batcher}
+                            gradient={{
+                                active: bg.colorMode === 'gradient',
+                                colors: bg.gradientColors,
+                                direction: bg.gradientDirection,
+                                onModeChange: colorMode => update({ colorMode }),
+                                onColorChange: updateGradientColor,
+                                onDirectionChange: gradientDirection => update({ gradientDirection }),
+                            }}
+                        />
+                        <Slider
+                            label="Padding"
+                            min={0}
+                            max={0.25}
+                            value={bg.padding}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={padding => update({ padding })}
+                            showTooltip
+                            units="%"
+                            decimals={0}
+                            valueTransform={v => v * 100}
+                        />
+                        <Slider
+                            label="Corner radius"
+                            min={0}
+                            max={200}
+                            value={bg.borderRadiusPx}
+                            onPointerDown={startInteraction}
+                            onPointerUp={endInteraction}
+                            onChange={v => update({ borderRadiusPx: Math.round(v) })}
+                            showTooltip
+                            units="px"
+                            decimals={0}
+                        />
+                    </>
+                )}
+            </div>
+        </CollapsibleCard>
+    );
+}
+
 function InfoPanel() {
     const doc = useScreenshotDoc();
     if (!doc) return null;
@@ -163,6 +282,7 @@ function InfoPanel() {
                     )}
                 </div>
             </CollapsibleCard>
+            <BackgroundPanel />
         </div>
     );
 }
@@ -172,10 +292,14 @@ export function ScreenshotInspector() {
     const tool = useScreenshotUIStore(s => s.tool);
     const selectedId = useScreenshotUIStore(s => s.selectedId);
     const selected = doc?.annotations.find(a => a.id === selectedId) ?? null;
+    const spotlight = doc?.spotlight && doc.spotlight.id === selectedId ? doc.spotlight : null;
 
     return (
         <aside aria-label="Inspector" className="w-72 shrink-0 bg-surface border-l border-border overflow-y-auto scrollbar-thin p-2">
-            {tool === 'crop' ? <CropPanel /> : selected ? <SelectionPanel item={selected} /> : <InfoPanel />}
+            {tool === 'crop' ? <CropPanel />
+                : spotlight ? <SpotlightPanel spotlight={spotlight} />
+                    : selected ? <SelectionPanel item={selected} />
+                        : <InfoPanel />}
         </aside>
     );
 }

@@ -7,8 +7,8 @@
  * property assignment in order.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { drawOverlayItem, wrapLines, type OverlayPaintContext } from './overlayPainter';
-import type { ArrowOverlayItem, BlurOverlayItem, BorderOverlayItem } from '../types/overlay';
+import { drawOverlayItem, textBackgroundRects, wrapLines, type OverlayPaintContext } from './overlayPainter';
+import type { ArrowOverlayItem, BlurOverlayItem, BorderOverlayItem, TextOverlayItem } from '../types/overlay';
 
 type Call = [string, ...unknown[]];
 
@@ -138,5 +138,39 @@ describe('wrapLines', () => {
         expect(wrapLines(ctx, 'ab cd ef', 30)).toEqual(['ab cd', 'ef']);
         expect(wrapLines(ctx, 'abcdefgh', 30)).toEqual(['abcde', 'fgh']);
         expect(wrapLines(ctx, '', 30)).toEqual(['']);
+    });
+});
+
+describe('text background', () => {
+    // 6px per char; 'ab cd ef' in 30px wraps to 'ab cd' (30px) + 'ef' (12px)
+    const text: TextOverlayItem = {
+        id: 't1', type: 'text', text: 'ab cd ef', topLeft: { x: 100, y: 200 }, widthPx: 30,
+        fontSizePx: 10, fontFamily: 'Inter', fontWeight: 400, color: '#000', backgroundColor: '#ff000080',
+    };
+
+    it('hugs each line instead of the whole box, filled once as a union', () => {
+        const calls: Call[] = [];
+        drawOverlayItem(stubCtx(calls), text, paintCtx());
+        const firstText = calls.findIndex(c => c[0] === 'fillText');
+        const bg = calls.slice(0, firstText);
+        expect(bg.filter(c => c[0] === 'beginPath')).toHaveLength(1);
+        expect(bg.filter(c => c[0] === 'fill')).toHaveLength(1);
+        // pad 8, radius 6, line height 12, centre x 115:
+        // line 1 → x 92 (115 - 15 - 8), y 192; line 2 → x 101 (115 - 6 - 8), y 204
+        expect(bg.filter(c => c[0] === 'moveTo')).toEqual([['moveTo', 98, 192], ['moveTo', 107, 204]]);
+    });
+
+    it('draws no background without a colour', () => {
+        const calls: Call[] = [];
+        drawOverlayItem(stubCtx(calls), { ...text, backgroundColor: undefined }, paintCtx());
+        expect(calls.some(c => c[0] === 'fill')).toBe(false);
+    });
+
+    it('skips blank lines', () => {
+        const rects = textBackgroundRects([20, 0, 10], { x: 0, y: 0 }, 40, 10, 2);
+        expect(rects).toEqual([
+            { x: 8, y: -2, width: 24, height: 14 },
+            { x: 13, y: 18, width: 14, height: 14 },
+        ]);
     });
 });

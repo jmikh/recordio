@@ -2,8 +2,19 @@ import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ColorSettings } from './ColorSettings';
 import { Button } from '@shared/components';
+import type { HistoryBatcher } from '../../hooks/useHistoryBatcher';
 
-
+/** Adds a Solid/Gradient toggle to the popover; the swatch previews the gradient while it's active. */
+export interface ColorButtonGradient {
+    /** Gradient mode is on (otherwise the solid `color` is) */
+    active: boolean;
+    colors: [string, string];
+    /** Gradient angle in degrees (CSS convention: 0 = up, 90 = right) */
+    direction: number;
+    onModeChange: (mode: 'solid' | 'gradient') => void;
+    onColorChange: (index: 0 | 1, color: string) => void;
+    onDirectionChange: (direction: number) => void;
+}
 
 interface ColorButtonProps {
     /** Current color value (hex format) */
@@ -18,6 +29,10 @@ interface ColorButtonProps {
     title: string;
     /** If true, shows an opacity/alpha slider on the color picker */
     showAlpha?: boolean;
+    /** Solid-only when omitted */
+    gradient?: ColorButtonGradient;
+    /** History batcher for the gradient direction dial; default: the video editor's */
+    batcher?: HistoryBatcher;
 }
 
 export const ColorButton: React.FC<ColorButtonProps> = ({
@@ -26,7 +41,9 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
     onPopoverOpen,
     onPopoverClose,
     title,
-    showAlpha
+    showAlpha,
+    gradient,
+    batcher
 }) => {
     const [showColorPopover, setShowColorPopover] = useState(false);
     const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
@@ -67,7 +84,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
         const top = Math.min(Math.max(margin, rect.top), maxTop);
 
         setPopoverPos({ top, left });
-    }, [showColorPopover]);
+    }, [showColorPopover, gradient?.active]);
 
     // Close popover when clicking outside
     useEffect(() => {
@@ -88,6 +105,10 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showColorPopover, onPopoverClose]);
 
+    const swatch = gradient?.active
+        ? `linear-gradient(${gradient.direction}deg, ${gradient.colors[0]}, ${gradient.colors[1]})`
+        : `linear-gradient(${color}, ${color})`;
+
     return (
         <div className="flex items-center gap-3">
             <span className="text-label w-[80px] shrink-0">{title}</span>
@@ -101,12 +122,12 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
                     <div
                         className="w-5 h-5 rounded-full border border-text-muted shrink-0"
                         style={{
-                            backgroundImage: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%)`,
+                            backgroundImage: `${swatch}, repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%)`,
                             backgroundSize: '100% 100%, 6px 6px'
                         }}
                     />
                     <span className="text-xs font-mono text-text-muted uppercase">
-                        {color}
+                        {gradient?.active ? 'Gradient' : color}
                     </span>
                 </Button>
             </div>
@@ -122,15 +143,17 @@ export const ColorButton: React.FC<ColorButtonProps> = ({
                     }}
                 >
                     <ColorSettings
-                        isSolid={true}
-                        isGradient={false}
+                        isSolid={!gradient?.active}
+                        isGradient={!!gradient?.active}
                         color={color}
-                        onTypeChange={() => { }}
+                        gradient={gradient && { colors: gradient.colors, direction: gradient.direction }}
+                        onTypeChange={gradient?.onModeChange ?? (() => { })}
                         onColorChange={onChange}
-                        onGradientColorChange={() => { }}
-                        onDirectionChange={() => { }}
-                        solidOnly={true}
+                        onGradientColorChange={gradient?.onColorChange ?? (() => { })}
+                        onDirectionChange={gradient?.onDirectionChange ?? (() => { })}
+                        solidOnly={!gradient}
                         showAlpha={showAlpha}
+                        batcher={batcher}
                     />
                 </div>,
                 document.body

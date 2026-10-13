@@ -41,18 +41,31 @@ export function cancelCrop(): void {
     useScreenshotUIStore.getState().setTool('select');
 }
 
-/** Switches tools; crop goes through startCrop so it always has a draft. */
+/**
+ * Switches tools; crop goes through startCrop so it always has a draft.
+ * A screenshot has at most one spotlight, so once it exists the spotlight
+ * tool selects it instead of drawing another.
+ */
 export function chooseTool(tool: ScreenshotTool): void {
     if (tool === 'crop') {
         startCrop();
         return;
     }
-    useScreenshotUIStore.getState().setTool(tool);
+    const ui = useScreenshotUIStore.getState();
+    const spotlight = useScreenshotStore.getState().doc?.spotlight;
+    if (tool === 'spotlight' && spotlight) {
+        ui.setTool('select');
+        ui.select(spotlight.id);
+        return;
+    }
+    ui.setTool(tool);
 }
 
 export function deleteSelected(): void {
     const { selectedId, select } = useScreenshotUIStore.getState();
     if (!selectedId) return;
-    useScreenshotStore.getState().removeAnnotation(selectedId);
+    const store = useScreenshotStore.getState();
+    if (store.doc?.spotlight?.id === selectedId) store.setSpotlight(null);
+    else store.removeAnnotation(selectedId);
     select(null);
 }

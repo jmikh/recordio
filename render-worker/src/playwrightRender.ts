@@ -2,8 +2,8 @@
  * Headless browser render orchestrator.
  *
  * Pre-launches Playwright Chromium at server startup so the ~26s cold start
- * is paid once, not per job. Each render creates a fresh page (isolated context)
- * on the shared browser instance.
+ * is paid once, not per job. Each render creates a fresh page in the shared
+ * persistent browser context.
  *
  * The render page runs the exact same ExportManager pipeline as the browser,
  * using WebCodecs for fast hardware/software video encoding.
@@ -14,8 +14,9 @@
  */
 
 import * as Sentry from '@sentry/node';
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type BrowserContext, type Page } from 'playwright';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { MediaFileNames } from './downloadMedia.js';
@@ -81,8 +82,8 @@ export function getMimeType(filePath: string): string {
 
 // ── Shared browser instance ──────────────────────────────────
 
-let _browser: Browser | null = null;
-let _browserLaunching: Promise<Browser> | null = null;
+let _browser: BrowserContext | null = null;
+let _browserLaunching: Promise<BrowserContext> | null = null;
 
 /**
  * Pre-launch Chromium at server startup. Call this once from server.ts.
@@ -95,7 +96,7 @@ export async function warmBrowser(): Promise<void> {
     console.log(`[Render] Chromium ready in ${((Date.now() - start) / 1000).toFixed(1)}s`);
 }
 
-async function launchBrowser(): Promise<Browser> {
+async function launchBrowser(): Promise<BrowserContext> {
     const isLinux = process.platform === 'linux';
     const gpuArgs = isLinux
         ? [
@@ -114,7 +115,11 @@ async function launchBrowser(): Promise<Browser> {
             '--enable-gpu-rasterization',
         ];
 
-    return chromium.launch({
+    // Persistent (non-incognito) profile: incognito contexts keep blobs in memory
+    // only, so fetch().blob() of a multi-GB recording fails with "Failed to fetch".
+    // A real profile lets Chromium page large blobs to disk.
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-chromium-'));
+    const context = await chromium.launchPersistentContext(userDataDir, {
         headless: false,
         args: [
             '--headless=new',
@@ -124,10 +129,15 @@ async function launchBrowser(): Promise<Browser> {
             '--no-sandbox',
         ],
     });
+    context.on('close', () => {
+        if (_browser === context) _browser = null;
+        fs.rmSync(userDataDir, { recursive: true, force: true });
+    });
+    return context;
 }
 
-async function getBrowser(): Promise<Browser> {
-    if (_browser?.isConnected()) return _browser;
+async function getBrowser(): Promise<BrowserContext> {
+    if (_browser) return _browser;
 
     // Avoid double-launching if two jobs arrive at once
     if (_browserLaunching) return _browserLaunching;

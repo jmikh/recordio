@@ -103,6 +103,7 @@
    --color-text-primary: var(--text-primary);
    --color-text-on-primary: var(--text-on-primary);
    --color-text-on-secondary: var(--text-on-secondary);
+   --color-text-on-track: var(--text-on-track);
 
    /* ─────────────────────────────────────────────────────────
      Shadows - Centralized for Tailwind utilities
@@ -164,14 +165,16 @@
       --primary-highlighted sits above --primary. */
    --track-clip: var(--primary);
    --track-clip-highlighted: var(--primary-highlighted);
-   --track-zoom: oklch(0.535 0.131 152.0);         /* #1A8245 green */
+   --track-zoom: oklch(0.710 0.141 160.3);         /* #38BC83 green */
    --track-zoom-highlighted: oklch(from var(--track-zoom) calc(l + 0.05) c h);
-   --track-spotlight: oklch(0.565 0.137 55.3);     /* #B15C08 amber */
+   --track-spotlight: oklch(0.727 0.156 47.0);     /* #F48448 orange */
    --track-spotlight-highlighted: oklch(from var(--track-spotlight) calc(l + 0.05) c h);
-   --track-blur: oklch(0.546 0.215 262.9);         /* #2563EB blue */
+   --track-blur: oklch(0.578 0.197 262.9);         /* #3670EC blue */
    --track-blur-highlighted: oklch(from var(--track-blur) calc(l + 0.05) c h);
    --track-camera: oklch(0.579 0.197 4.7);         /* #D1336B rose */
    --track-camera-highlighted: oklch(from var(--track-camera) calc(l + 0.05) c h);
+   /* Icons and labels drawn on track blocks (blockIconClass) */
+   --text-on-track: oklch(1 0 0);
 
    /* Z-Index Scale */
    --z-index-base: 1;

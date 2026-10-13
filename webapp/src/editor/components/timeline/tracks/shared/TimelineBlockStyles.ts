@@ -17,7 +17,7 @@ export const MIN_ICON_WIDTH_PX = 28;
 export const MIN_BLOCK_LABEL_WIDTH_PX = 40;
 
 /** className for a block icon */
-export const blockIconClass = 'text-text-on-primary/70';
+export const blockIconClass = 'text-text-on-track/80';
 
 /** className for text on a block (zoom factor, clip speed/duration) */
 export const blockLabelClass = `${blockIconClass} text-2xs leading-none whitespace-nowrap tabular-nums`;

@@ -85,6 +85,14 @@ async function run() {
         console.log(`Media: ${storagePath} → ${url}`);
     }
 
+    // Stream the MP4 to Fastify as it's muxed (direct HTTP, bypasses CDP pipe).
+    // Assembling it in memory fails past ~2 GiB — the max single ArrayBuffer.
+    // Chunks go one at a time, in order: finalize() re-patches header bytes
+    // that an earlier chunk already wrote.
+    let resultWrites = Promise.resolve();
+    let resultWriteError: Error | null = null;
+    let resultBytes = 0;
+
     const env: ExportEnvironment = {
         renderContext: browserRenderContext,
         videoDecodePreference: 'gpu',
@@ -93,6 +101,22 @@ async function run() {
             setPreferSoftwareDecode: () => {},
         },
         mediaUrls,
+        onMuxedData: (data, position) => {
+            resultWrites = resultWrites
+                .then(async () => {
+                    if (resultWriteError) return;
+                    const resp = await fetch(`${job.resultUrl}/chunk?position=${position}`, {
+                        method: 'PUT',
+                        body: data as Uint8Array<ArrayBuffer>,
+                        headers: { 'Content-Type': 'video/mp4' },
+                    });
+                    if (!resp.ok) throw new Error(`Result chunk at ${position} failed: ${resp.status}`);
+                    resultBytes += data.byteLength;
+                })
+                .catch((err) => {
+                    resultWriteError ??= err instanceof Error ? err : new Error(String(err));
+                });
+        },
     };
 
     try {
@@ -102,19 +126,13 @@ async function run() {
             window.__RENDER_FRAMES_TOTAL__ = progress.totalFrames;
         }, { skipDownload: true, fps }, env, projectName);
 
-        console.log(`Export complete! Blob size: ${(result.blob!.size / 1024 / 1024).toFixed(2)} MB`);
+        await resultWrites;
+        if (resultWriteError) throw resultWriteError;
+        console.log(`Export complete! Streamed ${(resultBytes / 1024 / 1024).toFixed(2)} MB`);
         console.log(`Codecs: video=${result.codecs.video.encoder}, audio=${result.codecs.audio.encoder}`);
 
-        // Send result to Fastify (direct HTTP, bypasses CDP pipe)
-        console.log(`[debug] resultUrl=${job.resultUrl} blob=${result.blob?.size}b`);
-        console.log(`Sending result to ${job.resultUrl}...`);
-        const uploadResp = await fetch(job.resultUrl, {
-            method: 'PUT',
-            body: result.blob,
-            headers: { 'Content-Type': 'video/mp4' },
-        });
-        console.log(`[debug] PUT response: ${uploadResp.status}`);
-        if (!uploadResp.ok) throw new Error(`Result POST failed: ${uploadResp.status}`);
+        const completeResp = await fetch(`${job.resultUrl}/complete`, { method: 'POST' });
+        if (!completeResp.ok) throw new Error(`Result complete failed: ${completeResp.status}`);
         console.log('Result sent to server.');
         window.__RENDER_DONE__ = true;
 

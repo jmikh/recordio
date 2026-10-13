@@ -13,11 +13,26 @@ export function roundRectPath(
     height: number,
     radii: number | [number, number, number, number],
 ): void {
+    ctx.beginPath();
+    roundRectSubpath(ctx, x, y, width, height, radii);
+}
+
+/**
+ * roundRectPath without the beginPath(): appends a clockwise rounded rect to
+ * the current path, so several can be filled together as one union.
+ */
+export function roundRectSubpath(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radii: number | [number, number, number, number],
+): void {
     const [tl, tr, br, bl] = typeof radii === 'number'
         ? [radii, radii, radii, radii]
         : radii;
 
-    ctx.beginPath();
     ctx.moveTo(x + tl, y);
     ctx.lineTo(x + width - tr, y);
     ctx.arcTo(x + width, y, x + width, y + tr, tr);

@@ -35,6 +35,21 @@ describe('downloadMedia', () => {
         expect(fs.readFileSync(path.join(tmpDir, 'screen.webm'))).toEqual(Buffer.from(fakeContent));
     });
 
+    it('streams multi-chunk bodies to disk intact', async () => {
+        const chunks = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5]), new Uint8Array([6])];
+        const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+                for (const chunk of chunks) controller.enqueue(chunk);
+                controller.close();
+            },
+        });
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body, { status: 200 }));
+
+        await downloadMedia({ 'user1/proj1/screen.webm': 'https://example.com/screen' }, {}, tmpDir);
+
+        expect(fs.readFileSync(path.join(tmpDir, 'screen.webm'))).toEqual(Buffer.from([1, 2, 3, 4, 5, 6]));
+    });
+
     it('downloads multiple media files in parallel', async () => {
         vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
             new Response(new Uint8Array([1, 2, 3]), { status: 200 }),

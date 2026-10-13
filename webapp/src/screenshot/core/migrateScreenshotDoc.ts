@@ -5,7 +5,7 @@
  * optional fields version-independently at the bottom.
  */
 import type { ScreenshotDoc } from '@shared/types';
-import { DEFAULT_ANNOTATION_DEFAULTS, SCREENSHOT_SCHEMA_VERSION } from './createScreenshotDoc';
+import { DEFAULT_ANNOTATION_DEFAULTS, DEFAULT_BACKGROUND, SCREENSHOT_SCHEMA_VERSION } from './createScreenshotDoc';
 
 export function migrateScreenshotDoc(raw: unknown): ScreenshotDoc {
     const doc = { ...(raw as ScreenshotDoc) };
@@ -17,6 +17,9 @@ export function migrateScreenshotDoc(raw: unknown): ScreenshotDoc {
     if (!Array.isArray(doc.annotations)) doc.annotations = [];
     if (doc.cropPx === undefined) doc.cropPx = null;
     doc.annotationDefaults = { ...DEFAULT_ANNOTATION_DEFAULTS, ...(doc.annotationDefaults ?? {}) };
+    // v2: background frame + spotlight
+    doc.background = { ...DEFAULT_BACKGROUND, ...(doc.background ?? {}) };
+    if (doc.spotlight === undefined) doc.spotlight = null;
 
     if (version < SCREENSHOT_SCHEMA_VERSION) doc.schemaVersion = SCREENSHOT_SCHEMA_VERSION;
     return doc;

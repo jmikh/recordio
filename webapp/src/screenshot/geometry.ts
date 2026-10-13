@@ -4,8 +4,8 @@
  */
 import type { Rect, Size } from '@shared/types';
 import type { OverlayItem, TextOverlayItem } from '@shared/types/overlay';
-import type { ScreenshotDoc } from '@shared/types/screenshot';
-import { TEXT_REF_PADDING } from '@shared/painters/overlayPainter';
+import type { ScreenshotBackground, ScreenshotDoc } from '@shared/types/screenshot';
+import { TEXT_LINE_HEIGHT, TEXT_REF_PADDING, getTextMeasureContext, measureTextLines } from '@shared/painters/overlayPainter';
 
 export interface Point { x: number; y: number }
 
@@ -19,6 +19,37 @@ export const HIT_TOLERANCE_DISPLAY_PX = 6;
 export function screenshotScales(viewWidth: number): { effectScale: number; textScale: number } {
     const s = viewWidth / SCALE_REF_WIDTH;
     return { effectScale: s, textScale: s };
+}
+
+/**
+ * The canvas a render produces: the view, framed by the background padding
+ * when the background is on. `origin` is the source point at canvas (0, 0),
+ * so source → canvas px is `p - origin` at 1:1.
+ */
+export interface ScreenshotFrame {
+    view: Rect;
+    /** The background is painted behind the image */
+    hasBackground: boolean;
+    paddingPx: number;
+    /** Radius of the image's corners in canvas px (0 without a background) */
+    cornerRadiusPx: number;
+    size: Size;
+    origin: Point;
+}
+
+/** The frame around `view`; `bare` (crop mode) drops the background entirely. */
+export function screenshotFrame(bg: ScreenshotBackground | null | undefined, view: Rect, bare = false): ScreenshotFrame {
+    const hasBackground = !bare && !!bg?.enabled;
+    const paddingPx = hasBackground ? Math.round(Math.max(0, bg!.padding) * view.width) : 0;
+    const radius = hasBackground ? Math.max(0, bg!.borderRadiusPx ?? 0) * view.width / SCALE_REF_WIDTH : 0;
+    return {
+        view,
+        hasBackground,
+        paddingPx,
+        cornerRadiusPx: Math.min(radius, view.width / 2, view.height / 2),
+        size: { width: view.width + paddingPx * 2, height: view.height + paddingPx * 2 },
+        origin: { x: view.x - paddingPx, y: view.y - paddingPx },
+    };
 }
 
 /** The crop, or the full source when there is none. */
@@ -49,11 +80,76 @@ export function clampRectToBounds(rect: Rect, bounds: Rect): Rect {
     return { x, y, width, height };
 }
 
+/** Overlap of two rects, or null when they don't overlap. */
+export function intersectRects(a: Rect, b: Rect): Rect | null {
+    const x = Math.max(a.x, b.x);
+    const y = Math.max(a.y, b.y);
+    const right = Math.min(a.x + a.width, b.x + b.width);
+    const bottom = Math.min(a.y + a.height, b.y + b.height);
+    if (right <= x || bottom <= y) return null;
+    return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * The spotlight a click (no drag) places: centred on p, sized from the view
+ * width so a tall full-page capture doesn't get a page-tall spotlight.
+ */
+export function defaultSpotlightRect(p: Point, view: Rect): Rect {
+    const width = Math.round(view.width * 0.4);
+    const height = Math.round(view.width * 0.25);
+    const r = clampRectToBounds({ x: p.x - width / 2, y: p.y - height / 2, width, height }, view);
+    return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+}
+
 export function clampPoint(p: Point, bounds: Rect): Point {
     return {
         x: Math.min(Math.max(p.x, bounds.x), bounds.x + bounds.width),
         y: Math.min(Math.max(p.y, bounds.y), bounds.y + bounds.height),
     };
+}
+
+/** Where the editor canvas sits and what part of the frame it paints. */
+export interface CanvasWindow {
+    /** Canvas placement inside the box, display px */
+    display: Rect;
+    /** The same area in frame px (what renderScreenshot paints) */
+    frameRect: Rect;
+    /** Backing store size, device px */
+    pixelSize: Size;
+    /** Canvas px per frame px (display scale × devicePixelRatio) */
+    scale: number;
+}
+
+/**
+ * The editor canvas only covers what's on screen: `visible` (the box's
+ * on-screen part, display px relative to the box) grown by `overscan` × its
+ * size on each side so scrolling doesn't outrun the next redraw, clamped to
+ * the box and snapped to device pixels. Null when nothing is visible.
+ */
+export function canvasWindow(visible: Rect, boxSize: Size, displayScale: number, dpr: number, overscan: number): CanvasWindow | null {
+    const ox = visible.width * overscan;
+    const oy = visible.height * overscan;
+    const dx0 = Math.floor(Math.max(0, visible.x - ox) * dpr);
+    const dy0 = Math.floor(Math.max(0, visible.y - oy) * dpr);
+    const dx1 = Math.ceil(Math.min(boxSize.width, visible.x + visible.width + ox) * dpr);
+    const dy1 = Math.ceil(Math.min(boxSize.height, visible.y + visible.height + oy) * dpr);
+    if (dx1 <= dx0 || dy1 <= dy0) return null;
+    const scale = displayScale * dpr;
+    const w = dx1 - dx0;
+    const h = dy1 - dy0;
+    return {
+        display: { x: dx0 / dpr, y: dy0 / dpr, width: w / dpr, height: h / dpr },
+        frameRect: { x: dx0 / scale, y: dy0 / scale, width: w / scale, height: h / scale },
+        pixelSize: { width: w, height: h },
+        scale,
+    };
+}
+
+/** Whether `inner` lies entirely inside `outer`. */
+export function rectContainsRect(outer: Rect, inner: Rect): boolean {
+    return inner.x >= outer.x && inner.y >= outer.y
+        && inner.x + inner.width <= outer.x + outer.width
+        && inner.y + inner.height <= outer.y + outer.height;
 }
 
 export function rectContains(rect: Rect, p: Point): boolean {
@@ -81,11 +177,14 @@ export function distanceToSegment(p: Point, a: Point, b: Point): number {
     return Math.hypot(p.x - cx, p.y - cy);
 }
 
-/** Approximate rendered height of a text item (newlines only; the painter also word-wraps). */
-export function textItemHeight(item: TextOverlayItem, textScale: number): number {
-    const lines = Math.max(1, item.text.split('\n').length);
+/**
+ * Rendered height of a text item, word-wrapped the way the painter wraps it.
+ * Without a measuring context (node) it falls back to counting newlines.
+ */
+export function textItemHeight(item: TextOverlayItem, textScale: number, ctx = getTextMeasureContext()): number {
+    const lines = ctx ? measureTextLines(ctx, item).lines.length : Math.max(1, item.text.split('\n').length);
     const pad = Math.round(TEXT_REF_PADDING * textScale);
-    return lines * item.fontSizePx * 1.2 + pad * 2;
+    return lines * item.fontSizePx * TEXT_LINE_HEIGHT + pad * 2;
 }
 
 /** Bounding rect of an annotation (arrows padded by half their stroke). */

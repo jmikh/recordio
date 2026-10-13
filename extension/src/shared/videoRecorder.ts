@@ -1,12 +1,15 @@
 /**
  * @fileoverview Video Recorder (WebCodecs + MediaRecorder)
  *
- * Screen capture uses WebCodecs VideoEncoder with smart keyframe placement:
- * - Detects static frames via lightweight pixel comparison
- * - Inserts keyframes only on scene changes (or every 10s max)
- * - VP9 with variable bitrate → tiny P-frames for static content
+ * Screen capture uses WebCodecs VideoEncoder (VP9):
+ * - Keyframe every KEYFRAME_INTERVAL_SEC (and on resume) so the editor can seek
+ * - Quantizer-mode rate control with a soft bitrate cap (screenEncoder.ts)
+ * - Chrome's capture only delivers frames on change, so static periods cost almost nothing
  *
- * Camera and mic still use MediaRecorder (unchanged).
+ * Screen audio (tab/system audio) uses WebCodecs AudioEncoder (Opus) and is muxed
+ * into the same WebM as the screen video.
+ *
+ * Camera (video only, CAMERA_VIDEO_BITS_PER_SECOND) and mic use MediaRecorder.
  *
  * Used by controller.ts (the controller tab handles all recording).
  */
@@ -16,18 +19,35 @@ import { ProjectStorage } from '../storage/projectStorage';
 import { captureException } from '../utils/sentry';
 import { EventType, type UserEvents, type Size, type ScreenMetadata, type CameraMetadata, type MicrophoneMetadata, type Rect } from '@shared/types';
 import { detectControllerWindow, type WindowDetectionResult } from './windowDetector';
+import { ScreenRateControl } from './screenEncoder';
 import type { RawRecording, RecordingPreferences } from '@shared/types';
 import * as WebMMuxer from 'webm-muxer';
 
 // MediaStreamTrackProcessor is not in TypeScript's default lib types
-declare class MediaStreamTrackProcessor {
-    readable: ReadableStream<VideoFrame>;
+declare class MediaStreamTrackProcessor<T extends VideoFrame | AudioData = VideoFrame> {
+    readable: ReadableStream<T>;
     constructor(init: { track: MediaStreamTrack });
 }
 
 export type RecorderState = 'idle' | 'preparing' | 'recording' | 'stopping';
 
 const KEYFRAME_INTERVAL_SEC = 5; // insert a keyframe every ~5 seconds
+
+/**
+ * Camera bitrate. Chrome's default is ~2.5 Mbps; 1.5 Mbps measured ~43% smaller with
+ * only faint softening during fast movement at full size (scripts/encoder-bench).
+ */
+const CAMERA_VIDEO_BITS_PER_SECOND = 1_500_000;
+
+// Tab/system audio tracks deliver data continuously (silence included), so a track that
+// stays quiet this long during prepare() is treated as having no audio.
+const SCREEN_AUDIO_FIRST_DATA_TIMEOUT_MS = 1000;
+// If audio and video timestamps disagree with wall-clock by more than this, they're on different clocks.
+const SHARED_CLOCK_TOLERANCE_US = 5_000_000;
+
+/** A track's media timestamp paired with the wall-clock time (µs) it was read — used to align audio to video. */
+type ClockAnchor = { mediaUs: number; wallUs: number };
+const nowUs = () => performance.now() * 1000;
 
 export class VideoRecorder {
     private state: RecorderState = 'idle';
@@ -37,11 +57,30 @@ export class VideoRecorder {
     // Screen WebCodecs pipeline
     private screenStream: MediaStream | null = null;
     private screenVideoEncoder: VideoEncoder | null = null;
+    private screenRateControl: ScreenRateControl | null = null;
     private screenMuxer: WebMMuxer.Muxer<WebMMuxer.FileSystemWritableFileStreamTarget> | null = null;
     private screenOPFSFileHandle: FileSystemFileHandle | null = null;
     private screenOPFSWritable: FileSystemWritableFileStream | null = null;
     private screenFrameReader: ReadableStreamDefaultReader<VideoFrame> | null = null;
     private frameProcessingDone: Promise<void> | null = null;
+
+    // Screen audio WebCodecs pipeline (muxed into the screen WebM)
+    private screenAudioReader: ReadableStreamDefaultReader<AudioData> | null = null;
+    private screenAudioEncoder: AudioEncoder | null = null;
+    private screenAudioChannels = 0;
+    private audioProcessingDone: Promise<void> | null = null;
+    private audioAnchor: ClockAnchor | null = null;
+    /** Media timestamp of the first screen frame — video t=0. */
+    private videoOriginUs = 0;
+    /** Audio-clock timestamp that lines up with video t=0; null until the first screen frame arrives. */
+    private audioOriginUs: number | null = null;
+    /** Encoded audio produced before the muxer exists (it's created on the first screen frame). */
+    private pendingAudioChunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[] = [];
+    /** Opus decoder config from the encoder, held until a chunk is actually muxed (the muxer needs it for CodecPrivate). */
+    private pendingAudioMeta: EncodedAudioChunkMetadata | undefined;
+    private lastAudioInputUs = -Infinity;
+    private lastAudioMuxUs = -1;
+    private audioChunksMuxed = 0;
 
     // Keyframe tracking
     private lastKeyframeTimestamp = -Infinity;
@@ -252,6 +291,9 @@ export class VideoRecorder {
 
         // Start the frame processing loop (encoder/muxer init on first frame)
         this.frameProcessingDone = this.processFrames();
+        if (this.screenAudioReader) {
+            this.audioProcessingDone = this.processAudio();
+        }
 
         if (this.cameraRecorder) {
             this.cameraRecorder.start(100);
@@ -265,7 +307,7 @@ export class VideoRecorder {
     }
 
     /**
-     * Pauses the recording. Screen frames are skipped (not encoded) until resume().
+     * Pauses the recording. Screen frames and screen audio are skipped (not encoded) until resume().
      * Camera and mic MediaRecorders are also paused.
      */
     public pause(): void {
@@ -353,14 +395,17 @@ export class VideoRecorder {
             }
         }
 
-        // --- 3. Wait for frame processing to finish, then finalize encoder + muxer ---
-        if (this.frameProcessingDone) {
-            await this.frameProcessingDone;
-        }
+        // --- 3. Wait for frame/audio processing to finish, then finalize encoders + muxer ---
+        await Promise.all([this.frameProcessingDone, this.audioProcessingDone]);
 
         if (this.screenVideoEncoder && this.screenVideoEncoder.state !== 'closed') {
             await this.screenVideoEncoder.flush();
             this.screenVideoEncoder.close();
+        }
+
+        if (this.screenAudioEncoder && this.screenAudioEncoder.state !== 'closed') {
+            await this.screenAudioEncoder.flush();
+            this.screenAudioEncoder.close();
         }
 
         if (this.screenMuxer) {
@@ -471,6 +516,9 @@ export class VideoRecorder {
             }
         }
         this.activeStreams = [];
+        if (this.screenAudioEncoder && this.screenAudioEncoder.state !== 'closed') {
+            this.screenAudioEncoder.close();
+        }
         // Stop any prewarmed streams that were never consumed (e.g. user cancelled before recording started)
         this.prewarmedMicStream?.getTracks().forEach(t => t.stop());
         this.prewarmedMicStream = null;
@@ -514,13 +562,16 @@ export class VideoRecorder {
                     continue;
                 }
 
-                // Adjust timestamp to remove paused periods
-                const adjustedTimestampUs = frame.timestamp - this.totalPausedUs;
-
                 this.totalFrameCount++;
 
                 // Initialize encoder/muxer on first encoded frame using actual dimensions
                 if (this.totalFrameCount === 1) {
+                    // The first frame is t=0 for both the video and audio tracks
+                    this.videoOriginUs = frame.timestamp - this.totalPausedUs;
+                    if (this.audioAnchor) {
+                        this.audioOriginUs = VideoRecorder.computeAudioOrigin(this.audioAnchor, { mediaUs: this.videoOriginUs, wallUs: nowUs() });
+                    }
+
                     const width = frame.displayWidth;
                     const height = frame.displayHeight;
                     this.screenDimensions = { width, height };
@@ -532,25 +583,34 @@ export class VideoRecorder {
                     this.screenMuxer = new WebMMuxer.Muxer({
                         target: new WebMMuxer.FileSystemWritableFileStreamTarget(this.screenOPFSWritable),
                         video: { codec: 'V_VP9', width, height },
-                        firstTimestampBehavior: 'offset',
+                        // Opus always decodes at 48 kHz, whatever the input sample rate
+                        ...(this.screenAudioEncoder && { audio: { codec: 'A_OPUS', sampleRate: 48000, numberOfChannels: this.screenAudioChannels } }),
+                        // Timestamps are already zero-based against the shared origin. 'offset' would
+                        // re-zero each track independently and shift audio relative to video.
+                        firstTimestampBehavior: 'permissive',
                     });
 
+                    const rateControl = await ScreenRateControl.create(width, height, KEYFRAME_INTERVAL_SEC);
+                    this.screenRateControl = rateControl;
+                    console.log('[VideoRecorder] Screen encoder rate control:', rateControl.mode);
+
                     this.screenVideoEncoder = new VideoEncoder({
-                        output: (chunk, meta) => { this.screenMuxer!.addVideoChunk(chunk, meta); },
+                        output: (chunk, meta) => {
+                            rateControl.onChunk(chunk.timestamp, chunk.byteLength);
+                            this.screenMuxer!.addVideoChunk(chunk, meta);
+                        },
                         error: (e) => { console.error('[VideoRecorder] VideoEncoder error:', e.name, e.message); },
                     });
 
-                    this.screenVideoEncoder.configure({
-                        codec: 'vp09.00.31.08',
-                        width,
-                        height,
-                        bitrate: 16_000_000,
-                        bitrateMode: 'variable',
-                        framerate: 30,
-                        latencyMode: 'realtime',
-                    });
+                    this.screenVideoEncoder.configure(rateControl.config);
 
+                    const pendingAudio = this.pendingAudioChunks;
+                    this.pendingAudioChunks = [];
+                    for (const { chunk, meta } of pendingAudio) this.muxAudioChunk(chunk, meta);
                 }
+
+                // Adjust timestamp to remove paused periods, relative to the first frame
+                const adjustedTimestampUs = frame.timestamp - this.totalPausedUs - this.videoOriginUs;
 
                 const needsKeyframe = (adjustedTimestampUs - this.lastKeyframeTimestamp) >= keyframeIntervalUs;
                 if (needsKeyframe) {
@@ -561,7 +621,7 @@ export class VideoRecorder {
                 // Create a new VideoFrame with the adjusted timestamp before encoding
                 const adjustedFrame = new VideoFrame(frame, { timestamp: adjustedTimestampUs });
                 frame.close();
-                this.screenVideoEncoder!.encode(adjustedFrame, { keyFrame: needsKeyframe });
+                this.screenVideoEncoder!.encode(adjustedFrame, this.screenRateControl!.encodeOptions(adjustedTimestampUs, needsKeyframe));
                 adjustedFrame.close();
             }
         } catch (e) {
@@ -574,6 +634,142 @@ export class VideoRecorder {
     }
 
 
+    // --- WebCodecs Screen Audio ---
+
+    /**
+     * Sets up the Opus encoder for the screen's audio track. Reads one AudioData first because
+     * AudioEncoder rejects input whose sampleRate/numberOfChannels differ from its config, and the
+     * track settings don't reliably report the delivered format.
+     */
+    private async initScreenAudio(track: MediaStreamTrack) {
+        const reader = new MediaStreamTrackProcessor<AudioData>({ track }).readable.getReader();
+        const first = await Promise.race([
+            reader.read(),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), SCREEN_AUDIO_FIRST_DATA_TIMEOUT_MS)),
+        ]);
+        if (!first || first.done) {
+            console.warn('[VideoRecorder] Screen audio track produced no data — recording without screen audio');
+            captureException(new Error('Screen audio track produced no data'));
+            reader.cancel().catch(() => {});
+            return;
+        }
+
+        const data = first.value;
+        const anchor: ClockAnchor = { mediaUs: data.timestamp, wallUs: nowUs() };
+        const encoderConfig: AudioEncoderConfig = {
+            codec: 'opus',
+            sampleRate: data.sampleRate,
+            numberOfChannels: data.numberOfChannels,
+            bitrate: 128_000,
+        };
+        data.close();
+
+        const { supported } = await AudioEncoder.isConfigSupported(encoderConfig);
+        if (!supported) {
+            console.warn('[VideoRecorder] Opus encoding unsupported for screen audio — recording without it:', encoderConfig);
+            captureException(new Error(`Screen audio format unsupported: ${encoderConfig.sampleRate}Hz x${encoderConfig.numberOfChannels}`));
+            reader.cancel().catch(() => {});
+            return;
+        }
+
+        this.screenAudioEncoder = new AudioEncoder({
+            output: (chunk, meta) => this.muxAudioChunk(chunk, meta),
+            error: (e) => {
+                console.error('[VideoRecorder] AudioEncoder error:', e.name, e.message);
+                captureException(e);
+            },
+        });
+        this.screenAudioEncoder.configure(encoderConfig);
+        this.screenAudioChannels = encoderConfig.numberOfChannels;
+        this.screenAudioReader = reader;
+        this.audioAnchor = anchor;
+        console.log(`[VideoRecorder] Screen audio: ${encoderConfig.sampleRate}Hz x${encoderConfig.numberOfChannels} (${track.label})`);
+    }
+
+    /** Reads screen audio and feeds it to the Opus encoder, skipping paused periods. */
+    private async processAudio() {
+        const reader = this.screenAudioReader!;
+        try {
+            while (true) {
+                const { value: data, done } = await reader.read();
+                if (done) break;
+
+                const timestampUs = data.timestamp - this.totalPausedUs;
+                // Data captured during a pause can be delivered after resume — it would land before
+                // audio already encoded, so drop it along with anything read while paused.
+                if (this.isPaused || timestampUs < this.lastAudioInputUs || this.screenAudioEncoder?.state !== 'configured') {
+                    data.close();
+                    continue;
+                }
+                this.lastAudioInputUs = timestampUs;
+
+                const input = timestampUs === data.timestamp ? data : VideoRecorder.withTimestamp(data, timestampUs);
+                if (input !== data) data.close();
+                this.screenAudioEncoder.encode(input);
+                input.close();
+            }
+        } catch (e) {
+            if (this.state === 'stopping') {
+                console.log('[VideoRecorder] Audio reader ended during stop (expected)');
+            } else {
+                console.error('[VideoRecorder] Audio processing error:', e);
+            }
+        }
+    }
+
+    private muxAudioChunk(chunk: EncodedAudioChunk, meta?: EncodedAudioChunkMetadata) {
+        if (meta?.decoderConfig) this.pendingAudioMeta = meta;
+        if (!this.screenMuxer || this.audioOriginUs === null) {
+            this.pendingAudioChunks.push({ chunk, meta });
+            return;
+        }
+
+        const timestampUs = chunk.timestamp - this.audioOriginUs;
+        // Before video t=0, or overlapping a pause boundary
+        if (timestampUs < 0 || timestampUs < this.lastAudioMuxUs) return;
+
+        this.screenMuxer.addAudioChunk(chunk, this.pendingAudioMeta, timestampUs);
+        this.pendingAudioMeta = undefined;
+        this.lastAudioMuxUs = timestampUs;
+        this.audioChunksMuxed++;
+    }
+
+    /**
+     * Returns the audio-clock timestamp that lines up with video t=0.
+     * When audio and video share a capture clock, that's simply the video origin. If their media
+     * timestamps disagree with wall-clock by seconds, they're on different clocks, so fall back to
+     * aligning by when each track's first sample was read.
+     */
+    private static computeAudioOrigin(audio: ClockAnchor, video: ClockAnchor): number {
+        const mediaDeltaUs = video.mediaUs - audio.mediaUs;
+        const wallDeltaUs = video.wallUs - audio.wallUs;
+        const sharedClock = Math.abs(mediaDeltaUs - wallDeltaUs) < SHARED_CLOCK_TOLERANCE_US;
+        console.log(`[VideoRecorder] Screen audio aligned via ${sharedClock ? 'shared capture clock' : 'wall clock'} (mediaΔ=${(mediaDeltaUs / 1000).toFixed(1)}ms, wallΔ=${(wallDeltaUs / 1000).toFixed(1)}ms)`);
+        return sharedClock ? video.mediaUs : audio.mediaUs + wallDeltaUs;
+    }
+
+    /** AudioData.timestamp is read-only, so retiming means copying the samples into a new AudioData. */
+    private static withTimestamp(data: AudioData, timestamp: number): AudioData {
+        const format = data.format!;
+        const planeCount = format.endsWith('-planar') ? data.numberOfChannels : 1;
+        const planeSizes = Array.from({ length: planeCount }, (_, planeIndex) => data.allocationSize({ planeIndex }));
+        const buffer = new Uint8Array(planeSizes.reduce((a, b) => a + b, 0));
+        let offset = 0;
+        planeSizes.forEach((size, planeIndex) => {
+            data.copyTo(buffer.subarray(offset, offset + size), { planeIndex });
+            offset += size;
+        });
+        return new AudioData({
+            format,
+            sampleRate: data.sampleRate,
+            numberOfFrames: data.numberOfFrames,
+            numberOfChannels: data.numberOfChannels,
+            timestamp,
+            data: buffer,
+        });
+    }
+
+
     // --- Media Setup ---
 
     private async initializeStreams(config: RecordingConfig) {
@@ -582,11 +778,13 @@ export class VideoRecorder {
         this.screenStream = screenStream;
         this.activeStreams.push(screenStream);
 
-        // 2. Playback System Audio (Anti-Swallow)
+        // 2. Playback System Audio (Anti-Swallow) and set up its encoder
         if (screenStream.getAudioTracks().length > 0) {
             this.audioContext = new AudioContext();
             const sysSource = this.audioContext.createMediaStreamSource(screenStream);
             sysSource.connect(this.audioContext.destination);
+
+            await this.initScreenAudio(screenStream.getAudioTracks()[0]);
         }
 
         // 3. Get Mic Stream (reuse pre-warmed stream if available)
@@ -659,12 +857,12 @@ export class VideoRecorder {
         const processor = new MediaStreamTrackProcessor({ track: videoTrack });
         this.screenFrameReader = processor.readable.getReader();
 
-        // 6. Setup Camera & Mic Recorders (unchanged — still MediaRecorder)
+        // 6. Setup Camera & Mic Recorders (MediaRecorder)
         const mimeType = VideoRecorder.getSupportedMimeType();
 
         if (cameraStream) {
             const cameraVideoOnly = new MediaStream(cameraStream.getVideoTracks());
-            this.cameraRecorder = new MediaRecorder(cameraVideoOnly, { mimeType });
+            this.cameraRecorder = new MediaRecorder(cameraVideoOnly, { mimeType, videoBitsPerSecond: CAMERA_VIDEO_BITS_PER_SECOND });
         }
 
         if (micStream) {
@@ -731,8 +929,8 @@ export class VideoRecorder {
 
 
 
-        // Screen audio: not included in WebCodecs output (video-only for now)
-        const screenHasAudio = (this.screenStream?.getAudioTracks().length ?? 0) > 0;
+        // Only claim screen audio if it actually made it into the file
+        const screenHasAudio = this.audioChunksMuxed > 0;
 
         // 2. Create Screen Source Metadata
         let trackableContentRect: Rect | undefined;
@@ -772,6 +970,8 @@ export class VideoRecorder {
             trackableContentRect,
             hasAudio: screenHasAudio,
             createdAt: now,
+            sizeBytes: screenBlob.size,
+            encoder: this.screenRateControl?.info(),
         };
 
         // 3. Save Camera Recording Blob (If any)
@@ -788,6 +988,8 @@ export class VideoRecorder {
                 size: this.cameraDimensions || { width: 1280, height: 720 },
                 frameRate: cameraFrameRate,
                 createdAt: now,
+                sizeBytes: camBlob.size,
+                encoder: { preset: 'mediarecorder-1.5m', mimeType: camMimeType, videoBitsPerSecond: CAMERA_VIDEO_BITS_PER_SECOND },
             };
         }
 

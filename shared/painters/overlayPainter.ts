@@ -10,9 +10,9 @@
  * blurPainter, whose drawBlurRect primitive the blur items here share.)
  */
 
-import type { Size, Rect } from '../types';
+import type { Size, Rect, Point } from '../types';
 import type { OverlayItem, BlurOverlayItem, TextOverlayItem, ArrowOverlayItem, BorderOverlayItem } from '../types/overlay';
-import { roundRectPath } from './utils/roundRect';
+import { roundRectPath, roundRectSubpath } from './utils/roundRect';
 import { drawBlurRect } from './blurPainter';
 
 // Reference constants — scaled by the caller's effectScale (matching camera painter pattern)
@@ -26,6 +26,8 @@ const HEAD_SCALE = 1.0;
 export const TEXT_REF_HEIGHT = 1080;
 export const TEXT_REF_PADDING = 8;
 export const TEXT_REF_RADIUS = 6;
+/** Line height as a multiple of font size (the inline editor's CSS line-height matches) */
+export const TEXT_LINE_HEIGHT = 1.2;
 
 /** Minimum pixelate cell size in canvas pixels (below this it's just a blur-less copy). */
 const MIN_PIXELATE_CELL = 2;
@@ -143,8 +145,47 @@ export function getOverlayTextFont(item: Pick<TextOverlayItem, 'fontSizePx' | 'f
     return `${item.fontWeight} ${item.fontSizePx}px ${item.fontFamily}, sans-serif`;
 }
 
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+
+/**
+ * Offscreen context for measuring text outside a paint (hit-testing, the DOM
+ * inline editor). Null where there is no DOM canvas (node tests).
+ */
+export function getTextMeasureContext(): CanvasRenderingContext2D | null {
+    if (measureCtx === undefined) {
+        measureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+    }
+    return measureCtx;
+}
+
+/** Wraps a text item into lines and measures each line's width. Sets `ctx.font`. */
+export function measureTextLines(
+    ctx: CanvasRenderingContext2D,
+    item: Pick<TextOverlayItem, 'text' | 'widthPx' | 'fontSizePx' | 'fontFamily' | 'fontWeight'>,
+): { lines: string[]; widths: number[] } {
+    ctx.font = getOverlayTextFont(item);
+    const lines = wrapLines(ctx, item.text || '', item.widthPx);
+    return { lines, widths: lines.map(line => ctx.measureText(line).width) };
+}
+
+/**
+ * Text background rects: one per wrapped line, hugging that line's (centred)
+ * text with `pad` on every side. Neighbouring lines overlap by 2·pad, so fill
+ * them as ONE path — separate fills would darken a translucent colour where
+ * lines meet. Blank lines get no rect.
+ */
+export function textBackgroundRects(lineWidths: number[], topLeft: Point, widthPx: number, lineHeightPx: number, pad: number): Rect[] {
+    const centerX = topLeft.x + widthPx / 2;
+    return lineWidths.flatMap((w, i) => w > 0 ? [{
+        x: centerX - w / 2 - pad,
+        y: topLeft.y + i * lineHeightPx - pad,
+        width: w + pad * 2,
+        height: lineHeightPx + pad * 2,
+    }] : []);
+}
+
 function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, textScale: number): void {
-    const { topLeft, widthPx, text, fontSizePx, fontFamily, fontWeight, color } = item;
+    const { topLeft, widthPx, fontSizePx, color } = item;
 
     ctx.save();
 
@@ -152,21 +193,19 @@ function drawText(ctx: CanvasRenderingContext2D, item: TextOverlayItem, textScal
     const pad = Math.round(TEXT_REF_PADDING * textScale);
     const bgRadius = Math.round(TEXT_REF_RADIUS * textScale);
 
-    // Font
-    const fontString = getOverlayTextFont({ fontSizePx, fontFamily, fontWeight });
-    ctx.font = fontString;
+    // Font + line wrapping
+    const { lines, widths } = measureTextLines(ctx, item);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
+    const lineHeightPx = fontSizePx * TEXT_LINE_HEIGHT;
 
-    // Line wrapping
-    const lineHeightPx = fontSizePx * 1.2;
-    const lines = wrapLines(ctx, text || '', widthPx);
-
-    // Background
+    // Background — behind each line's text, not the whole box
     if (item.backgroundColor) {
-        const bgH = lines.length * lineHeightPx + pad * 2;
         ctx.fillStyle = item.backgroundColor;
-        roundRectPath(ctx, topLeft.x - pad, topLeft.y - pad, widthPx + pad * 2, bgH, bgRadius);
+        ctx.beginPath();
+        for (const r of textBackgroundRects(widths, topLeft, widthPx, lineHeightPx, pad)) {
+            roundRectSubpath(ctx, r.x, r.y, r.width, r.height, bgRadius);
+        }
         ctx.fill();
     }
 

@@ -8,9 +8,19 @@
  * TEXT_REF_HEIGHT` so screenshots can scale text metrics by width.
  */
 import React, { useEffect } from 'react';
-import { TEXT_REF_PADDING, TEXT_REF_RADIUS } from '@shared/painters/overlayPainter';
+import {
+    TEXT_LINE_HEIGHT, TEXT_REF_PADDING, TEXT_REF_RADIUS, getTextMeasureContext, measureTextLines, textBackgroundRects,
+} from '@shared/painters/overlayPainter';
 import type { OverlayItem, TextOverlayItem } from '@shared/types/overlay';
 import { useDisplayMapper } from '../../../hooks/useDisplayMapper';
+
+/** SVG subpath for a clockwise rounded rect (same winding for every line → fills as a union). */
+function roundRectSvgPath(x: number, y: number, w: number, h: number, r: number): string {
+    return `M${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}`
+        + `V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}`
+        + `H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}`
+        + `V${y + r}A${r},${r} 0 0 1 ${x + r},${y}Z`;
+}
 
 export const InlineTextEditor: React.FC<{
     item: TextOverlayItem;
@@ -46,6 +56,26 @@ export const InlineTextEditor: React.FC<{
     const displayFontSize = item.fontSizePx * scale;
     const displayPadding = pad * scale;
     const displayBgRadius = Math.round(TEXT_REF_RADIUS * textScale) * scale;
+
+    // Text as typed so far — the contentEditable only commits on exit, but the
+    // per-line background has to follow every keystroke.
+    const [draftText, setDraftText] = React.useState<string | null>(null);
+    useEffect(() => {
+        if (!isEditing) setDraftText(null);
+    }, [isEditing]);
+    const liveText = draftText ?? item.text;
+
+    // Per-line background, laid out exactly as the canvas painter does it, in
+    // display px relative to the bg box origin (topLeft - pad).
+    const { widthPx, fontSizePx, fontFamily, fontWeight, backgroundColor } = item;
+    const bgPath = React.useMemo(() => {
+        const ctx = backgroundColor ? getTextMeasureContext() : null;
+        if (!ctx) return null;
+        const { widths } = measureTextLines(ctx, { text: liveText, widthPx, fontSizePx, fontFamily, fontWeight });
+        return textBackgroundRects(widths, { x: pad, y: pad }, widthPx, fontSizePx * TEXT_LINE_HEIGHT, pad)
+            .map(r => roundRectSvgPath(r.x * scale, r.y * scale, r.width * scale, r.height * scale, displayBgRadius))
+            .join('');
+    }, [backgroundColor, liveText, widthPx, fontSizePx, fontFamily, fontWeight, pad, scale, displayBgRadius]);
 
     // Focus and select text when entering edit mode
     useEffect(() => {
@@ -145,13 +175,15 @@ export const InlineTextEditor: React.FC<{
     const displayWidth = bgDisplayRect.width;
 
     const textStyle: React.CSSProperties = {
-        // border-box: width = total bg width (content + padding), matching canvas bg rect
+        // Positioned so it paints above the absolutely positioned background svg
+        position: 'relative',
+        // border-box: width = content + padding, matching the canvas text box
         boxSizing: 'border-box',
         fontFamily: `${item.fontFamily}, sans-serif`,
         fontSize: `${displayFontSize}px`,
         fontWeight: item.fontWeight,
         color: item.color,
-        lineHeight: 1.2,
+        lineHeight: TEXT_LINE_HEIGHT,
         textAlign: 'center',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
@@ -160,9 +192,6 @@ export const InlineTextEditor: React.FC<{
         cursor: isEditing ? 'text' : 'move',
         userSelect: isEditing ? 'text' : 'none',
         padding: displayPadding > 0 ? `${displayPadding}px` : undefined,
-        backgroundColor: item.backgroundColor || undefined,
-        borderRadius: displayBgRadius > 0 ? `${displayBgRadius}px` : undefined,
-
     };
 
     // Drag left/right edges to resize width
@@ -240,11 +269,22 @@ export const InlineTextEditor: React.FC<{
             onPointerDown={handlePointerDown}
             onDoubleClick={handleDoubleClick}
         >
+            {bgPath && (
+                <svg
+                    aria-hidden
+                    width="100%"
+                    height="100%"
+                    style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }}
+                >
+                    <path d={bgPath} fill={backgroundColor} />
+                </svg>
+            )}
             <div
                 ref={textRef}
                 contentEditable={isEditing}
                 suppressContentEditableWarning
                 style={textStyle}
+                onInput={isEditing ? (e) => setDraftText(e.currentTarget.textContent ?? '') : undefined}
                 onBlur={isEditing ? commitAndExit : undefined}
                 onKeyDown={(e) => {
                     if (!isEditing) return;
