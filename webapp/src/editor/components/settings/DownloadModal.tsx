@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal, XButton, Button, MultiToggle, Toggle, InfoTooltip, type MultiToggleOption } from '@shared/components';
 import { LuLock, LuZap } from 'react-icons/lu';
-import { useProjectStore, useProjectName } from '../../stores/useProjectStore';
+import { useProjectStore, useProjectName, flushProjectSave } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { useToast } from '../../../components/Toast';
 import { useLocalRender } from './useLocalRender';
@@ -50,8 +50,9 @@ export function DownloadModal({
     // Any setting is freely selectable; entitlements are checked on Export
     const [choice, setChoice] = useState<ExportResolutionChoice>('HD');
     const [cloudExport, setCloudExport] = useState(true);
-    const [fps60, setFps60] = useState(false);
-    const fps: ExportFps = fps60 ? 60 : 30;
+    // MultiToggle values are strings; ExportFps is numeric
+    const [fpsChoice, setFpsChoice] = useState<'30' | '60'>('30');
+    const fps: ExportFps = fpsChoice === '60' ? 60 : 30;
 
     // The quality actually rendered: decided here, so local and cloud renders match
     const recordingSize = project.screenSource.size;
@@ -99,6 +100,10 @@ export function DownloadModal({
         { value: 'HD', label: 'HD', tooltip: 'HD (1080p)' },
         { value: '4K', label: '4K', icon: lockIcon, tooltip: entitlements.can4k ? 'Ultra HD' : 'Ultra HD — Pro' },
     ];
+    const fpsOptions: MultiToggleOption<'30' | '60'>[] = [
+        { value: '30', label: '30', ariaLabel: '30 fps', tooltip: '30 fps' },
+        { value: '60', label: '60', ariaLabel: '60 fps', tooltip: '60 fps' },
+    ];
 
     // Entitlements gate on Export, not on selection: pick anything, and if
     // the combination needs Pro the upgrade modal names what's missing
@@ -124,6 +129,9 @@ export function DownloadModal({
             onStartCloudRender(quality, fps);
             handleClose();
         } else {
+            // A local render reads the in-memory project; this just persists it.
+            // (The cloud render flushes inside CloudRenderService.start.)
+            void flushProjectSave(project.id);
             trackRenderLocallyClicked(project.id);
             setView('local');
         }
@@ -159,15 +167,13 @@ export function DownloadModal({
                     />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-text-main">60 fps</span>
-                        <Toggle
-                            value={fps60}
-                            onChange={setFps60}
-                            aria-label="60 fps"
-                        />
-                    </div>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-main">Frame rate</span>
+                    <MultiToggle
+                        options={fpsOptions}
+                        value={fpsChoice}
+                        onChange={setFpsChoice}
+                    />
                 </div>
 
                 <div className="flex flex-col gap-1.5">

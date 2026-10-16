@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useProjectData, useProjectName, useProjectHistory } from '../../stores/useProjectStore';
+import { useProjectData, useProjectName, useProjectHistory, flushProjectSave } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { LuDownload, LuRedo2, LuShare2, LuUndo2 } from 'react-icons/lu';
 
@@ -48,6 +48,8 @@ export const Header = () => {
             setIsAuthModalOpen(true);
             return;
         }
+        // Get the latest edits saved while the user picks export options
+        void flushProjectSave(project.id);
         setIsDownloadModalOpen(true);
     };
 

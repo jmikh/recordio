@@ -110,8 +110,8 @@ export class CloudProjectService {
     }
     /** In-memory project data hash — skip no-op cloud writes. */
     private static projectHashes = new Map<string, string>();
-    /** Guard against concurrent saves for the same project. */
-    private static saveInFlight = new Set<string>();
+    /** Guard against concurrent saves for the same project; flushProject waits on it. */
+    private static saveInFlight = new Map<string, Promise<void>>();
     /** In-memory hash of last uploaded thumbnail per project. */
     private static thumbnailHashes = new Map<string, string>();
     /** Active media upload promises keyed by projectId. Used to dedupe + allow `pending` editor loads. */
@@ -587,11 +587,34 @@ export class CloudProjectService {
         // Skip if a save is already in flight
         if (this.saveInFlight.has(projectId)) return;
 
+        // Registered before any await so a concurrent call can't slip past
+        // the guard (two writes at one expectedVersion = a false conflict)
+        const save = this.writeProject(project, userId)
+            .finally(() => this.saveInFlight.delete(projectId));
+        this.saveInFlight.set(projectId, save);
+        return save;
+    }
+
+    /**
+     * Save now, for actions that read the project server-side (cloud render,
+     * publish). Where saveProject skips while another save is in flight —
+     * the cloud would then lag the editor — this waits it out, then saves
+     * what `getProject` returns at that point (null = nothing to save).
+     */
+    static async flushProject(projectId: string, userId: string, getProject: () => Project | null): Promise<void> {
+        let inFlight: Promise<void> | undefined;
+        while ((inFlight = this.saveInFlight.get(projectId))) await inFlight;
+        const project = getProject();
+        if (project) await this.saveProject(project, userId);
+    }
+
+    private static async writeProject(project: Project, userId: string): Promise<void> {
+        const projectId = project.id;
+
         // Skip if project data hasn't changed
         const hash = await this.projectDataHash(project);
         if (this.projectHashes.get(projectId) === hash) return;
 
-        this.saveInFlight.add(projectId);
         const store = useSyncStatusStore.getState();
         store.setSyncing();
 
@@ -617,8 +640,6 @@ export class CloudProjectService {
                 Sentry.captureException(err, { extra: { phase: 'save_project', projectId } });
                 store.setError(err instanceof Error ? err.message : 'Save failed');
             }
-        } finally {
-            this.saveInFlight.delete(projectId);
         }
     }
 

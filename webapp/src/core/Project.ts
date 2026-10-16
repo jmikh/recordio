@@ -91,7 +91,7 @@ export const createDefaultSettings = (): ProjectSettings => ({
         borderRadiusPx: 20,
         borderColor: '#ffffffb0',
         deviceFrameId: 'macbook-air-dark',
-        effect: 'glow',
+        effect: 'shadow',
         effectAmount: 0.5,
         mute: false
     },

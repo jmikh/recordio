@@ -3,18 +3,17 @@ import { CloudRenderService } from './cloudRenderService';
 import { useActivityStore, renderTaskId } from './useActivityStore';
 import { invokeFunction } from '../api/client';
 import { CloudProjectService } from '../storage/cloudProjectService';
+import { flushProjectSave } from '../editor/stores/useProjectStore';
 import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../analytics';
 
 // ─── Mocks ──────────────────────────────────────────────────
 
 vi.mock('../api/client', () => ({ invokeFunction: vi.fn() }));
 vi.mock('../storage/cloudProjectService', () => ({
-    CloudProjectService: { saveProject: vi.fn(), getCloudVersion: vi.fn() },
-}));
-vi.mock('../auth/useUserStore', () => ({
-    useUserStore: { getState: () => ({ userId: 'user-1' }) },
+    CloudProjectService: { getCloudVersion: vi.fn() },
 }));
 vi.mock('../editor/stores/useProjectStore', () => ({
+    flushProjectSave: vi.fn(),
     useProjectStore: {
         getState: () => ({
             project: {
@@ -85,7 +84,7 @@ describe('CloudRenderService.start', () => {
 
         await CloudRenderService.start('p1', 'My video', '1080p');
 
-        expect(CloudProjectService.saveProject).toHaveBeenCalledOnce();
+        expect(flushProjectSave).toHaveBeenCalledWith('p1');
         expect(mockInvoke).toHaveBeenCalledWith('render-job-create', { projectId: 'p1', cloudVersion: 3, quality: '1080p', fps: 30 });
         expect(task()).toMatchObject({ kind: 'render', status: 'active', phase: 'queued', projectSlug: 'slug-1', quality: '1080p' });
 
@@ -140,7 +139,7 @@ describe('CloudRenderService.start', () => {
         await CloudRenderService.start('p1', 'My video');
 
         expect(mockInvoke.mock.calls.length).toBe(before);
-        expect(CloudProjectService.saveProject).toHaveBeenCalledOnce();
+        expect(flushProjectSave).toHaveBeenCalledWith('p1');
     });
 
     it('a cache hit downloads straight away', async () => {
@@ -181,6 +180,6 @@ describe('CloudRenderService.retry', () => {
 
         expect(mockInvoke).toHaveBeenLastCalledWith('render-job-get-status', { jobId: 'j1' });
         expect(task().status).toBe('completed');
-        expect(CloudProjectService.saveProject).toHaveBeenCalledOnce();
+        expect(flushProjectSave).toHaveBeenCalledWith('p1');
     });
 });

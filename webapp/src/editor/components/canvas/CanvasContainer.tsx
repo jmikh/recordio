@@ -345,6 +345,22 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                     && !screenVideo.seeking;
                 if (pendingThumbnailCaptureRef.current && canvasMode === CanvasMode.Preview && hasScreenFrame) {
                     pendingThumbnailCaptureRef.current = false;
+                    // TEMP diagnostics — blank-thumbnail investigation. Remove once root-caused.
+                    const describeVideo = (v: HTMLVideoElement | undefined) => v && {
+                        readyState: v.readyState,
+                        seeking: v.seeking,
+                        paused: v.paused,
+                        currentTime: +v.currentTime.toFixed(3),
+                        size: `${v.videoWidth}x${v.videoHeight}`,
+                        decodedFrames: v.getVideoPlaybackQuality?.().totalVideoFrames,
+                    };
+                    const thumbDiag = {
+                        waitedMs: Math.round(performance.now() - thumbnailPendingSinceRef.current),
+                        effectiveTimeMs: Math.round(effectiveTimeMs),
+                        sourceTimeMs: Math.round(timeMapperRef.current.mapOutputToSourceTime(effectiveTimeMs)),
+                        screen: describeVideo(screenVideo),
+                        camera: project.cameraSource ? describeVideo(internalVideoRefs.current[project.cameraSource.storagePath]) ?? 'no element' : 'none',
+                    };
                     lastCapturedBgRef.current = { ...project.settings.background };
                     const thumbMaxEdge = 1200;
                     const scale = Math.min(thumbMaxEdge / Math.max(canvas.width, canvas.height), 1);
@@ -357,6 +373,8 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                     thumbCtx.imageSmoothingQuality = 'high';
                     thumbCtx.drawImage(canvas, 0, 0, thumbW, thumbH);
                     offscreen.toBlob((blob) => {
+                        // TEMP diagnostics — open `image` to see exactly what was uploaded
+                        console.log('[thumbnail] captured', { ...thumbDiag, image: blob && URL.createObjectURL(blob) });
                         if (blob) CloudProjectService.saveThumbnail(project.id, blob).catch(err =>
                             captureError(err, { flow: 'thumbnail_save', projectId: project.id })
                         );
@@ -397,10 +415,12 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
     const pendingThumbnailCaptureRef = useRef(false);
     const thumbnailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastCapturedBgRef = useRef<BackgroundSettings | null>(null);
+    const thumbnailPendingSinceRef = useRef(0); // TEMP diagnostics
 
     const scheduleThumbnailCapture = (delayMs: number) => {
         if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
         thumbnailTimerRef.current = setTimeout(() => {
+            thumbnailPendingSinceRef.current = performance.now();
             pendingThumbnailCaptureRef.current = true;
         }, delayMs);
     };

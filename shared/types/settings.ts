@@ -60,6 +60,9 @@ export interface CameraSettings extends StyleSettings {
     /** Horizontally flip the camera feed */
     mirrored: boolean;
 
+    /** Brightness multiplier for the camera feed, applied as a canvas filter at draw time (1 = unchanged). Absent = 1 */
+    brightness?: number;
+
     /**
      * Draw the camera as a background-removed cutout. Takes effect once
      * `cameraSource.matte` exists; absent = off.

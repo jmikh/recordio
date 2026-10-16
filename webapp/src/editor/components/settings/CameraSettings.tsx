@@ -65,6 +65,7 @@ export const CameraSettings = () => {
         autoShrink = false,
         shrinkScale = 0.7,
         mirrored = false,
+        brightness = 1,
         removeBackground = false
     } = cameraConfig;
 
@@ -189,6 +190,23 @@ export const CameraSettings = () => {
                             decimals={0}
                             valueTransform={(v) => v * 100}
                         />
+
+                        {/* Brightness — lighting differs per recording, so not a default */}
+                        {!templateMode && (
+                            <Slider
+                                label="Brightness"
+                                min={0.5}
+                                max={1.5}
+                                value={brightness}
+                                onPointerDown={startInteraction}
+                                onPointerUp={endInteraction}
+                                onChange={(val) => batchAction(() => updateSettings({ camera: { ...cameraConfig, brightness: val } }))}
+                                showTooltip
+                                units="%"
+                                decimals={0}
+                                valueTransform={(v) => v * 100}
+                            />
+                        )}
 
                         {/* Mirrored Toggle (per recording, not a default) */}
                         {!templateMode && (

@@ -1,6 +1,5 @@
 import { invokeFunction } from '../api/client';
-import { useUserStore } from '../auth/useUserStore';
-import { useProjectStore } from '../editor/stores/useProjectStore';
+import { useProjectStore, flushProjectSave } from '../editor/stores/useProjectStore';
 import { useProjectMetaStore } from '../share/useProjectMetaStore';
 import { CloudProjectService } from '../storage/cloudProjectService';
 import { trackRenderInCloudCompleted, trackRenderInCloudFailed } from '../analytics';
@@ -122,12 +121,8 @@ export class CloudRenderService {
         let failPhase: FailPhase = 'saving_project';
 
         try {
-            const userId = useUserStore.getState().userId;
-            if (userId) {
-                const project = useProjectStore.getState().project;
-                const fullProject = { ...project, userEvents: useProjectStore.getState().userEvents };
-                await CloudProjectService.saveProject(fullProject, userId);
-            }
+            // The server renders the cloud copy — it must hold the latest edits
+            await flushProjectSave(projectId);
 
             const cloudVersion = CloudProjectService.getCloudVersion(projectId);
             if (cloudVersion === undefined) {

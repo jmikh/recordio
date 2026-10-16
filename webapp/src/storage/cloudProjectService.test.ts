@@ -97,7 +97,7 @@ beforeEach(() => {
     // Reset internal state
     (CloudProjectService as any).cloudVersions = new Map();
     (CloudProjectService as any).projectHashes = new Map();
-    (CloudProjectService as any).saveInFlight = new Set();
+    (CloudProjectService as any).saveInFlight = new Map();
     (CloudProjectService as any).thumbnailHashes = new Map();
     (CloudProjectService as any).activeUploads = new Map();
     // Reset stores
@@ -176,7 +176,7 @@ describe('CloudProjectService.saveProject', () => {
         const project = makeProject();
 
         // Simulate a save already in flight
-        (CloudProjectService as any).saveInFlight.add('proj-1');
+        (CloudProjectService as any).saveInFlight.set('proj-1', Promise.resolve());
 
         await CloudProjectService.saveProject(project, 'user-1');
 
@@ -210,6 +210,29 @@ describe('CloudProjectService.saveProject', () => {
         expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledWith(
             project, 'user-1', 5,
         );
+    });
+
+    it('flushProject waits out an in-flight save, then saves the project read after it', async () => {
+        // Distinct hash per save (the hash-match test above pins digest to one value)
+        vi.mocked(crypto.subtle.digest).mockImplementation(async () => new Uint8Array([hashCounter++, 1, 2, 3]).buffer);
+        let finishFirst!: (v: { cloudVersion: number }) => void;
+        vi.mocked(CloudStorage.saveProjectMetadata)
+            .mockReturnValueOnce(new Promise(r => { finishFirst = r; }))
+            .mockResolvedValueOnce({ cloudVersion: 3 });
+
+        const stale = makeProject();
+        const latest = { ...makeProject(), name: 'latest' } as any;
+        const first = CloudProjectService.saveProject(stale, 'user-1');
+        // A plain save would be skipped here; the flush must not be
+        const flush = CloudProjectService.flushProject('proj-1', 'user-1', () => latest);
+
+        await vi.waitFor(() => expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledOnce());
+        finishFirst({ cloudVersion: 2 });
+        await Promise.all([first, flush]);
+
+        expect(CloudStorage.saveProjectMetadata).toHaveBeenCalledTimes(2);
+        expect(CloudStorage.saveProjectMetadata).toHaveBeenLastCalledWith(latest, 'user-1', 2);
+        expect(CloudProjectService.getCloudVersion('proj-1')).toBe(3);
     });
 
     it('clears in-flight guard even on error', async () => {

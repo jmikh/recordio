@@ -88,8 +88,13 @@ export function drawCamera(
         xPx: x, yPx: y, widthPx: width, heightPx: height,
         borderRadiusPx: borderRadius = 0,
         cropZoom = 1,
-        mirrored = false
+        mirrored = false,
+        brightness = 1
     } = settings;
+
+    // Applied to the camera pixels only — set right before each content draw,
+    // so the shadow/glow caster fill keeps its color
+    const contentFilter = brightness !== 1 ? `brightness(${brightness})` : 'none';
 
     // Calculate Crop (Object-Fit: Cover)
     const srcRatio = inputSize.width / inputSize.height;
@@ -185,6 +190,7 @@ export function drawCamera(
         if (blend) {
             // The shadow is cast from the blend's alpha: the fading shape plus the silhouette
             applyStyleEffect(ctx, settings, effectScale, shadowDirection);
+            ctx.filter = contentFilter;
             ctx.drawImage(blend, 0, 0, width, height, x, y, width, height);
             ctx.restore();
             return;
@@ -195,6 +201,7 @@ export function drawCamera(
     if (cutout && cutoutAmount >= 0.5) {
         // The canvas shadow is cast from the image's alpha, so it traces the silhouette
         applyStyleEffect(ctx, settings, effectScale, shadowDirection);
+        ctx.filter = contentFilter;
         ctx.drawImage(cutout, sx, sy, sw, sh, x, y, width, height);
         ctx.restore();
         return;
@@ -214,6 +221,7 @@ export function drawCamera(
     ctx.save();
     definePath();
     ctx.clip();
+    ctx.filter = contentFilter;
     ctx.drawImage(video, sx, sy, sw, sh, x, y, width, height);
     ctx.restore();
 

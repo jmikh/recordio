@@ -422,6 +422,32 @@ function flushPendingSave() {
     run?.();
 }
 
+/**
+ * Save the latest edits now instead of after the debounce, and resolve once
+ * the cloud copy has them — for Download/Export, whose cloud render (and
+ * publish) read the project server-side. With `projectId`, a no-op unless
+ * the store holds that project.
+ */
+export async function flushProjectSave(projectId?: ID): Promise<void> {
+    const { project, templateMode } = useProjectStore.getState();
+    const { userId } = useUserStore.getState();
+    if (!userId || templateMode || !project.id) return;
+    if (projectId && project.id !== projectId) return;
+
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+    }
+    pendingSave = null;
+
+    await CloudProjectService.flushProject(project.id, userId, () => {
+        // Read after any in-flight save: edits made meanwhile belong in this one
+        const current = useProjectStore.getState();
+        if (current.templateMode || current.project.id !== project.id) return null;
+        return { ...current.project, userEvents: current.userEvents };
+    });
+}
+
 useProjectStore.subscribe(
     (state) => state.project,
     (project) => {
