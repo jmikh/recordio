@@ -180,11 +180,15 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
 
             if (uiState.isPlaying) {
                 if (lastTimeRef.current === 0) lastTimeRef.current = time;
+                // Advance by the full elapsed time, never a capped amount: the
+                // media elements keep playing in real time through slow frames
+                // (and hidden tabs), so a clock that drops time falls behind
+                // them and syncVideo seeks the audio backward — heard as
+                // repeated words on slow machines like Chromebooks.
                 const delta = time - lastTimeRef.current;
-                const safeDelta = Math.min(delta, 100);
 
-                if (safeDelta > 0) {
-                    let nextTime = uiState.currentTimeMs + safeDelta;
+                if (delta > 0) {
+                    let nextTime = uiState.currentTimeMs + delta;
                     // Use the latest timeMapper from the ref (synced with React state)
                     const outputDuration = timeMapperRef.current.outputDuration;
 
