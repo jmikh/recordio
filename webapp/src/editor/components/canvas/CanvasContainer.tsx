@@ -119,6 +119,23 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
         return () => observer.disconnect();
     }, [setCanvasContainerSize]);
 
+    // Pause playback when the tab is hidden: requestAnimationFrame stops there,
+    // so nothing keeps the media in sync and the mic would play straight
+    // through cuts. Pause the elements directly — the render loop that
+    // normally pauses them won't run again until the tab is visible.
+    useEffect(() => {
+        const onVisibilityChange = () => {
+            if (!document.hidden) return;
+            const uiState = useUIStore.getState();
+            if (!uiState.isPlaying) return;
+            uiState.setIsPlaying(false);
+            Object.values(internalVideoRefs.current).forEach(video => video.pause());
+            micAudioRef.current?.pause();
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    }, []);
+
     // -----------------------------------------------------------
     // RENDER LOOP
     // -----------------------------------------------------------
