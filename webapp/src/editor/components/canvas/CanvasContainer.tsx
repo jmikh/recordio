@@ -157,7 +157,7 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
             }
         };
 
-        const tick = (time: number) => {
+        const tick = () => {
             animationFrameRef.current = requestAnimationFrame(tick);
 
             // FPS + per-operation profiler
@@ -195,14 +195,20 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                 sources[project.cameraSource.storagePath] = project.cameraSource;
             }
 
+            // The playback clock reads the current time, not rAF's timestamp:
+            // that's when the frame began, and under load this callback can
+            // run hundreds of ms later — by then the media elements are that
+            // far ahead, and syncing against the frame-start time seeks them back.
+            const nowMs = performance.now();
+
             if (uiState.isPlaying) {
-                if (lastTimeRef.current === 0) lastTimeRef.current = time;
+                if (lastTimeRef.current === 0) lastTimeRef.current = nowMs;
                 // Advance by the full elapsed time, never a capped amount: the
                 // media elements keep playing in real time through slow frames
                 // (and hidden tabs), so a clock that drops time falls behind
                 // them and syncVideo seeks the audio backward — heard as
                 // repeated words on slow machines like Chromebooks.
-                const delta = time - lastTimeRef.current;
+                const delta = nowMs - lastTimeRef.current;
 
                 if (delta > 0) {
                     let nextTime = uiState.currentTimeMs + delta;
@@ -215,7 +221,7 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                     }
                     uiState.setCurrentTime(nextTime);
                 }
-                lastTimeRef.current = time;
+                lastTimeRef.current = nowMs;
             } else {
                 lastTimeRef.current = 0;
                 resetClickSounds();
@@ -226,27 +232,19 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
             const ctx = canvas?.getContext('2d');
 
             if (canvas && ctx) {
-                // 1. CLEAR & BACKGROUND
-                perf('bg', () => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    drawBackground(
-                        ctx,
-                        project.settings.background,
-                        project.settings.background.backgroundBlurPx,
-                        { width: canvas.width, height: canvas.height },
-                        bgRef.current
-                    );
-                });
-
-                // 2. DETERMINE FRAME TIME
-                let effectiveTimeMs = uiState.currentTimeMs;
+                // 1. DETERMINE FRAME TIME
+                // Re-read the store: `uiState` is the snapshot from before this
+                // frame's advance, so syncing against it would target a whole
+                // frame in the past — on a slow frame, far enough to seek back.
+                let effectiveTimeMs = useUIStore.getState().currentTimeMs;
 
                 // Implement Preview Logic
                 if (!uiState.isPlaying && uiState.previewTimeMs !== null) {
                     effectiveTimeMs = uiState.previewTimeMs;
                 }
 
-                // 3. SYNC VIDEO
+                // 2. SYNC VIDEO — before any drawing, so slow drawing can't
+                // put the media ahead of the time just computed
                 perf('videoSync', () => {
                     const sourceTimeMs = timeMapperRef.current.mapOutputToSourceTime(effectiveTimeMs);
                     const windowInfo = timeMapperRef.current.getWindowAtOutputTime(effectiveTimeMs);
@@ -280,6 +278,18 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
                             syncVideo(micAudio, sourceTimeMs / 1000, uiState.isPlaying);
                         }
                     }
+                });
+
+                // 3. CLEAR & BACKGROUND
+                perf('bg', () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawBackground(
+                        ctx,
+                        project.settings.background,
+                        project.settings.background.backgroundBlurPx,
+                        { width: canvas.width, height: canvas.height },
+                        bgRef.current
+                    );
                 });
 
                 // 4. STRATEGY
@@ -642,6 +652,10 @@ export const CanvasContainer = ({ children }: CanvasContainerProps) => {
 const syncVideo = (media: HTMLMediaElement, desiredTimeS: number, isPlaying: boolean) => {
     if (isPlaying) {
         if (media.paused) media.play().catch(() => { });
+        // Let an in-flight seek land: until it does, currentTime reports the
+        // seek target and stands still, so the drift check would always see
+        // the element behind and restart the seek — every frame, on a slow machine.
+        if (media.seeking) return;
         if (Math.abs(media.currentTime - desiredTimeS) > 0.4) {
             media.currentTime = desiredTimeS;
         }
